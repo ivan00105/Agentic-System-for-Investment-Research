@@ -1,0 +1,35 @@
+{
+  "contract": "design-contract.md; local research workspace with explicit run modes, inspectable sources, preserved corrections, separate unavailable forecast, and qualified reports.",
+  "targetViewports": ["1440x900", "390x844"],
+  "accessibility": {
+    "status": "pass",
+    "evidence": "Playwright/axe reported no violations for desktop research, desktop discovery and mobile research after three muted colours were darkened. Keyboard checks verified skip navigation, citation-to-source focus and return focus on close. Controls have accessible labels and statuses include text. This is not a full screen-reader usability study."
+  },
+  "responsive": {
+    "status": "pass",
+    "evidence": "Inspected desktop and mobile screenshots. At 390px, document scrollWidth equalled innerWidth, the source panel became static inline content, and a long injected source identifier wrapped without overflow. Reduced-motion media was exercised. Candidate tables use a labelled internal scrolling region."
+  },
+  "contentStates": {
+    "loading": {"status": "pass", "evidence": "Delayed run fetch displayed a named loading state. A running status showed the actual action. A failed poll preserved the report and allowed reconnect without submission; see loading-state.png."},
+    "empty": {"status": "pass", "evidence": "Research without a run displayed a clear starting action and labelled teaching example; see empty-state.png."},
+    "error": {"status": "pass", "evidence": "Missing run ID, missing SEC configuration and a connection failure displayed explicit errors with recovery. Lost POST response was recovered after refresh using the same idempotency key; total run count increased by one only. See error-state.png."},
+    "partial": {"status": "pass", "evidence": "Missing model configuration produced a failed run with saved deterministic metrics, no copied critic review, and an explicit model-review limitation. Refresh/history reopened the same result; see partial-result.png."},
+    "success": {"status": "pass", "evidence": "Saved synthetic replay displayed source provenance, a recorded mixed-period correction, a supported fact and an explicitly unavailable forecast. Research reload made no POST. Discovery retained pass/fail/unknown outcomes and opened company details."},
+    "permission": {"status": "not-applicable", "reason": "There is no account or permission UI in this loopback single-user application. Host/origin boundaries and cross-site rejection were verified by API tests, including an explicit local-only 403 response."}
+  },
+  "renderedEvidence": [
+    {"viewport": "1440x900", "artifact": "desktop-research.png", "observation": "Full-page capture from the desktop viewport: quiet research layout, three aligned metrics, claim statuses, original/objection/check/revision trail, adjacent source desk, separate forecast and limitations."},
+    {"viewport": "1440x900", "artifact": "desktop-discovery.png", "observation": "Declared five-company universe, visible threshold, selection counts, sortable results and explicit unknown/exclusion reasons."},
+    {"viewport": "390x844", "artifact": "mobile-research.png", "observation": "Full-page capture from the mobile viewport: compact navigation, stacked controls and metrics, wrapping report text and inline source inspector without document horizontal overflow."},
+    {"viewport": "1440x900", "artifact": "partial-result.png", "observation": "Financial calculations remain available when model review fails; failure and qualification are visible."},
+    {"viewport": "1440x900", "artifact": "loading-state.png", "observation": "Initial loading state has named feedback and does not invent progress."},
+    {"viewport": "1440x900", "artifact": "empty-state.png", "observation": "Empty research workspace offers a clear first action."},
+    {"viewport": "1440x900", "artifact": "error-state.png", "observation": "Missing-run error provides a visible recovery control."}
+  ],
+  "validation": {
+    "backend": "21 tests passed, including idempotency/concurrency, restart, scope, immutable evidence, Eastern/DST cutoff handling, structured model-output handling and API boundaries.",
+    "browser": "All 8 browser acceptance scenarios passed. The 3 research/discovery/mobile scenarios were rerun successfully against a clean test database after the final report-fixture adjustment.",
+    "build": "TypeScript and Vite production build passed.",
+    "limitations": "SEC and model integration tests use mocked/recorded responses. No authenticated live-provider smoke test, validated forecasting artifact or full five-role agent evaluation has been completed."
+  }
+}
