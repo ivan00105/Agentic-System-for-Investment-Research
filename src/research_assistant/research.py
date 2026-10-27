@@ -29,7 +29,7 @@ def company_report(ticker: str, values: list[Metric], limitations: list[str]):
     revenue = next(m for m in values if m.id == "revenue")
     if revenue.value is not None:
         claims.append(Claim(id=f"{ticker}-revenue", statement=f"Annual revenue is USD {revenue.value:,.0f} for {revenue.period}.", kind="fact", status="supported", evidence_ids=revenue.evidence_ids))
-    return CompanyReport(ticker=ticker, company=UNIVERSE[ticker]["name"], summary=statement + " Inspect the aligned inputs and source before interpreting this result.", metrics=values, claims=claims, reviews=[], limitations=limitations)
+    return CompanyReport(ticker=ticker, company=UNIVERSE[ticker]["name"], summary=statement + " Inspect the aligned inputs and source before interpreting this result.", metrics=values, claims=claims, reviews=[], limitations=limitations.copy(), source_limitations=limitations.copy(), review_status="not_requested")
 
 
 class SecFact(BaseModel):
@@ -49,7 +49,12 @@ def conservative_availability(filed: date):
 
 
 def eligible_facts(payload: dict, tag: str, cutoff: datetime):
-    units = payload.get("facts", {}).get("us-gaap", {}).get(tag, {}).get("units", {}).get("USD", [])
+    collection = payload
+    for key in ("facts", "us-gaap", tag, "units"):
+        collection = collection.get(key, {})
+        if not isinstance(collection, dict):
+            raise DomainError("SEC returned an invalid fact collection.", "source_format")
+    units = collection.get("USD", [])
     if not isinstance(units, list):
         raise DomainError("SEC returned an invalid fact collection.", "source_format")
     facts = []
@@ -67,16 +72,17 @@ def eligible_facts(payload: dict, tag: str, cutoff: datetime):
 def extract_annual(payload: dict, ticker: str, cutoff: datetime):
     if str(payload.get("cik", "")).zfill(10) != UNIVERSE[ticker]["cik"]:
         raise DomainError("Source issuer does not match the requested company.", "issuer_mismatch")
-    revenue = []
-    for tag in ("RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"):
-        revenue = eligible_facts(payload, tag, cutoff)
-        if revenue:
-            break
+    # A company can change revenue tags; tag order must not select an older year.
+    revenue = [
+        (fact, tag)
+        for tag in ("RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet")
+        for fact in eligible_facts(payload, tag, cutoff)
+    ]
     income = eligible_facts(payload, "OperatingIncomeLoss", cutoff)
     if not revenue:
         return None, None, None
-    newest = max(revenue, key=lambda f: (f.end, f.filed, f.accn))
-    same_revenue = [r for r in revenue if (r.start, r.end, r.accn) == (newest.start, newest.end, newest.accn)]
+    newest, tag = max(revenue, key=lambda item: (item[0].end, item[0].filed, item[0].accn))
+    same_revenue = [r for r, _ in revenue if (r.start, r.end, r.accn) == (newest.start, newest.end, newest.accn)]
     if len({r.val for r in same_revenue}) != 1:
         raise DomainError("Conflicting revenue values require manual source review.", "ambiguous_fact")
     matching = [f for f in income if (f.start, f.end, f.accn) == (newest.start, newest.end, newest.accn)]
@@ -88,7 +94,7 @@ def extract_annual(payload: dict, ticker: str, cutoff: datetime):
 def retrieve_company(store: Store, run_id: str, ticker: str, cutoff: datetime):
     user_agent = os.getenv("SEC_USER_AGENT", "").strip()
     if not user_agent or "@" not in user_agent:
-        raise DomainError("Fresh retrieval needs SEC_USER_AGENT with your application name and contact email. Set it on the server, or open a labelled saved replay.", "configuration", 503)
+        raise DomainError("New research needs SEC source access setup. Follow the setup guide, or open a saved report.", "configuration", 503)
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{UNIVERSE[ticker]['cik']}.json"
     try:
         with httpx.Client(timeout=httpx.Timeout(20, connect=5), follow_redirects=False) as client:
@@ -108,7 +114,7 @@ def retrieve_company(store: Store, run_id: str, ticker: str, cutoff: datetime):
         raise DomainError("SEC retrieval failed or returned invalid data. Saved results remain available; retry explicitly later.", "retrieval_failed", 502) from exc
     digest = store.snapshot(raw)
     revenue, income, tag = extract_annual(payload, ticker, cutoff)
-    limitations = ["Annual USD company-facts only; events, news and price-based forecasting are not yet connected.", "SEC fact availability uses midnight following the filing date in America/New_York, converted to UTC; this endpoint does not supply an acceptance timestamp.", "The current SEC aggregate is not a historical vintage archive; cutoff filtering alone does not establish a leakage-free historical backtest."]
+    limitations = ["This report covers annual financial figures in USD. It does not include news, events or price forecasts.", "Filing availability is dated conservatively to the day after filing in New York; an exact publication time is unavailable.", "These figures come from the SEC's current record. They may not reproduce exactly what investors could see at an earlier date."]
     if revenue is None:
         return company_report(ticker, metrics(None, None, "Unavailable", []), limitations)
     period = f"{revenue.start} – {revenue.end}"

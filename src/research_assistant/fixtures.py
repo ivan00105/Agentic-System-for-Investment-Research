@@ -22,7 +22,7 @@ def seed(store):
         digest = store.snapshot(json.dumps({"synthetic": True, "ticker": ticker, "excerpt": excerpt}).encode())
         evidence = Evidence(id=evidence_id, ticker=ticker, title=f"{ticker} · synthetic annual statement", excerpt=excerpt, source_url=None, available_at=datetime(2025, 2, 1, tzinfo=timezone.utc), retrieved_at=FIXTURE_CUTOFF, period="2024-01-01 – 2024-12-31", locator="Teaching fixture / income statement / annual USD values", snapshot_hash=digest, synthetic=True)
         values = metrics(Decimal(revenue) * 1_000_000, Decimal(income) * 1_000_000 if income is not None else None, evidence.period, [evidence_id])
-        company = company_report(ticker, values, ["All figures and review steps in this saved example are synthetic teaching data, not investment research.", "Free cash flow, news and historical prices are absent from this evidence packet."])
+        company = company_report(ticker, values, ["All financial figures in this saved source are synthetic teaching data, not investment research.", "Free cash flow, news and historical prices are absent from this evidence packet."])
         if ticker == "MSFT":
             company.claims[0].version = 2
             company.claims[0].status = "corrected"

@@ -59,7 +59,8 @@ class Store:
             db.execute("BEGIN IMMEDIATE")
             old = db.execute("SELECT id, request FROM runs WHERE idempotency_key=?", (key,)).fetchone()
             if old:
-                if old["request"] != payload:
+                # Older saved requests lack fields added with compatible defaults.
+                if self.canonical(RunRequest.model_validate_json(old["request"])) != payload:
                     raise DomainError("This submission key was already used with different inputs.", "idempotency_conflict", 409)
                 return old["id"], False
             active = db.execute("SELECT id FROM runs WHERE status IN ('queued','running')").fetchone()
@@ -141,4 +142,12 @@ class Store:
 
     def recover(self):
         with self.connect() as db:
+            for row in db.execute("SELECT id, report FROM runs WHERE status IN ('queued','running') AND report IS NOT NULL").fetchall():
+                report = Report.model_validate_json(row["report"])
+                pending = [company for company in report.companies if company.review_status == "pending"]
+                if pending:
+                    for company in pending:
+                        company.review_status = "failed"
+                        company.review_error = "Model analysis was interrupted by a server restart. Start a new review explicitly."
+                    db.execute("UPDATE runs SET report=? WHERE id=?", (report.model_dump_json(), row["id"]))
             db.execute("UPDATE runs SET status='interrupted', stage='Interrupted by server restart', error='The server stopped before this run finished. Saved results are preserved; start a new run explicitly.', updated_at=? WHERE status IN ('queued','running')", (utcnow().isoformat(),))

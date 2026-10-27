@@ -1,0 +1,239 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Current behavior · no automatic correction loop",
+    "locale": "en",
+    "output": "current-flow.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "intake",
+      "label": "Request and mode"
+    },
+    {
+      "id": "inputs",
+      "label": "Evidence and screening"
+    },
+    {
+      "id": "review",
+      "label": "One review pass"
+    },
+    {
+      "id": "results",
+      "label": "Saved outcome"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "named",
+      "label": "Named stock",
+      "type": "frontend",
+      "lane": "intake",
+      "col": 0
+    },
+    {
+      "id": "discovery",
+      "label": "Discovery filters",
+      "type": "frontend",
+      "lane": "intake",
+      "col": 1
+    },
+    {
+      "id": "mode",
+      "label": "Run mode?",
+      "type": "backend",
+      "lane": "intake",
+      "col": 2
+    },
+    {
+      "id": "replay",
+      "label": "Saved replay",
+      "type": "database",
+      "lane": "intake",
+      "col": 5
+    },
+    {
+      "id": "fresh",
+      "label": "SEC + calculation",
+      "type": "backend",
+      "lane": "inputs",
+      "col": 1
+    },
+    {
+      "id": "frozen",
+      "label": "Reuse saved packet",
+      "type": "database",
+      "lane": "inputs",
+      "col": 3
+    },
+    {
+      "id": "kind",
+      "label": "Discovery?",
+      "type": "backend",
+      "lane": "inputs",
+      "col": 4
+    },
+    {
+      "id": "screen",
+      "label": "Screen and select",
+      "type": "backend",
+      "lane": "inputs",
+      "col": 5
+    },
+    {
+      "id": "ready",
+      "label": "Model review?",
+      "type": "backend",
+      "lane": "review",
+      "col": 4
+    },
+    {
+      "id": "draft",
+      "label": "Draft interpretation",
+      "type": "backend",
+      "lane": "review",
+      "col": 3
+    },
+    {
+      "id": "critic",
+      "label": "Critic objections?",
+      "type": "backend",
+      "lane": "review",
+      "col": 2
+    },
+    {
+      "id": "checks",
+      "label": "Record unresolved checks",
+      "type": "security",
+      "lane": "results",
+      "col": 2
+    },
+    {
+      "id": "report",
+      "label": "Saved report",
+      "type": "frontend",
+      "lane": "results",
+      "col": 5
+    },
+    {
+      "id": "stop",
+      "label": "Preserve partial results",
+      "type": "backend",
+      "lane": "review",
+      "col": 5
+    }
+  ],
+  "edges": [
+    {
+      "id": "named-mode",
+      "from": "named",
+      "to": "mode"
+    },
+    {
+      "id": "discovery-mode",
+      "from": "discovery",
+      "to": "mode"
+    },
+    {
+      "id": "mode-replay",
+      "from": "mode",
+      "to": "replay",
+      "label": "replay"
+    },
+    {
+      "id": "mode-fresh",
+      "from": "mode",
+      "to": "fresh",
+      "label": "fresh"
+    },
+    {
+      "id": "mode-frozen",
+      "from": "mode",
+      "to": "frozen",
+      "label": "frozen"
+    },
+    {
+      "id": "replay-report",
+      "from": "replay",
+      "to": "report",
+      "label": "unchanged"
+    },
+    {
+      "id": "fresh-kind",
+      "from": "fresh",
+      "to": "kind"
+    },
+    {
+      "id": "frozen-kind",
+      "from": "frozen",
+      "to": "kind"
+    },
+    {
+      "id": "kind-screen",
+      "from": "kind",
+      "to": "screen",
+      "label": "yes"
+    },
+    {
+      "id": "kind-ready",
+      "from": "kind",
+      "to": "ready",
+      "label": "no"
+    },
+    {
+      "id": "screen-ready",
+      "from": "screen",
+      "to": "ready",
+      "label": "selected"
+    },
+    {
+      "id": "screen-report",
+      "from": "screen",
+      "to": "report",
+      "label": "none selected"
+    },
+    {
+      "id": "ready-draft",
+      "from": "ready",
+      "to": "draft",
+      "label": "requested + ready"
+    },
+    {
+      "id": "ready-report",
+      "from": "ready",
+      "to": "report",
+      "label": "off / unavailable"
+    },
+    {
+      "id": "ready-stop",
+      "from": "ready",
+      "to": "stop",
+      "label": "limit reached"
+    },
+    {
+      "id": "draft-critic",
+      "from": "draft",
+      "to": "critic"
+    },
+    {
+      "id": "critic-checks",
+      "from": "critic",
+      "to": "checks",
+      "label": "yes"
+    },
+    {
+      "id": "critic-report",
+      "from": "critic",
+      "to": "report",
+      "label": "no"
+    },
+    {
+      "id": "checks-report",
+      "from": "checks",
+      "to": "report",
+      "label": "unresolved"
+    }
+  ]
+}

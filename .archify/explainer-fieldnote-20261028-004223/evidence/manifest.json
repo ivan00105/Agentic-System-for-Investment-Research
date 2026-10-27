@@ -1,0 +1,62 @@
+{
+  "inspected_at": "2026-10-28T00:42:23+08:00",
+  "files": [
+    {
+      "copy": "src__research_assistant__application.py",
+      "path": "src/research_assistant/application.py",
+      "sha256": "2067711a419156c8a1abc30ec274b54da313055d6d2609971b2a53d1868456f4"
+    },
+    {
+      "copy": "src__research_assistant__model_access.py",
+      "path": "src/research_assistant/model_access.py",
+      "sha256": "6e5b3e7ca92430f35de79567bc1c373e6232f11a0da9fa12c36b8eadf02e01f9"
+    },
+    {
+      "copy": "src__research_assistant__contracts.py",
+      "path": "src/research_assistant/contracts.py",
+      "sha256": "6185c8ba263d514c78f62da92b5a1991d68532bc430849af3995baf9baf00b25"
+    },
+    {
+      "copy": "src__research_assistant__research.py",
+      "path": "src/research_assistant/research.py",
+      "sha256": "19e171c33d89de1a3631cbd780a52d18a20ce26e846a4ed9629cac38eda77be5"
+    },
+    {
+      "copy": "src__research_assistant__screening.py",
+      "path": "src/research_assistant/screening.py",
+      "sha256": "e044c4e77b7ec5f031bac71aa297fa4d55eda2380d1437772ec41544ccc44633"
+    },
+    {
+      "copy": "src__research_assistant__store.py",
+      "path": "src/research_assistant/store.py",
+      "sha256": "f5fe77659d2203057df9650cb4fdc138010faa3448068bc6092462dd98eaf41a"
+    },
+    {
+      "copy": "src__research_assistant__api.py",
+      "path": "src/research_assistant/api.py",
+      "sha256": "218c164a961dea7e1ed8c5c217306dcbaeebf9c974ad6686f42b0b6eb35f4512"
+    },
+    {
+      "copy": "frontend__src__App.tsx",
+      "path": "frontend/src/App.tsx",
+      "sha256": "6d8d894527f9d19b9b2a0dcbbc59a6c844665c458a2d9199e7efb0425e02baba"
+    },
+    {
+      "copy": "frontend__src__api.ts",
+      "path": "frontend/src/api.ts",
+      "sha256": "ef30d7a90e3bf0ee3adf8bc2993e71a85a2c89766e4f544077b1030f92e1fed4"
+    },
+    {
+      "copy": "STATUS.md",
+      "path": "STATUS.md",
+      "sha256": "a6cbf3fca8385151c530102dec01b29f2397aaa565a67dd5d78bf7362b930657"
+    },
+    {
+      "copy": "docs__design.md",
+      "path": "docs/design.md",
+      "sha256": "71904999ddaace9e3f8ea6d232f4a27fbba33522786ef5d4e46413c603526106"
+    }
+  ],
+  "scope": "Uncommitted working-tree snapshot; not the bytes of HEAD",
+  "baseline": "c11467888b9dcb1f4f6380d8cb3face288a7b27a"
+}

@@ -1,25 +1,47 @@
-# Current implementation
+# Current status
 
-The custom web milestone is implemented in this directory. Start from [README.md](README.md); the four design/research documents are in [docs/planning](docs/planning/implementation_plan.md).
+[Start](README.md) · [Design](docs/design.md) · [Sources](docs/sources.md)
 
-## Working behaviour
+Updated **28 October 2026**. Section 2B OpenRouter support and section 2C connection-check controls are implemented. **Setup only**, as requested: live checks are deferred; current verification uses mocked providers.
 
-- React/TypeScript/Vite workspace with Research, Discovery and History.
-- Saved evidence inspector, deterministic financial metrics, qualified claims and a preserved teaching correction.
-- FastAPI, SQLite, immutable local snapshots, a single worker, persistent idempotency and refresh-safe run URLs.
-- Explicit fresh/frozen/replay modes. Missing configuration or failed inference preserves available results and stops clearly.
-- Five-company synthetic examples; narrow SEC annual-facts retrieval and structured interpretation/critic integration behind explicit server configuration.
+## Capability board
 
-## Proof
+| Ready | Partial | Planned |
+|---|---|---|
+| Research, Discovery and History; optional model analysis | Narrow annual USD SEC facts | Archived filing/table evidence |
+| Saved sources, Decimal metrics, replay and recovery | Interpretation and critic checks | Real claim correction and re-screening |
+| Five labelled synthetic examples | Mocked provider verification | Live provider check and held-out evaluation |
+| Pass/fail/unknown screening; alphabetical selection | — | Separate statistical forecast |
+| Connections: setup, current-session outcomes and explicit test controls | Live SEC/model access unverified | Additional data feeds only when needed |
 
-- Production frontend build passed.
-- 21 backend tests passed.
-- All 8 browser scenarios passed; the final report-fixture adjustment also passed a clean-database rerun of the 3 desktop/discovery/mobile checks.
-- Browser accessibility scans passed after contrast fixes. Screenshot and state evidence is recorded in [verification/evidence.json](verification/evidence.json).
-- Local links in the relocated planning documents resolve.
+The saved 3% → 15% correction is synthetic. Current critic objections remain unresolved. Current SEC aggregates are not historical filing-vintage archives; forecast probabilities remain unavailable.
 
-## Next acceptance criterion
+## Work checklist
 
-Configure a real SEC contact identity and an accessible Responses API model. Manually check one annual evidence packet, then run an explicitly budgeted live-provider smoke test. Mock tests do not establish real account access or financial correctness across the universe.
+- [x] **1 · Optional model analysis:** financial results complete independently; separate statuses, replay and submission recovery.
+- [x] **2A · Connections status:** separate setup/attempt state, no secrets or automatic calls, safe refresh and restart behavior.
+- [x] **2B · OpenRouter:** explicit server-only provider/model configuration, validated output, persisted usage and clear failures; mocked verification only.
+- [x] **2C · Explicit check controls:** fixed MSFT SEC probe without a model; saved-evidence model check with allowance, consent, provider-cap confirmation and submission recovery.
+- [ ] **2C · Real checks (deferred):** run the SEC probe and one interpretation/critic pair when requested, after identity, key, model and spending authorization are supplied.
+- [ ] **3 · Original filing evidence:** independently check two Microsoft FY2024 figures against the original annual filing/table and save the evidence packet.
+- [ ] **4 · Fact/calculation validation:** reject incompatible issuer, unit, period and scope; preserve inputs and replay old reports.
+- [ ] **5 · Broader searchable SEC US directory:** find a company outside the original five and show unsupported financial coverage explicitly.
+- [ ] **6 · Selected-company financial screen:** screen up to ten user-selected companies with real retrieved financials; show pass/fail/unknown and actual coverage.
 
-The full five-role coordinator/correction evaluation and price-based forecasting remain research work. Current critic objections remain unresolved for adjudication. The bundled margin correction is synthetic and recorded. Do not present it as a live model result or claim a validated outperformance probability.
+The five companies are the current supported live universe as well as the subjects of the synthetic fixtures. A broader directory adds identity lookup and search; directory metadata is not financial evidence or a ranking signal. Tasks 3–6 are planned, not implemented. Task 3 can proceed while model access is pending. Later: bounded corrections and re-screening, frozen research comparison, wider automatic candidate sourcing, then a separate price forecast baseline. Add prices/news or other integrations only when that work needs them.
+
+**Inspect now:** restart Fieldnote and open Connections. Setup and **Not tested** appear separately. Refresh status makes no provider calls; test buttons submit saved runs. The model test requires selected saved evidence, a positive allowance and consent/provider-cap confirmation. Reports expose per-call usage under Model usage; unknown costs remain unknown. Restart clears current-session outcomes, while saved runs retain their usage.
+
+Live financial retrieval needs a real SEC contact identity. Model analysis also needs an accessible model and explicit experiment budget. Live access remains unverified. GP/neural-network/LLM factor mining and trading stay deferred. Implementation and evaluation rules live in [Design](docs/design.md).
+
+## Recorded checks
+
+| Check | Result | Date |
+|---|---|---|
+| Backend regression tests | 151 passed, including real SDK with mocked HTTP transport; one upstream Starlette/httpx deprecation warning | 28 Oct |
+| Browser scenarios | 23 passed (18 full-suite scenarios plus 5 new recovery cases; existing lost-response case also re-passed); accessibility and desktop/mobile visual checks passed | 28 Oct |
+| Production UI build | Passed | 28 Oct |
+| Combined system/roadmap diagrams | Refreshed for section 2; artifact and desktop/mobile browser checks passed; captures visually inspected | 28 Oct |
+| Live providers / research quality / investment performance | **Not validated** | — |
+
+Current screenshots are in ignored `.tmp/openrouter-verification/`; [earlier tracked evidence](verification/evidence.json) remains available. Browser checks used an isolated server/database on port 5173, leaving port 8000 untouched. All provider responses and displayed connection outcomes in tests are mocked. Independent review caught two issues now fixed: invalid model output retains returned usage/cost, and malformed submission responses retain the original recovery key. The [dated review](docs/archive/alignment_review_2026-10-25.md) records earlier checks.

@@ -90,7 +90,8 @@ def create_app(data_dir: Path | None = None):
 
     @app.get("/api/config")
     def config():
-        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": bool(os.getenv("SEC_USER_AGENT", "").strip() and "@" in os.getenv("SEC_USER_AGENT", "")), "model_configured": bool(os.getenv("OPENAI_API_KEY") and os.getenv("RESEARCH_MODEL")), "model": os.getenv("RESEARCH_MODEL") or None, "forecast_available": False}
+        connections = app.state.application.connections()
+        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):
