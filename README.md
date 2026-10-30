@@ -1,26 +1,85 @@
-# Fieldnote — local stock research workspace
+# Fieldnote
 
-React + TypeScript + Vite, FastAPI, and SQLite. Research, discovery, evidence inspection, claim corrections, and saved run history live in one local browser application.
+A local workspace for researching companies, inspecting sources and revisiting saved reports. Live retrieval currently supports Microsoft, Apple, Amazon, Alphabet and NVIDIA; the bundled saved examples for those companies use synthetic data.
 
-**The default demonstration is synthetic.** The five company names are real, but every bundled financial figure is invented for teaching. The Microsoft example deliberately corrects an annual/quarterly mismatch from 3% to 15%. It is a saved correction, not a live model performance claim.
-
-## Project directory
-
-Everything for this application lives in `stock_research/`, including `frontend/`, `src/`, `tests/`, local `data/`, `verification/`, and `docs/planning/`. Course materials remain in the parent directory.
-
-The [implementation plan](docs/planning/implementation_plan.md), [technical blueprint](docs/planning/technical_blueprint.md), [source audit](docs/planning/source_audit.md), and [Codex build playbook](docs/planning/codex_build_playbook.md) are kept with the application.
+**The bundled demonstration uses invented financial figures.** Its Microsoft 3% → 15% correction is a saved teaching example. Live correction and forecasting are still being developed.
 
 ## Start
 
-Requires Python 3.12+ and Node 22.12+ (tested with Python 3.12 and Node 22). From this directory in PowerShell:
+Requires Python 3.12+ and Node 22.12+. From this project directory in PowerShell:
 
 ```powershell
 .\start.ps1
 ```
 
-The script creates a project virtual environment if needed, installs the pinned dependencies, builds the frontend, then serves [http://127.0.0.1:8000](http://127.0.0.1:8000). First setup needs internet access. Subsequent starts reuse the installed environment and build unless a manifest/source has changed. Leave that terminal running; press Ctrl+C to stop. It never exposes the server on your network. Only one server may own a data directory.
+Open [Fieldnote](http://127.0.0.1:8000). First setup needs internet; saved examples need no API credentials afterward. Keep the terminal running; press Ctrl+C to stop. The server is local-only.
 
-If PowerShell policy prevents local scripts, use these equivalent commands without changing your machine's policy:
+## Where to look
+
+| You want to… | Read |
+|---|---|
+| See what works and what comes next | [Current status](STATUS.md) |
+| Assign a focused task to a separate work chat | [Work chats and task catalogue](docs/workstreams.md) — owners, dependencies, finish lines and starter prompt |
+| Understand the architecture, contracts or evaluation | [Design](docs/design.md) — diagrams first, detailed references expandable |
+| Choose sources/tools or understand factor research | [Sources](docs/sources.md) |
+
+## Try the example
+
+1. Open the Microsoft saved report. Under **Inputs & source**, inspect annual revenue and operating income.
+2. Select **Evidence 1**, then follow the recorded correction. **Source details** contains the locator and hash.
+3. Open Discovery: missing data stays **unknown**. Use History to reopen a report; refresh does not start a new run.
+4. Open **Connections** to see setup status and the latest provider attempt during this server session. Opening or refreshing it makes no provider calls. Explicit test buttons start a saved connection-check run.
+
+In **History**, add or change a report name and archive/restore reports. Archived reports stay readable through saved links and keep their source evidence. Organizing a report does not edit its financial results or run new research; clear its name to return to the default label.
+
+| Action | What happens |
+|---|---|
+| Open saved report | Reopens an existing result; no retrieval or model call |
+| Review saved sources again | Uses the original sources/cutoff; model analysis is optional |
+| Research with latest available sources | Retrieves annual SEC facts eligible before your cutoff and calculates the figures; model analysis is optional |
+
+**Include model analysis** starts unchecked. Financial figures work without model credentials; fresh research still needs SEC access. Reports show financial availability and model-analysis status separately. An unavailable or failed model review keeps the financial results usable. Synthetic data is never substituted for failed live retrieval.
+
+## Setup and development
+
+<details>
+<summary>Enable SEC retrieval and optional model analysis</summary>
+
+To configure live access, copy the example once in PowerShell, then edit your local file:
+
+```powershell
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item .env.example .env }
+notepad .env
+```
+
+Uncomment and fill in only the settings you need. Save as UTF-8 (with or without a byte-order mark). Fieldnote loads `.env` from the project folder when the server starts; restart after changing it. Existing environment variables take precedence, including empty values. Values are literal; `${...}` expansion is not supported. Connections displays setup and runs explicit checks but does not write settings or store credentials.
+
+| Variable | Purpose |
+|---|---|
+| `SEC_USER_AGENT` | Application name and real contact email for SEC requests |
+| `RESEARCH_MODEL_PROVIDER` | `openai` (default), `openrouter`, or `compatible` |
+| `OPENAI_API_KEY` | OpenAI or trusted compatible-provider credential; Codex access does not supply it |
+| `OPENROUTER_API_KEY` | OpenRouter credential when its provider is explicitly selected |
+| `RESEARCH_MODEL` | Accessible model supporting Responses structured outputs |
+| `RESEARCH_DATA_DIR` | Optional alternative database/snapshot directory |
+| `OPENAI_BASE_URL` | Optional trusted compatible endpoint; compatibility must be tested |
+
+`SEC_USER_AGENT` is sufficient for financial retrieval. Add model credentials only to enable model analysis, then select it explicitly in the research controls.
+
+For OpenRouter, set `RESEARCH_MODEL_PROVIDER=openrouter`, `OPENROUTER_API_KEY` and an explicit `RESEARCH_MODEL`. Remove `OPENAI_BASE_URL`: OpenRouter uses the fixed `https://openrouter.ai/api/v1/responses` endpoint. Automatic model routing and online-search model variants are rejected. Requests disable storage, SDK retries and provider fallbacks, and require parameter support. OpenAI and trusted compatible endpoints remain available; compatible access uses `OPENAI_API_KEY` and `OPENAI_BASE_URL`.
+
+`.env` is ignored by Git; keep it private and do not commit or share credentials. Before a live experiment, check account/model capability and agree a small budget. Mocked input/output tests do not establish model quality or real provider access.
+
+Connections separates **Configured** from **Not tested / Check passed / Check failed**. **Test SEC connection** retrieves MSFT facts without a model call. **Test model connection** uses selected saved evidence for at most one interpretation and one critic call; it requires a positive USD allowance and consent to send evidence and incur charges, including confirmation that a provider/key spending cap is set. The app cannot guarantee that allowance as a dollar cap. An uncertain submission can be recovered with the same submission key.
+
+Results describe provider attempts in this server session, not source correctness; restarting clears them. Opening saved examples and replay do not count as checks. Saved reports retain per-call model, response ID, tokens and provider-reported cost; missing cost is **unknown**, never zero. The latest live SEC/model check outcomes and their limits are recorded in [STATUS](STATUS.md).
+
+</details>
+
+<details>
+<summary>Manual installation if PowerShell blocks start.ps1</summary>
+
+These commands avoid changing machine policy:
 
 ```powershell
 python -m venv .venv
@@ -31,91 +90,37 @@ npm.cmd --prefix frontend run build
 .\.venv\Scripts\python.exe -m research_assistant.cli
 ```
 
-Open a saved replay to use the application with **no API credentials**. The default page opens the Microsoft teaching example. Discovery offers five synthetic companies with pass, fail and unknown outcomes.
+</details>
 
-## Optional real retrieval and new inference
+<details>
+<summary>Development, checks and backup</summary>
 
-Set the following environment variables in the terminal before starting the server. Do not put keys in frontend files, commit them, or paste them into a browser:
-
-| Variable | Purpose |
+| Task | Command |
 |---|---|
-| `SEC_USER_AGENT` | SEC contact identity, such as your application name and your real contact email |
-| `OPENAI_API_KEY` | Your application API credential; Codex access does not supply this |
-| `RESEARCH_MODEL` | An API model your account can access that supports Responses structured outputs |
-| `RESEARCH_DATA_DIR` | Optional alternate local database/snapshot directory |
+| Backend tests | `.\.venv\Scripts\python.exe -m pytest -q` |
+| Production UI build | `npm.cmd --prefix frontend run build` |
+| Browser checks | `npm.cmd --prefix frontend test` |
+| Frontend dev server | `npm.cmd --prefix frontend run dev` |
 
-`.env` is ignored by version control but is **not automatically loaded**. Use actual environment variables. The SDK's `OPENAI_BASE_URL` may be used for a trusted compatible endpoint; gateway compatibility is not established by the mock tests.
+Stop the normal server before browser checks: tests use port 8000 and a separate test database. Backend and browser tests disable local `.env` loading and isolate provider settings; `.env` tests use temporary files. Browser checks use installed Chrome and save screenshots in `verification/` unless `FIELDNOTE_VERIFICATION_DIR` overrides the destination.
 
-- **Fresh retrieval + inference:** downloads SEC company-facts JSON, stores immutable bytes, selects annual USD revenue and operating income with matching accession and periods, then requests structured interpretation and critique. No price feed is configured.
-- **New inference · frozen evidence:** copies the selected saved evidence and deterministic calculations, preserves the original company and cutoff, and invokes new interpretation/review. It does not copy old claims or old review outcomes. Synthetic evidence stays labelled synthetic.
-- **Saved replay:** reopens the saved result without retrieval or inference. It works offline after installation. API replay requests can also create a saved copy with an explicit replay action.
+For UI development, run the Python server and frontend dev server in separate terminals; open port 5173. Vite proxies `/api` to port 8000. Production uses one Python server for UI and API. Only one server may own a data directory.
 
-When SEC configuration is missing, fresh retrieval fails clearly. When model configuration is missing or a model request fails, completed financial calculations remain available in a failed/partial run. The UI never substitutes synthetic data for live retrieval or silently replays a model result.
+Back up the **entire `data/` directory while the server is stopped**; it contains the database and saved source bytes. There is no destructive cleanup/reset endpoint. See [Design](docs/design.md#rules-that-must-survive-changes) for runtime, API and retry behavior, and the [UI verification contract](verification/design-contract.md) for interaction checks.
 
-API capability has been tested with recorded/mocked SEC and model responses. **An authenticated live SEC/model smoke test is still required with your account and contact identity.** The default configuration does not make paid calls.
+</details>
 
-## Demo walkthrough
+<details>
+<summary>Earlier plans and review history</summary>
 
-1. Open the Microsoft saved replay; read the synthetic-data banner.
-2. Inspect Annual revenue and Operating income under **Inputs & source**.
-3. Select **Evidence 1**. The source desk shows the excerpt, reporting period, availability and snapshot hash.
-4. Follow the correction: draft 3% → mixed-period objection → aligned annual check → 15% revision.
-5. Inspect the unavailable forecast and stated limitations. A margin is not an outperformance probability.
-6. Open Discovery's teaching screen. NVIDIA remains **unknown**, Amazon fails the margin filter, and three candidates pass. Inspect a company, then return to the screen.
-7. Open History and reopen the original report. Reloading or leaving the page does not create a run.
-8. With no model configured, attempt frozen inference to demonstrate a clearly failed review with preserved financial results. This creates a new local run but no paid call.
+These are archived references, not the current work order:
 
-## Implementation boundaries
+- [Original research specification](docs/archive/implementation_plan.md)
+- [Detailed target interfaces](docs/archive/technical_blueprint.md)
+- [Source/methodology audit](docs/archive/source_audit.md)
+- [October alignment review](docs/archive/alignment_review_2026-10-25.md)
+- [Earlier coding playbook](docs/archive/codex_build_playbook.md)
 
-| Component | Ownership |
-|---|---|
-| `frontend/src` | Presentation, accessible interactions, URL navigation, two-second status polling, stable submission retries |
-| `api.py` | Validated HTTP boundary, local origin/host restrictions, static production assets |
-| `application.py` | One worker, run lifecycle, shared discovery/research logic, bounded model review |
-| `research.py` | SEC response validation, annual fact matching, deterministic Decimal calculations |
-| `screening.py` | Pass/fail/unknown filters and declared selection order |
-| `store.py` | SQLite transactions, idempotency, run-scoped evidence, content-addressed files |
+Update the existing document that owns the topic instead of adding a new summary after each change. The task catalogue owns detailed chat assignments; historical decisions remain available here and routine changes belong in Git.
 
-SQLite's unique active-run index and an immediate write transaction protect against concurrent submissions. A process file lock prevents a second server from marking a live run interrupted. Each submission key is stored with its canonical request and result ID; a changed request with the same key is rejected. Accepted keys are retained for the database lifetime.
-
-The browser retains an uncertain submission key in session storage, including across refresh, and retries that same intent. It never restarts research from a GET, rerender or reconnect. A server restart marks unfinished runs interrupted and preserves saved results. Graceful shutdown waits for the bounded worker; it does not cancel an already sent model request.
-
-Budgets are shared across discovery: at most 12 model calls, 20 retrieval/check actions, a 180-second admission deadline, and an 18,000-token stopping threshold. Each company currently has one interpretation/critic pass (two calls, within the planned two-review-round maximum). Model requests have a 45-second timeout and no automatic retries; SEC requests have a 20-second read timeout, 5-second connect timeout and 25 MB response cap. In-flight calls can cross the admission deadline/token threshold; remote billing is not guaranteed exactly once. Costs are not estimated from invented prices. Token usage is logged.
-
-## API
-
-Interactive API documentation is available through the OpenAPI JSON at `/openapi.json`; the application uses a restrictive content security policy and does not rely on external Swagger assets.
-
-| Endpoint | Behaviour |
-|---|---|
-| `GET /api/config` | Supported companies and configuration booleans; never credentials |
-| `POST /api/runs` | JSON request plus `Idempotency-Key`; returns run with HTTP 202 |
-| `GET /api/runs?limit=30&offset=0` | Paginated history |
-| `GET /api/runs/{id}` | Persisted status, actions and available report |
-| `GET /api/runs/{id}/evidence/{evidence_id}` | Run-scoped saved evidence; cross-run IDs return 404 |
-
-Requests use a timezone-aware cutoff, a supported company or screen, and an explicit mode. Saved replay retains original inputs; frozen discovery may change screening thresholds over the same saved company packets. Supported screen fields are sector, minimum annual operating margin (ratio, so `0.1` means 10%), and limit 1–5. Invalid inputs return structured 422 errors; conflicts return 409; unsupported origins return 403.
-
-## Verification and development
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-npm.cmd --prefix frontend run build
-# Stop a normally running server first; tests use port 8000 and a separate test database.
-npm.cmd --prefix frontend test
-```
-
-Browser tests use an isolated installed Chrome profile, disable external credentials, check desktop/mobile with axe, and exercise replay, evidence, corrections, history, missing configuration, source injection, polling and an accepted submission whose HTTP response is lost. Screenshots are saved in `verification/`. Browser tests do not establish screen-reader usability or live-provider correctness on their own.
-
-For frontend development, run the Python server and `npm.cmd --prefix frontend run dev` in separate terminals, then open port 5173. Vite proxies `/api` to port 8000. Production serves built assets from the Python server.
-
-## Remaining research work
-
-This implements the custom web milestone and a small functional backend foundation; the earlier full research specification remains a roadmap.
-
-- No validated forecast artifact, historical price pipeline, model training or held-out statistical evaluation exists yet. Probability remains unavailable. Discovery explicitly selects alphabetically among eligible companies rather than pretending to rank by probability.
-- Live facts use a current SEC aggregate, not archived filing-vintage data. Filing dates are conservatively available from the next midnight in America/New_York, converted to UTC. These safeguards do not establish leakage-free historical research. Annual mapping is intentionally narrow; quarterly metrics, events, free cash flow and general news are not implemented.
-- The runtime is a bounded interpretation/critic workflow with deterministic checks, not the full five-role coordinator and correction/evaluation system. Critic objections remain unresolved pending adjudication. The saved synthetic correction demonstrates the UI contract, not measured agent accuracy.
-- Public hosting, authentication, multi-user operation, cancellation and automatic checkpoint resumption are outside this local milestone. Do not expose this server publicly.
-
-Back up the entire `data/` directory while the server is stopped; it contains the database and immutable snapshots. No destructive cleanup or reset endpoint is exposed.
+</details>

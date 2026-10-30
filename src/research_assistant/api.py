@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
@@ -9,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .application import Application
-from .contracts import DomainError, Evidence, Run, RunRequest, UNIVERSE
+from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE
 from .fixtures import FIXTURE_CUTOFF, seed
 from .store import Store
 
@@ -42,6 +43,7 @@ async def instance_lock(path):
 
 
 def create_app(data_dir: Path | None = None):
+    load_dotenv(PROJECT / ".env", override=False, interpolate=False, encoding="utf-8-sig")
     root = data_dir or Path(os.getenv("RESEARCH_DATA_DIR", str(PROJECT / "data")))
     root.mkdir(parents=True, exist_ok=True)
 
@@ -69,7 +71,7 @@ def create_app(data_dir: Path | None = None):
             return JSONResponse({"error": {"code": "origin_denied", "message": "This local application does not accept requests from other websites."}}, status_code=403)
         if request.headers.get("sec-fetch-site") == "cross-site":
             return JSONResponse({"error": {"code": "origin_denied", "message": "Cross-site access is not allowed."}}, status_code=403)
-        if request.method == "POST" and request.headers.get("content-type", "").split(";")[0] != "application/json":
+        if request.method in {"POST", "PATCH"} and request.headers.get("content-type", "").split(";")[0] != "application/json":
             return JSONResponse({"error": {"code": "content_type", "message": "Send an application/json request."}}, status_code=415)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -90,15 +92,20 @@ def create_app(data_dir: Path | None = None):
 
     @app.get("/api/config")
     def config():
-        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": bool(os.getenv("SEC_USER_AGENT", "").strip() and "@" in os.getenv("SEC_USER_AGENT", "")), "model_configured": bool(os.getenv("OPENAI_API_KEY") and os.getenv("RESEARCH_MODEL")), "model": os.getenv("RESEARCH_MODEL") or None, "forecast_available": False}
+        connections = app.state.application.connections()
+        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):
         return app.state.application.submit(body, idempotency_key)
 
     @app.get("/api/runs")
-    def history(limit: int = Query(30, ge=1, le=100), offset: int = Query(0, ge=0)):
-        return app.state.store.history(limit, offset)
+    def history(limit: int = Query(30, ge=1, le=100), offset: int = Query(0, ge=0), archived: bool = False):
+        return app.state.store.history(limit, offset, archived)
+
+    @app.patch("/api/runs/{run_id}", response_model=Run)
+    def update_metadata(run_id: str, body: RunMetadataPatch):
+        return app.state.store.set_metadata(run_id, body)
 
     @app.get("/api/runs/{run_id}", response_model=Run)
     def get_run(run_id: str):

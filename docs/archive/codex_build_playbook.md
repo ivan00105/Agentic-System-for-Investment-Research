@@ -1,8 +1,10 @@
+> Archived on 27 October 2026. Historical design/review context; it may describe unimplemented behavior. For current guidance use [Start](../../README.md), [Status](../../STATUS.md), [Design](../design.md) and [Sources](../sources.md).
+
 # Codex build playbook and model choices
 
-19 October 2026. Companion to the [technical blueprint](./technical_blueprint.md) and [implementation plan](./implementation_plan.md).
+Prepared 19 October; execution order updated 26 October 2026. Companion to the [technical blueprint](./technical_blueprint.md) and [implementation plan](./implementation_plan.md).
 
-Implementation update: [Fieldnote](../../README.md) now contains the custom React/TypeScript/Vite workspace, thin FastAPI boundary and local foundation. Use its README and verification record as the implementation status; the research stages in this playbook remain future work where explicitly identified. Preserve its labelled synthetic/live distinction and do not describe the full research specification as delivered.
+Implementation update: [Fieldnote](../../README.md) now contains the custom React/TypeScript/Vite workspace, thin FastAPI boundary and local foundation. Use STATUS.md as the authoritative implementation status and remaining work order; the research stages in this playbook remain future work where explicitly identified. Preserve its labelled synthetic/live distinction and do not describe the full research specification as delivered.
 
 ## 1. Separate development agents from application agents
 
@@ -10,7 +12,7 @@ Codex is the development assistant: it edits files, runs tests, inspects failure
 
 Changing the model in the Codex composer does not change the application's runtime model. Similarly, adding a critic to the application does not require a permanent critic chat in Codex. A coding subagent's context is not the research application's memory.
 
-Use this chat as the design/integration reference. Implement one milestone at a time. A fresh implementation chat can point at the saved documents and current code; it does not need the entire brainstorming conversation. Keep a short `STATUS.md` with the last working command, completed milestone, known failure and next acceptance criterion. Do not treat chat memory as the source of truth for requirements.
+Use the saved documents and current code as the design/integration reference. Implement one milestone at a time. A fresh implementation chat can point at the saved documents and current code; it does not need the entire brainstorming conversation. Keep a short `STATUS.md` with the last working command, completed milestone, known failure and next acceptance criterion. Do not treat chat memory as the source of truth for requirements.
 
 ## 2. Recommended Codex model and effort
 
@@ -71,11 +73,11 @@ Example delegation request for later:
 
 > Use one read-only subagent to inspect forecast label leakage and another to inspect evidence cutoff enforcement. Give each the current implementation and invariants. They should report concrete counterexamples and file locations. Keep edits with the main agent, reconcile findings, and implement only verified fixes with focused tests.
 
-This is a suggested future prompt. No subagents or extra chats were created while preparing this guide.
+This is a suggested review prompt, not an instruction to create extra chats or duplicate shared-file ownership.
 
 ## 5. Repository instructions to establish
 
-Put concise, stable rules in a project-root `AGENTS.md` once the application repository is created. Codex reads these instructions according to directory scope; the official [AGENTS.md guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md) explains discovery and precedence. Keep task status in `STATUS.md`, rather than continually expanding the instruction file.
+The application repository already exists. If adopting a project-root `AGENTS.md`, keep it limited to stable rules. Codex reads these instructions according to directory scope; the official [AGENTS.md guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md) explains discovery and precedence. Keep task status in `STATUS.md`, rather than continually expanding the instruction file.
 
 Suggested project rules:
 
@@ -100,61 +102,47 @@ Add the actual setup/test commands when they exist. Do not copy unimplemented co
 
 ## 6. Build stages and ready-to-use Codex tasks
 
-### Stage 0 — first working numerical path
+These stages follow the current order in [STATUS.md](../../STATUS.md). The original initialization-first sequence is superseded.
 
-Use Sol / High for the initial contract decisions, then Medium for implementation. Estimated scope: one focused milestone; duration depends on environment setup.
+### Existing baseline — preserve, do not recreate
 
-> Read the saved implementation plan and technical blueprint. Inspect the workspace and preserve course files. Create the application in a dedicated stock_research directory. Implement only the first executable path: fixture → validated facts → operating-margin calculation → report JSON/Markdown → CLI. Use a synthetic fixture explicitly labelled synthetic and a separately hand-checked real filing fixture when available. Reject mismatched periods, units and zero denominators. Add focused tests, a reproducible environment and actual setup/run instructions. Do not add LLM calls, discovery, a web UI or empty future modules. Run the CLI and tests, then report the evidence and remaining limitations.
+The project directory, Git repository, environment, local web UI, saved-run lifecycle, synthetic examples and narrow SEC/model integration already exist. Use the commands in the README and inspect current tests before extending them. The synthetic correction is a teaching example, not a live correction workflow.
 
-You inspect the real input values and independently calculate the expected answer. Codex can implement the path; it should not be the only source of the numerical ground truth.
+### Stage 1 — eligible evidence and typed calculations
 
-### Stage 1 — eligible real data
+Use High effort for source/contract decisions and ordinary effort for mechanical integration.
 
-Use Sol / High. Keep fixture tests independent of network availability.
+> Extend the existing annual SEC path. Archive an accession-specific original filing/table packet, retain availability and source locators, and carry issuer, concept, unit, period and scope into the calculation boundary. Compare reviewed revenue tags by recency; reject incompatible or ambiguous inputs. Add focused restatement, cutoff, period/unit and missing-data cases. Preserve old saved-report replay. Demonstrate one independently hand-checked annual packet; mock fixtures alone do not prove live access.
 
-> Extend the working path to retrieve and cache SEC evidence for the supported issuers. Implement immutable source versions, cutoff eligibility, exact period/context selection and source locations. Add fixtures for a later restatement, annual/quarterly mismatch and ambiguous facts. Route the existing calculation through these records. Do not silently use current summaries as historical facts. Demonstrate one real filing result and one ineligible-source rejection. Preserve the fixture-only command.
+The application already has Responses integration. Configure the actual endpoint/model through the existing environment settings, then run one explicitly budgeted capability test when credentials are available. Keep fixture checks runnable beforehand. Do not create a provider framework or guess account entitlement.
 
-You validate issuer mappings and a small sample of values in the original tables. This stage owns most of the financial-data correctness risk.
+### Stage 2 — bounded follow-up and real corrections
 
-### Stage 2 — statistical forecast, in parallel only after contracts stabilize
+Use High effort for claim-state and numerical invariants.
 
-Use Sol / High for implementation; Astra / High for the independent leakage review.
+> Extend the current worker and interpretation/critic path. Add immutable fact/calculation references, claim versions, version-targeted objections, dispositions and resolution evidence. Allow only bounded source checks and named calculations. Demonstrate error correction, a clean claim retained, an invalid objection rejected and unresolved issues surviving exhaustion. Recompute dependent results after a corrected input. Preserve a tool-using single-agent condition and a role-only condition for comparison; do not add services merely to represent roles.
 
-> Implement daily price ingestion, explicit adjustment conventions, features, forecast labels and the base-rate/logistic baselines from the plan. Training is an offline command. Split by dates across securities and exclude labels not observable at each fit cutoff. Add holiday, split/dividend, overlapping-label and future-row-invariance fixtures. Save model/data/target manifests. Report chronological results honestly, including whether the model fails to beat the base rate. Do not add LLM probability adjustments or trading simulations.
+Narrative support needs independent assessment; two agreeing model calls do not prove a source supports a claim. Keep review at two rounds maximum within the existing shared run budgets.
 
-You approve the target definition before running experiments and keep a record of model/feature variants tried.
+### Stage 3 — corrected discovery and report integration
 
-### Stage 3 — one tool-using research agent
+> Reuse the research path in Discovery. Re-screen corrected inputs and replace an ineligible selected candidate within the existing universe and shared budget. Preserve pass/fail/unknown and allow fewer results than requested. Retain explicit alphabetical selection until validated forecast ranking exists. Present results, sources, dates, corrections and limitations first; keep diagnostics behind disclosure. Preserve refresh-safe URLs and idempotent retry behavior.
 
-Use Sol / Medium for implementation and initially the same runtime setting.
+Do not add natural-language filters or expand the universe as part of this integration.
 
-> Add the chosen provider integration after a small endpoint capability check. Implement a single coordinator using the existing retrieval/calculation tools, trusted host context, bounded calls and structured output. Demonstrate that a mismatched period causes a new retrieval and recalculation, and missing evidence produces qualification. Log tool outcomes and usage. No critic or extra specialist workflow yet. Keep deterministic tests and opt-in live tests separate.
+### Stage 4 — frozen research evaluation
 
-This becomes the meaningful single-agent baseline. Do not discard it when adding roles.
+Use a separate methodology review after the runner works.
 
-### Stage 4 — specialist roles and critic
+> Freeze cases, source packets, prompts, model settings and budgets before held-out evaluation. Compare deterministic, tool-using single-agent, role-only and critic-enabled conditions. Isolate review using the same initial drafts/evidence and include self-review. Measure factual/numerical correctness, coverage, harmful revisions, failures, latency and actual usage. Keep semantic human assessment separate from automated ID/number checks. Report negative findings and affected reruns without selectively rerunning poor outcomes.
 
-Use Sol / High for review-state implementation.
+Mocked outputs verify runner behavior. Research-quality claims require actual evaluated outputs and independently checked references. Size the paid run using measured pilot usage and the team's declared budget.
 
-> Preserve the single-agent baseline. Add role-specific contexts and a critic using existing contracts/tools. Store claim versions, objection IDs, dispositions and resolution evidence. Enforce two review rounds plus overall budgets. Demonstrate an error corrected, a clean claim unchanged, an invalid objection rejected, and a material unresolved issue surviving budget exhaustion. Recompute dependent results after correction. No free-form debate transcript as the system's authoritative state.
+### Stage 5 — separate forecasting baseline, later
 
-You judge whether the cited evidence actually resolves the objection. Agreement between two model calls is not independent proof.
+> Validate one daily-price source and explicit corporate-action/calendar conventions. Implement the target and base-rate/logistic baselines in the implementation plan. Split all securities by date, exclude labels not matured at fitting time, and fit transformations only on training data. Add holiday, split/dividend, overlapping-label and future-row-invariance checks. Record every model/feature trial and reserve the final test. Keep LLM narratives from changing probabilities.
 
-### Stage 5 — discovery and interface
-
-Use Sol / Medium; Luna / Medium is suitable for isolated presentation changes.
-
-> Extend bounded discovery through the shared application functions. Use pass/fail/unknown filters, total candidate/call budgets and logged replacement reasons. Retain the React/TypeScript/Vite workspace and thin FastAPI boundary. Show sources, calculations, forecast target, objections and qualifications. Preserve idempotent submissions, refresh-safe run URLs and explicit fresh/frozen/replay modes. Until a validated p0 model exists, label alphabetical selection clearly; do not imply probability ranking. Demonstrate fewer-than-k results when evidence is insufficient.
-
-You test natural-language filters for ambiguous terms such as “cheap” or “safe,” and make sure the UI does not imply market-wide search.
-
-### Stage 6 — frozen evaluation and final integration
-
-Use Sol / High for the runner; Astra / High for an independent methodology review.
-
-> Freeze the evaluation manifest, prompts, model settings, budgets and source snapshots. Run deterministic, single-agent, role-only and critic-enabled conditions. For isolated review, reuse exactly the same initial drafts/evidence and compare self-review with critic-guided revision. Report actual cost, coverage, correctness, damage, latency and failures. Keep forecast scoring separate. Do not tune against held-out answers. Prepare a reproducible demo and setup instructions; identify scientific limitations explicitly.
-
-You own the final interpretation and presentation. If a bug invalidates a test, document the issue and affected reruns; do not selectively rerun only poor outcomes.
+Freeze the precise forecast target before experiments. GP, neural-network and LLM factor mining are later optional research, not prerequisites for the report/correction system. Portfolio/trading simulations remain outside this milestone.
 
 ## 7. A useful review prompt
 
@@ -168,6 +156,6 @@ Then ask the implementation chat to assess and fix confirmed findings. A fresh r
 
 You should make the product/research decisions, verify a small set of financial ground truths, approve the evaluation protocol before seeing results, protect API budgets and ensure the group understands what it will demonstrate. Codex should handle implementation, tests, tracing, documentation and investigation of concrete failures.
 
-The custom-web milestone now has a runnable local foundation. Next, use Sol / High to verify one real annual evidence packet and the team's runtime API access, then proceed with the next research acceptance criterion. Use the installed frontend-design-direction skill for UI changes and browser-testing-with-devtools for rendered verification; preserve screenshots and the checkable design contract. Before paid experiments, establish actual gateway access and quota. Before parallel code changes, establish a Git repository and a committed integration baseline.
+The custom-web milestone now has a runnable local foundation. Next, use Sol / High to verify one real annual evidence packet and the team's runtime API access, then proceed with the next research acceptance criterion. Use the installed frontend-design-direction skill for UI changes and browser-testing-with-devtools for rendered verification; preserve screenshots and the checkable design contract. Before paid experiments, establish actual gateway access and quota. The existing Git repository and custom web foundation are the integration baseline; assign non-overlapping files or isolated worktrees for parallel edits.
 
 Completion of one stage should yield a working command and a specific proof, not only scaffolding or a promise that the pieces will connect later.

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "a02f1349-31a7-4e45-966e-ed16082e76f1",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.archify\\explainer-fieldnote-20261028-004223\\candidate.archify.md",
+  "output": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.archify\\explainer-fieldnote-20261028-004223\\fieldnote.html",
+  "specification": {
+    "sha256": "331312b90f51bf47d3f0594a3fd79cdd6ae2b2f8917416fe8a33a1ac16163f98",
+    "bytes": 6944
+  },
+  "artifact": {
+    "sha256": "d4b66eb7af385c5fbc6f80de8278599aae5f29b3dd97f071ce3c7695cb18c834",
+    "bytes": 1377799
+  },
+  "explainer": {
+    "preparedSha256": "26a90b2cf382823d7ab24e35627a5fa48bba661d6cc4073447946d103e60a597",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "system-map",
+        "inline": true,
+        "sha256": "37a97e2f845193dc2070abe6a75a7526318b4613e94821bbfdbeecd533a5dcba",
+        "bytes": 1555
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "current-flow",
+        "path": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.archify\\explainer-fieldnote-20261028-004223\\current-flow.json",
+        "relativePath": "current-flow.json",
+        "sha256": "68a0766c4e3e542e3214ada6f44da62e6f47dc27432e6777db011bd7a459f2ce",
+        "bytes": 4650
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "target-flow",
+        "inline": true,
+        "sha256": "6dcd594ce4d891484dc39313b89fcf2fe1c01b83fcda4310b5a6f45dc67c1b0f",
+        "bytes": 1810
+      }
+    ]
+  }
+}

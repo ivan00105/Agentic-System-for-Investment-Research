@@ -1,0 +1,49 @@
+{
+  "artifact": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.archify\\explainer-fieldnote-20261028-004223\\fieldnote.html",
+  "errors": [],
+  "externalRequests": [],
+  "layouts": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390
+    }
+  ],
+  "interactions": [
+    {
+      "width": 1440,
+      "id": "system-map",
+      "opened": true
+    },
+    {
+      "width": 1440,
+      "id": "current-flow",
+      "opened": true
+    },
+    {
+      "width": 1440,
+      "id": "target-flow",
+      "opened": true
+    },
+    {
+      "width": 390,
+      "id": "system-map",
+      "opened": true
+    },
+    {
+      "width": 390,
+      "id": "current-flow",
+      "opened": true
+    },
+    {
+      "width": 390,
+      "id": "target-flow",
+      "opened": true
+    }
+  ],
+  "artifactSha256": "d4b66eb7af385c5fbc6f80de8278599aae5f29b3dd97f071ce3c7695cb18c834",
+  "perceptualReview": "Desktop architecture/current/target and mobile architecture/next captures inspected; expanded views opened at both widths"
+}
