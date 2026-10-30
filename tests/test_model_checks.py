@@ -1,6 +1,7 @@
 """Explicit paid checks run against an in-process HTTP transport, never a provider."""
 
 import json
+import re
 import time
 from decimal import Decimal
 
@@ -137,7 +138,7 @@ def test_openrouter_check_sends_strict_bounded_requests_and_persists_metadata(ap
     company = assert_saved_financials(app, result)
     assert company.review_status == "completed"
     assert len(requests) == len(constructors) == 2
-    for request, settings in zip(requests, constructors):
+    for index, (request, settings) in enumerate(zip(requests, constructors)):
         assert str(request.url) == "https://openrouter.ai/api/v1/responses"
         assert request.headers["authorization"] == "Bearer secret-router-key"
         assert not request.headers.get("openai-organization")
@@ -152,6 +153,11 @@ def test_openrouter_check_sends_strict_bounded_requests_and_persists_metadata(ap
         format_ = payload["text"]["format"]
         assert format_["type"] == "json_schema" and format_["strict"] is True
         assert format_["schema"]["additionalProperties"] is False
+        if index == 0:
+            statement = format_["schema"]["$defs"]["Interpretation"]["properties"]["statement"]
+            for prose in ("Margin is 20 percent.", "The 10-K needs context.", "For 2025, margin needs context."):
+                assert re.fullmatch(statement["pattern"], prose) is None
+            assert re.fullmatch(statement["pattern"], "The annual filing needs business context.")
         packet = json.loads(payload["input"][1]["content"])
         assert {item["id"] for item in packet["evidence"]} == {"fixture-MSFT-annual"}
     assert result.report.model_run.provider == "openrouter"
@@ -245,15 +251,19 @@ def test_unusable_provider_cost_stays_unknown(app, monkeypatch, cost):
     assert all(call.cost_usd is None for call in result.report.model_calls)
 
 
-@pytest.mark.parametrize("output", [
-    {"interpretations": [], "unexpected": "field"},
-    {"interpretations": [{"statement": "Margin is 20 percent.", "evidence_ids": ["fixture-MSFT-annual"]}]},
-    {"interpretations": [{"statement": "Margin needs context.", "evidence_ids": ["unknown"]}]},
+@pytest.mark.parametrize("output,reason", [
+    ({"interpretations": [], "unexpected": "field"}, "required schema"),
+    ({"interpretations": [{"statement": "Margin is 20 percent.", "evidence_ids": ["fixture-MSFT-annual"]}]}, "numbers in a qualitative interpretation"),
+    ({"interpretations": [{"statement": "The 10-K needs context.", "evidence_ids": ["fixture-MSFT-annual"]}]}, "numbers in a qualitative interpretation"),
+    ({"interpretations": [{"statement": "For 2025, margin needs context.", "evidence_ids": ["fixture-MSFT-annual"]}]}, "numbers in a qualitative interpretation"),
+    ({"interpretations": [{"statement": "Margin needs context.", "evidence_ids": ["unknown"]}]}, "source outside the supplied evidence"),
 ])
-def test_schema_and_reference_failures_do_not_pass_check(app, monkeypatch, output):
+def test_schema_and_reference_failures_do_not_pass_check(app, monkeypatch, output, reason):
     requests, _ = wire_model(monkeypatch, [httpx.Response(200, json=response_body(output))])
     result = submit(app)
-    assert assert_saved_financials(app, result).review_status == "failed"
+    company = assert_saved_financials(app, result)
+    assert company.review_status == "failed"
+    assert reason in company.review_error
     assert len(requests) == 1
     assert app.connections()["model"].check.status == "failed"
     assert result.report.model_calls[0].status == "failed"

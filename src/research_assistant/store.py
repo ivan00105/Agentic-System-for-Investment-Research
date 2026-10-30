@@ -36,6 +36,10 @@ class Store:
                     run_id TEXT NOT NULL REFERENCES runs(id), id TEXT NOT NULL, data TEXT NOT NULL,
                     PRIMARY KEY (run_id, id)
                 );
+                CREATE TABLE IF NOT EXISTS run_metadata (
+                    run_id TEXT PRIMARY KEY REFERENCES runs(id), label TEXT,
+                    archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1))
+                );
             """)
 
     @contextmanager
@@ -73,18 +77,32 @@ class Store:
 
     def get(self, run_id: str) -> Run:
         with self.connect() as db:
-            row = db.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+            row = db.execute("SELECT runs.*, run_metadata.label, coalesce(run_metadata.archived,0) AS archived FROM runs LEFT JOIN run_metadata ON runs.id=run_metadata.run_id WHERE runs.id=?", (run_id,)).fetchone()
             if not row:
                 raise DomainError("Run not found. Open History or start a new investigation.", "not_found", 404)
             actions = db.execute("SELECT sequence,at,role,message FROM actions WHERE run_id=? ORDER BY sequence", (run_id,)).fetchall()
-        return Run(id=row["id"], request=RunRequest.model_validate_json(row["request"]), status=row["status"], created_at=row["created_at"], updated_at=row["updated_at"], stage=row["stage"], actions=[Action(**dict(a)) for a in actions], report=Report.model_validate_json(row["report"]) if row["report"] else None, error=row["error"], synthetic=bool(row["synthetic"]))
+        return Run(id=row["id"], request=RunRequest.model_validate_json(row["request"]), status=row["status"], created_at=row["created_at"], updated_at=row["updated_at"], stage=row["stage"], actions=[Action(**dict(a)) for a in actions], report=Report.model_validate_json(row["report"]) if row["report"] else None, error=row["error"], synthetic=bool(row["synthetic"]), label=row["label"], archived=bool(row["archived"]))
 
-    def history(self, limit: int = 30, offset: int = 0):
+    def history(self, limit: int = 30, offset: int = 0, archived: bool = False):
         with self.connect() as db:
-            rows = db.execute("SELECT id FROM runs ORDER BY created_at DESC, id LIMIT ? OFFSET ?", (limit, offset)).fetchall()
-            total = db.execute("SELECT count(*) FROM runs").fetchone()[0]
+            source = "FROM runs LEFT JOIN run_metadata ON runs.id=run_metadata.run_id WHERE coalesce(run_metadata.archived,0)=?"
+            rows = db.execute(f"SELECT runs.id {source} ORDER BY runs.created_at DESC, runs.id LIMIT ? OFFSET ?", (int(archived), limit, offset)).fetchall()
+            total = db.execute(f"SELECT count(*) {source}", (int(archived),)).fetchone()[0]
         # History deliberately excludes reports, evidence and action payloads.
         return {"items": [self.get(r["id"]).model_dump(mode="json", exclude={"report", "actions"}) for r in rows], "total": total}
+
+    def set_metadata(self, run_id, patch):
+        fields = patch.model_dump(exclude_unset=True)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM runs WHERE id=?", (run_id,)).fetchone():
+                raise DomainError("Run not found. Open History to choose a saved investigation.", "not_found", 404)
+            db.execute("INSERT OR IGNORE INTO run_metadata (run_id) VALUES (?)", (run_id,))
+            if "label" in fields:
+                db.execute("UPDATE run_metadata SET label=? WHERE run_id=?", (fields["label"], run_id))
+            if "archived" in fields:
+                db.execute("UPDATE run_metadata SET archived=? WHERE run_id=?", (int(fields["archived"]), run_id))
+        return self.get(run_id)
 
     def update(self, run_id: str, *, status=None, stage=None, report: Report | None = None, error=None):
         fields = {"updated_at": utcnow().isoformat()}

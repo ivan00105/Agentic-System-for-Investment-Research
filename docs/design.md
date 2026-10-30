@@ -54,6 +54,8 @@ Current annual facts compare three supported revenue tags by eligible recency, r
 
 Synthetic sources remain labelled in every mode. Frozen discovery can change screening thresholds over the same saved company packets. No mode silently substitutes synthetic data or a saved model answer for a failed live operation.
 
+History supports optional names and archive/restore. These live in a separate `run_metadata` table, created alongside existing tables without rewriting old runs. Archive hides reports from ordinary history and new source selection; saved links, evidence, frozen/replay references and submission recovery still work. Names/archive state belong to each run and are not inherited by a replay copy. Organizing an active run does not cancel it or free the single-worker slot. No report-content edit or permanent-delete operation exists.
+
 The browser defaults model analysis off and submits `model_analysis` explicitly. Older API requests that omit it retain the previous default of `true`; replay never calls a model. Financial availability comes from metric values, independently of each company's `review_status` and `review_error`. Review status is `not_requested`, `pending`, `completed`, `unavailable`, or `failed`; legacy reports default to `not_recorded`. Missing setup/evidence and expected model errors preserve financial completion, while budget exhaustion still stops the run. Restart recovery marks pending analysis failed without changing saved figures or retrying. Completed model analysis does not establish source correctness.
 
 <details>
@@ -74,12 +76,15 @@ In-flight calls may cross admission thresholds. Remote billing is not guaranteed
 
 Model settings come from the server environment and are fixed until restart. `RESEARCH_MODEL_PROVIDER` selects OpenAI, OpenRouter or a trusted compatible endpoint. OpenRouter requires its own key and an explicit model, uses only `https://openrouter.ai/api/v1/responses`, and rejects `OPENAI_BASE_URL`, automatic model routing and online-search variants. All model requests set `store=False`; clients use `max_retries=0`. OpenRouter also sends `require_parameters=true` and `allow_fallbacks=false`. Structured output still passes the application's schema and evidence-reference validation. These request controls do not establish live compatibility, provider retention policy or research quality.
 
+Interpretation statements remain qualitative; figures appear in the deterministic metrics. The response schema publishes the host's existing no-digit rule, and the prompt explicitly excludes years and numbered filing names while allowing digits in evidence IDs. The host still rejects violations if a provider ignores the schema; no paid repair call runs automatically.
+
 | Endpoint | Behavior |
 |---|---|
 | `GET /api/config` | Company/configuration information and current-session connection outcomes; no credentials |
 | `POST /api/runs` | JSON plus `Idempotency-Key`; returns HTTP 202 |
-| `GET /api/runs?limit=30&offset=0` | Paginated history |
+| `GET /api/runs?limit=30&offset=0&archived=false` | Paginated current history; `archived=true` lists archived reports |
 | `GET /api/runs/{id}` | Persisted state and available report |
+| `PATCH /api/runs/{id}` | Update only `label` (up to 120 trimmed characters, blank/null resets) and/or `archived` (boolean); return the run |
 | `GET /api/runs/{id}/evidence/{evidence_id}` | Run-scoped evidence; cross-run IDs return 404 |
 
 Use timezone-aware cutoffs and an explicit mode. Screen fields are sector, minimum annual margin as a ratio (`0.1` = 10%) and result limit 1–5. Validation errors return 422, conflicts 409, unsupported origins 403 and unsupported hosts 400. Full field definitions live in [contracts.py](../src/research_assistant/contracts.py) and the running server's `/openapi.json`.
@@ -90,11 +95,11 @@ Submission recovery compares requests after applying compatible schema defaults.
 
 ### Connections
 
-Environment variables remain the sole configuration source; changes require restart. Connections uses `GET /api/config`, retaining legacy fields and adding separate SEC/model setup and last-attempt records. No settings-write API or browser credential storage exists. Raw endpoint URLs and SEC contact identities are not returned. Opening and refreshing Connections never calls a provider.
+At server startup, the project-root UTF-8 `.env` (with or without a byte-order mark) supplies missing environment variables; existing variables, including empty ones, take precedence. Values are literal and changes require restart. Connections uses `GET /api/config`, retaining legacy fields and adding separate SEC/model setup and last-attempt records. No settings-write API or browser credential storage exists. Raw endpoint URLs and SEC contact identities are not returned. Opening and refreshing Connections never calls a provider.
 
 Connection outcomes are scoped to the current application instance and reset on restart. Only actual retrieval/review paths can record passed or failed outcomes; opening saved examples, replay, missing setup/evidence and unrelated host failures cannot establish provider access. A successful SEC response does not guarantee eligible financial coverage; a valid model review does not establish research correctness.
 
-Explicit check buttons submit ordinary saved runs through `POST /api/runs` and reuse idempotency/recovery safeguards. The SEC check is fixed to fresh MSFT retrieval with model analysis off. The model check selects finished saved company evidence and reuses its cutoff in frozen mode; the UI labels synthetic sources. It requires a positive USD allowance and explicit consent to send evidence/incur charges with confirmation that a provider/key spending cap is set. This records authorization, not an enforceable dollar guarantee: the app cannot ensure provider billing stays within the allowance. Current provider checks are mocked; real checks remain pending identity, credentials, model and spending authorization. Later data providers belong to their data type and must retain provenance without silent fallback.
+Explicit check buttons submit ordinary saved runs through `POST /api/runs` and reuse idempotency/recovery safeguards. The SEC check is fixed to fresh MSFT retrieval with model analysis off. The model check selects finished saved company evidence and reuses its cutoff in frozen mode; the UI labels synthetic sources. It requires a positive USD allowance and explicit consent to send evidence/incur charges with confirmation that a provider/key spending cap is set. This records authorization, not an enforceable dollar guarantee: the app cannot ensure provider billing stays within the allowance. Automated provider checks use mocks; dated live attempts and actual outcomes are recorded in STATUS. Later data providers belong to their data type and must retain provenance without silent fallback.
 
 </details>
 
@@ -160,8 +165,14 @@ Factor families and mining requirements: [sources and factors](sources.md#factor
 
 </details>
 
+## Parallel development chats
+
+For a separate development chat, read the [work-chat catalogue](workstreams.md). It owns C0–C10 assignments, task-sized acceptance criteria, dependency gates, shared-file coordination and the [starter prompt](workstreams.md#copy-into-a-new-work-chat). Read only the selected brief and its [resource pack](sources.md#resource-packs-for-work-chats); use this document for the relevant stable invariants.
+
+Start evidence/calculation work and evaluation design first. Directory work follows stable identity/fact contracts; correction work follows immutable calculation/claim records. Agree a shared baseline before concurrent edits: a new worktree excludes another checkout's uncommitted changes. Keep one integration owner and at most two implementation chats active. Development chat lanes are separate from runtime research roles.
+
 ## Keep these documents small
 
-Update the existing owner: setup in README, capabilities/next acceptance in STATUS, stable behavior here, external evidence in Sources. Use code/types/OpenAPI for exhaustive fields. Routine fixes belong in Git; add a new document only when an existing section cannot own the information.
+Update the existing owner: setup in README, milestone completion/order in STATUS, stable behavior here, external evidence in Sources, detailed assignments in the work-chat catalogue. The catalogue is separate so each chat can load its own brief without expanding the architecture reference. Use code/types/OpenAPI for exhaustive fields. Routine fixes belong in Git; add a new document only when an existing section cannot own the information.
 
 Earlier decisions and full design examples are preserved in the [archive](archive/). The dated [alignment review](archive/alignment_review_2026-10-25.md) records the two October bug fixes and review limits. The [UI verification contract](../verification/design-contract.md) remains the specialist interaction checklist.

@@ -19,6 +19,7 @@ Open [Fieldnote](http://127.0.0.1:8000). First setup needs internet; saved examp
 | You want to… | Read |
 |---|---|
 | See what works and what comes next | [Current status](STATUS.md) |
+| Assign a focused task to a separate work chat | [Work chats and task catalogue](docs/workstreams.md) — owners, dependencies, finish lines and starter prompt |
 | Understand the architecture, contracts or evaluation | [Design](docs/design.md) — diagrams first, detailed references expandable |
 | Choose sources/tools or understand factor research | [Sources](docs/sources.md) |
 
@@ -28,6 +29,8 @@ Open [Fieldnote](http://127.0.0.1:8000). First setup needs internet; saved examp
 2. Select **Evidence 1**, then follow the recorded correction. **Source details** contains the locator and hash.
 3. Open Discovery: missing data stays **unknown**. Use History to reopen a report; refresh does not start a new run.
 4. Open **Connections** to see setup status and the latest provider attempt during this server session. Opening or refreshing it makes no provider calls. Explicit test buttons start a saved connection-check run.
+
+In **History**, add or change a report name and archive/restore reports. Archived reports stay readable through saved links and keep their source evidence. Organizing a report does not edit its financial results or run new research; clear its name to return to the default label.
 
 | Action | What happens |
 |---|---|
@@ -42,7 +45,14 @@ Open [Fieldnote](http://127.0.0.1:8000). First setup needs internet; saved examp
 <details>
 <summary>Enable SEC retrieval and optional model analysis</summary>
 
-Set these environment variables in the terminal **before starting** the server. Restart after changing them. This is the only configuration source: Connections displays setup and runs explicit checks, but never writes settings or stores credentials. Keep credentials out of the browser, source code and commits.
+To configure live access, copy the example once in PowerShell, then edit your local file:
+
+```powershell
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item .env.example .env }
+notepad .env
+```
+
+Uncomment and fill in only the settings you need. Save as UTF-8 (with or without a byte-order mark). Fieldnote loads `.env` from the project folder when the server starts; restart after changing it. Existing environment variables take precedence, including empty values. Values are literal; `${...}` expansion is not supported. Connections displays setup and runs explicit checks but does not write settings or store credentials.
 
 | Variable | Purpose |
 |---|---|
@@ -58,11 +68,11 @@ Set these environment variables in the terminal **before starting** the server. 
 
 For OpenRouter, set `RESEARCH_MODEL_PROVIDER=openrouter`, `OPENROUTER_API_KEY` and an explicit `RESEARCH_MODEL`. Remove `OPENAI_BASE_URL`: OpenRouter uses the fixed `https://openrouter.ai/api/v1/responses` endpoint. Automatic model routing and online-search model variants are rejected. Requests disable storage, SDK retries and provider fallbacks, and require parameter support. OpenAI and trusted compatible endpoints remain available; compatible access uses `OPENAI_API_KEY` and `OPENAI_BASE_URL`.
 
-`.env` is ignored by Git but **not automatically loaded**. Use actual environment variables. Before a live experiment, check account/model capability and agree a small budget. Mocked input/output tests do not establish model quality or real provider access.
+`.env` is ignored by Git; keep it private and do not commit or share credentials. Before a live experiment, check account/model capability and agree a small budget. Mocked input/output tests do not establish model quality or real provider access.
 
 Connections separates **Configured** from **Not tested / Check passed / Check failed**. **Test SEC connection** retrieves MSFT facts without a model call. **Test model connection** uses selected saved evidence for at most one interpretation and one critic call; it requires a positive USD allowance and consent to send evidence and incur charges, including confirmation that a provider/key spending cap is set. The app cannot guarantee that allowance as a dollar cap. An uncertain submission can be recovered with the same submission key.
 
-Results describe provider attempts in this server session, not source correctness; restarting clears them. Opening saved examples and replay do not count as checks. Saved reports retain per-call model, response ID, tokens and provider-reported cost; missing cost is **unknown**, never zero. Live provider access remains unverified pending contact identity, credentials, a compatible model and spending authorization.
+Results describe provider attempts in this server session, not source correctness; restarting clears them. Opening saved examples and replay do not count as checks. Saved reports retain per-call model, response ID, tokens and provider-reported cost; missing cost is **unknown**, never zero. The latest live SEC/model check outcomes and their limits are recorded in [STATUS](STATUS.md).
 
 </details>
 
@@ -92,7 +102,7 @@ npm.cmd --prefix frontend run build
 | Browser checks | `npm.cmd --prefix frontend test` |
 | Frontend dev server | `npm.cmd --prefix frontend run dev` |
 
-Stop the normal server before browser checks: tests use port 8000 and a separate test database. Browser checks use installed Chrome, disable external credentials and save screenshots in `verification/` unless `FIELDNOTE_VERIFICATION_DIR` overrides the destination.
+Stop the normal server before browser checks: tests use port 8000 and a separate test database. Backend and browser tests disable local `.env` loading and isolate provider settings; `.env` tests use temporary files. Browser checks use installed Chrome and save screenshots in `verification/` unless `FIELDNOTE_VERIFICATION_DIR` overrides the destination.
 
 For UI development, run the Python server and frontend dev server in separate terminals; open port 5173. Vite proxies `/api` to port 8000. Production uses one Python server for UI and API. Only one server may own a data directory.
 
@@ -111,6 +121,6 @@ These are archived references, not the current work order:
 - [October alignment review](docs/archive/alignment_review_2026-10-25.md)
 - [Earlier coding playbook](docs/archive/codex_build_playbook.md)
 
-Update the existing four main documents instead of adding a new summary after each change. Historical decisions remain available here; routine changes belong in Git.
+Update the existing document that owns the topic instead of adding a new summary after each change. The task catalogue owns detailed chat assignments; historical decisions remain available here and routine changes belong in Git.
 
 </details>

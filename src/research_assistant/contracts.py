@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 UNIVERSE = {
@@ -195,6 +195,22 @@ class Action(Record):
     message: str
 
 
+class RunMetadataPatch(Record):
+    label: str | None = Field(default=None, max_length=120)
+    archived: bool = Field(default=False, strict=True)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def normalize_label(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set:
+            raise ValueError("Provide a name or archive state to update.")
+        return self
+
+
 class Run(Record):
     id: str
     request: RunRequest
@@ -206,6 +222,8 @@ class Run(Record):
     report: Report | None = None
     error: str | None = None
     synthetic: bool = False
+    label: str | None = None
+    archived: bool = False
 
 
 class DomainError(Exception):

@@ -12,7 +12,7 @@ export interface ModelCall { role: string; provider: string; requested_model: st
 export interface ModelRun { provider: string; model: string | null; schema_version: string; max_output_tokens: number }
 export interface Report { model_run?: ModelRun | null; model_calls?: ModelCall[];  title: string; synthetic: boolean; companies: CompanyReport[]; candidates: Candidate[]; ranking: string | null; limitations: string[] }
 export interface Action { sequence: number; at: string; role: string; message: string }
-export interface Run { id: string; request: RunRequest; status: string; created_at: string; updated_at: string; stage: string; actions: Action[]; report: Report | null; error: string | null; synthetic: boolean }
+export interface Run { id: string; request: RunRequest; status: string; created_at: string; updated_at: string; stage: string; actions: Action[]; report: Report | null; error: string | null; synthetic: boolean; label?: string | null; archived?: boolean }
 export type HistoryItem = Omit<Run, 'actions' | 'report'>
 export interface Evidence { id: string; ticker: string; title: string; excerpt: string; source_url: string | null; available_at: string; retrieved_at: string; period: string; locator: string; snapshot_hash: string; synthetic: boolean }
 export interface ConnectionInfo { configuration_error?: string | null; configured: boolean; provider: string; model: string | null; check: {status: 'not_tested' | 'passed' | 'failed'; checked_at: string | null; run_id: string | null; message: string | null} }
@@ -33,7 +33,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   config: () => request<Config>('/config'),
   run: (id: string) => request<Run>(`/runs/${encodeURIComponent(id)}`),
-  history: (offset = 0) => request<{items: HistoryItem[]; total: number}>(`/runs?limit=30&offset=${offset}`),
+  history: (offset = 0, archived = false) => request<{items: HistoryItem[]; total: number}>(`/runs?archived=${archived}&limit=30&offset=${offset}`),
+  updateRun: (id: string, update: {label?: string | null; archived?: boolean}) => request<Run>(`/runs/${encodeURIComponent(id)}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(update)}),
   evidence: (run: string, id: string) => request<Evidence>(`/runs/${encodeURIComponent(run)}/evidence/${encodeURIComponent(id)}`),
   submit: async (body: RunRequest, key: string): Promise<Run> => {
     const result = await request<unknown>('/runs', {method: 'POST', headers: {'Content-Type': 'application/json', 'Idempotency-Key': key}, body: JSON.stringify(body)})

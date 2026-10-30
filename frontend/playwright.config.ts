@@ -11,6 +11,6 @@ export default defineConfig({
     command: '..\\.venv\\Scripts\\python.exe -m research_assistant.cli',
     url: 'http://127.0.0.1:8000/api/config',
     reuseExistingServer: false,
-    env: {RESEARCH_DATA_DIR: path.resolve('../.tmp/browser-runs', String(Date.now())), SEC_USER_AGENT: '', OPENAI_API_KEY: '', OPENAI_BASE_URL: '', OPENROUTER_API_KEY: '', RESEARCH_MODEL_PROVIDER: '', RESEARCH_MODEL: ''},
+    env: {PYTHON_DOTENV_DISABLED: '1', RESEARCH_DATA_DIR: path.resolve('../.tmp/browser-runs', String(Date.now())), SEC_USER_AGENT: '', OPENAI_API_KEY: '', OPENAI_BASE_URL: '', OPENROUTER_API_KEY: '', RESEARCH_MODEL_PROVIDER: '', RESEARCH_MODEL: ''},
   },
 })
