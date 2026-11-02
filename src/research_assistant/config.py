@@ -88,3 +88,15 @@ PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
 PRICE_CLOSE_AVAILABLE_HOUR = 18
 # Annualisation for volatility: US exchanges trade about 252 days a year.
 TRADING_DAYS_PER_YEAR = 252
+
+# --- Agents -------------------------------------------------------------------------------
+
+# Model calls per agent run: a guard against infinite loops, not a quality cap (§5). A Check or
+# Compare question needs roughly 8-20 calls. Reaching the guard asks the model once for its best
+# report from what it has, marked "stopped at limit"; it never errors.
+AGENT_MAX_STEPS = 30
+
+
+def trace_dir() -> Path:
+    # One append-only JSONL trace per run, written step by step so a crash still leaves the trace.
+    return data_dir() / "traces"
