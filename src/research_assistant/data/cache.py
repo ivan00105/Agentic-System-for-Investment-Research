@@ -1,4 +1,5 @@
 """A small disk cache shared by every data provider: one body file and one metadata file per key."""
+import contextlib
 import hashlib
 import json
 import logging
@@ -43,7 +44,10 @@ class DiskCache:
             except OSError as exc:
                 # The data was fetched fine, so a cache problem must not fail the caller.
                 LOG.warning("Cache write failed for %s: %s", key, exc)
-                temporary.unlink(missing_ok=True)
+                # Best-effort cleanup. Linux raises NotADirectoryError (not FileNotFoundError) when the
+                # cache folder is a file, so missing_ok alone is not enough.
+                with contextlib.suppress(OSError):
+                    temporary.unlink()
                 return
 
     def _paths(self, key: str) -> tuple[Path, Path]:

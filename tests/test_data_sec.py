@@ -1,6 +1,7 @@
 import json
 import threading
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -155,6 +156,16 @@ def test_corrupt_cache_entry_is_refetched(tmp_path):
         body.write_bytes(b"torn")
     assert sec_client.get(FACTS).body == b"good"
     assert len(network.requests) == 2
+
+
+def test_failed_cache_cleanup_never_reaches_the_caller(tmp_path, monkeypatch):
+    # Linux raises NotADirectoryError, not FileNotFoundError, when the cache folder is a file.
+    def unlink(self, missing_ok=False):
+        raise NotADirectoryError(20, "Not a directory", str(self))
+    monkeypatch.setattr(Path, "unlink", unlink)
+    (tmp_path / "cache").write_text("a file where the cache folder should be", encoding="utf-8")
+    response = client(tmp_path, Network(httpx.Response(200, content=b"facts"))).get(FACTS)
+    assert response.body == b"facts" and not response.from_cache
 
 
 def test_unwritable_cache_still_returns_the_response(tmp_path):
