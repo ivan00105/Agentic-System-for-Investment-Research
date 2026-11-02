@@ -34,6 +34,12 @@ class FakeClient:
         self.requests: list[dict] = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+
     def create(self, **kwargs):
         self.requests.append({**kwargs, "messages": list(kwargs["messages"])})
         if not self.script:
