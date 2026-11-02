@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from pydantic import BaseModel, ConfigDict
 
-from .contracts import Claim, CompanyReport, DomainError, Evidence, Metric, UNIVERSE, utcnow
+from .contracts import Claim, CompanyReport, DomainError, Evidence, Metric, UNIVERSE
 from .store import Store
 from .filings import fetch_source, retrieve_packet
 from .financials import eligible_fact, operating_margin, parse_filing_facts

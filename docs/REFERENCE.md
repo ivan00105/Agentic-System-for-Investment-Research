@@ -1,6 +1,6 @@
 # Reference: rules, finance cautions, evaluation and resources
 
-The plan is in [PROJECT_GUIDE.md](../PROJECT_GUIDE.md). This file is the **lookup shelf**: everything useful from the old docs (`docs/archive/`, `STATUS.md`, `design.md`, `sources.md`, `workstreams.md`, `c1-handoff.md`, `integration.md`), merged and de-duplicated. Read only the section you need.
+The plan is in [PROJECT_GUIDE.md](../PROJECT_GUIDE.md). This file is the **lookup shelf**: everything useful from the old docs (all now in `docs/archive/`: `STATUS.md`, `design.md`, `sources.md`, `workstreams.md`, `c1-handoff.md`, `integration.md` and the earlier specs), merged and de-duplicated. Read only the section you need.
 
 Contents: [1 Rules](#1-system-rules-non-negotiable) · [2 Analyst roles](#2-analyst-role-contracts) · [3 Review outcomes](#3-claims-objections-and-outcomes) · [4 Discover](#4-discover-mode-rules) · [5 Finance cautions](#5-finance-and-data-cautions) · [6 Outlook model](#6-outlook-forecast-specification) · [7 Evaluation](#7-evaluation-protocol) · [8 Security](#8-security-and-prompt-injection) · [9 UI](#9-ui-requirements) · [10 Resources](#10-resource-catalogue)
 

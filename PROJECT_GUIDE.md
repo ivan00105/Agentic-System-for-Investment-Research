@@ -182,10 +182,10 @@ What went wrong before: a 2,000-output-token cap cut off reasoning-model answers
 | Hard-coded limit / assumption | Where | Effect | Fix effort |
 |---|---|---|---|
 | 5 tickers (`UNIVERSE`, `Ticker` Literal) | [contracts.py:8-15](src/research_assistant/contracts.py:8), used in ~8 files | No other stock possible | Medium. The new tools use `find_company`; the old pipeline can keep its 5. |
-| Store re-validates every fact against `UNIVERSE[ticker]` | [store.py:122-165](src/research_assistant/store.py:122) | **Breaks any new ticker** | Easy: delete the check |
+| Store re-validates every fact against `UNIVERSE[ticker]` | [store.py:122-165](src/research_assistant/store.py:122) | **Breaks any new ticker** | Done (Phase 0) |
 | Sector Literal (4 values) hard-coded per ticker | [contracts.py:38](src/research_assistant/contracts.py:38) | Wrong for most companies | Easy: SIC code from SEC |
 | Screen: margin only, 1–5 results | [contracts.py:39-40](src/research_assistant/contracts.py:39) | Can't express real criteria | Easy (new `screen` tool) |
-| `max_retries=0` on the LLM client | [model_access.py:42](src/research_assistant/model_access.py:42) | One network blip = failed call | Trivial |
+| `max_retries=0` on the LLM client | [model_access.py:42](src/research_assistant/model_access.py:42) | One network blip = failed call | Done (Phase 0): SDK default retries |
 | No-digit rejection | [application.py:339](src/research_assistant/application.py:339) | Throws away whole answers | Easy |
 | Exactly one interpretation + one critic call | [application.py:284](src/research_assistant/application.py:284) | No loop | This *is* the agent work |
 | One worker, one active run at a time | [application.py:128](src/research_assistant/application.py:128), store index | Evaluation can't run cases in parallel through the API | Easy: the eval runner calls agents directly |
@@ -208,7 +208,7 @@ What went wrong before: a 2,000-output-token cap cut off reasoning-model answers
 
 | Scaffolding | Gets in the way? | Decision |
 |---|---|---|
-| Fact provenance re-check on every save | **Yes**: breaks new tickers | Remove (easy) |
+| Fact provenance re-check against the fixed universe | **Yes**: breaks new tickers | Removed in Phase 0 (the check against the source filing stays) |
 | XBRL 10-K re-parse on every fetch (3 extra downloads; fails if basis/scope text is missing) | **Yes**: slow, and makes many companies "unavailable" | Make it optional: becomes the `verify_against_filing` tool |
 | Strict contracts (`extra="forbid"`, Literals) + legacy migration | Somewhat: every new field touches 3+ files | New agent code uses its own simple models; leave the old ones alone |
 | Idempotency keys, single worker, process lock | Slightly: only the API path | Keep for the UI; eval bypasses it |
@@ -323,11 +323,13 @@ flowchart LR
 ```
 
 ### Phase 0: Tidy + guardrails
-- [ ] Commit the current tree as a checkpoint and tag it `pre-agent`.
-- [ ] Add `AGENTS.md` + `CLAUDE.md`, CI (pytest, ruff, tsc) and a PR template.
-- [ ] Move old planning docs (STATUS, design, workstreams, sources, c1-handoff, integration, tasks/) into `docs/archive/`. Cut the README down to "what + how to run + link here".
-- [ ] Add `.archify/`, `graphify-out/` and `verification/packets/` to `.gitignore` (keep them locally).
-- [ ] Quick fixes: `max_retries` default, remove the store's UNIVERSE re-check.
+- [x] Commit the current tree as a checkpoint and tag it `pre-agent`.
+- [x] Add `AGENTS.md` + `CLAUDE.md`, CI (pytest, ruff, tsc) and a PR template.
+- [x] Move old planning docs (STATUS, design, workstreams, sources, c1-handoff, integration, tasks/) into `docs/archive/`. Cut the README down to "what + how to run + link here".
+- [x] Add `.archify/`, `graphify-out/` and `verification/packets/` to `.gitignore` (keep them locally). Tests that read the packet skip when it's missing, so CI skips them.
+- [x] Quick fixes: `max_retries` default, remove the store's UNIVERSE re-check.
+- [ ] Optional, any time: run `ruff format` once over the old code in its own commit, then enforce it in CI and a pre-commit hook. Until then CI runs only bug-catching lint rules.
+- [ ] Protect `main` on GitHub (Settings → Branches): require a PR and green CI.
 
 ### Phase 1: Tools
 **Adopt before you build.** Before writing a tool or adding a dependency, check the [adopt-or-build table](docs/REFERENCE.md#adopt-or-build-tool-by-tool-survey-of-2-nov-2026). Most tools are ours, built over SEC JSON. The exceptions:

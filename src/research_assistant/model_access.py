@@ -36,10 +36,10 @@ class ModelSettings:
 
     @property
     def client_kwargs(self) -> dict:
+        # No max_retries override: the SDK default retries 429/5xx and connection errors.
         kwargs = {
             "api_key": self.api_key,
             "base_url": self.base_url,
-            "max_retries": 0,
         }
         if self.provider == "openrouter":
             # Empty values suppress the SDK's OPENAI_ORG_ID/OPENAI_PROJECT_ID defaults.
@@ -80,7 +80,7 @@ def _valid_endpoint(value: str) -> bool:
             or any(character.isspace() or ord(character) < 32 for character in value)
         ):
             return False
-        endpoint.port  # Reject malformed ports during configuration loading.
+        _ = endpoint.port  # Reject malformed ports during configuration loading.
         if endpoint.scheme == "https":
             return True
         if endpoint.scheme != "http":
@@ -131,9 +131,9 @@ def safe_model_error(exc: Exception) -> DomainError:
     if isinstance(exc, (AuthenticationError, PermissionDeniedError)):
         return DomainError("Model authentication or access was rejected. Check the selected provider credentials and permissions.", "model_authentication", 502)
     if isinstance(exc, RateLimitError):
-        return DomainError("The model provider rate limit was reached. Retry explicitly later; no automatic retry was made.", "model_rate_limit", 502)
+        return DomainError("The model provider rate limit was still reached after automatic retries. Saved results remain available; retry later.", "model_rate_limit", 502)
     if isinstance(exc, (APITimeoutError, TimeoutError)):
-        return DomainError("The model request timed out. No automatic retry was made because the request may still incur cost.", "model_timeout", 502)
+        return DomainError("The model request still timed out after automatic retries. Saved results remain available.", "model_timeout", 502)
     if isinstance(exc, (BadRequestError, APIResponseValidationError, ValueError)):
         return DomainError("The model request or structured response was incompatible with the required schema. Saved results remain available.", "model_schema", 502)
     if isinstance(exc, (NotFoundError, APIConnectionError)):
@@ -142,4 +142,4 @@ def safe_model_error(exc: Exception) -> DomainError:
         if exc.status_code == 402:
             return DomainError("The model provider requires payment or additional credits. Check the selected provider account.", "model_unavailable", 502)
         return DomainError("The model provider could not complete the request. Saved results remain available; retry explicitly later.", "model_unavailable", 502)
-    return DomainError("Model request failed. No automatic retry was made. Saved results remain available.", "model_failed", 502)
+    return DomainError("Model request failed. Saved results remain available.", "model_failed", 502)

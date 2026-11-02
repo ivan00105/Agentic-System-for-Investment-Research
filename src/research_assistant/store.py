@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
 
-from .contracts import Action, Calculation, DomainError, Evidence, FinancialFact, Report, Run, RunRequest, UNIVERSE, utcnow
+from .contracts import Action, Calculation, DomainError, Evidence, FinancialFact, Report, Run, RunRequest, utcnow
 
 
 class Store:
@@ -132,7 +132,7 @@ class Store:
                 source = evidence.get(fact.evidence_id)
                 if (identified(fact, "fact-").id != fact.id or source is None or source.packet is None
                         or fact.available_at > request.cutoff or source.snapshot_hash != fact.snapshot_hash
-                        or source.packet.cik != fact.issuer_cik or fact.issuer_cik != UNIVERSE[company.ticker]["cik"]
+                        or source.packet.cik != fact.issuer_cik
                         or source.packet.accession != fact.accession or source.packet.form != fact.form
                         or source.packet.filed != fact.filed or source.packet.period_end != fact.end
                         or source.available_at != fact.available_at):

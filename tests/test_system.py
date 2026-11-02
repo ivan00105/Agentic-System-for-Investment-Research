@@ -387,7 +387,7 @@ def test_model_failure_is_separate_and_preserves_financial_results(store, monkey
     calls = []
     class FakeClient:
         def __init__(self, **kwargs):
-            assert kwargs == {"api_key": "test-only-not-a-real-key", "base_url": "https://api.openai.com/v1", "max_retries": 0}
+            assert kwargs == {"api_key": "test-only-not-a-real-key", "base_url": "https://api.openai.com/v1"}
             self.responses = self
             self.with_raw_response = self
         def __enter__(self): return self

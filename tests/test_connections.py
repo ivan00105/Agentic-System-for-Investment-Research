@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from research_assistant import research
 from research_assistant.api import create_app
 from research_assistant.application import Application, Critique, Draft, Interpretation, Objection
-from research_assistant.contracts import ConnectionCheck, DomainError, RunRequest
+from research_assistant.contracts import ConnectionCheck, RunRequest
 from research_assistant.fixtures import FIXTURE_CUTOFF, seed
 from research_assistant.store import Store
 

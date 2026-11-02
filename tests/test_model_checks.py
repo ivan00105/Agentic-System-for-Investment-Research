@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import httpx
 import pytest
-from openai import OpenAI
+from openai import DEFAULT_MAX_RETRIES, OpenAI
 from pydantic import ValidationError
 
 from research_assistant import research
@@ -138,12 +138,12 @@ def test_openrouter_check_sends_strict_bounded_requests_and_persists_metadata(ap
     company = assert_saved_financials(app, result)
     assert company.review_status == "completed"
     assert len(requests) == len(constructors) == 2
-    for index, (request, settings) in enumerate(zip(requests, constructors)):
+    for index, (request, settings) in enumerate(zip(requests, constructors, strict=True)):
         assert str(request.url) == "https://openrouter.ai/api/v1/responses"
         assert request.headers["authorization"] == "Bearer secret-router-key"
         assert not request.headers.get("openai-organization")
         assert not request.headers.get("openai-project")
-        assert settings["max_retries"] == 0 and "timeout" not in settings
+        assert "max_retries" not in settings and "timeout" not in settings
         payload = json.loads(request.content)
         assert payload["input"][0]["role"] == "system"
         if index == 0:
@@ -202,13 +202,14 @@ def test_missing_usage_and_returned_model_remain_unknown(app, monkeypatch):
 
 
 @pytest.mark.parametrize("status", [400, 401, 402, 403, 404, 429, 500])
-def test_provider_failure_is_not_retried_and_keeps_financials(app, monkeypatch, status):
+def test_provider_failure_keeps_financials_and_only_transient_errors_retry(app, monkeypatch, status):
     requests, _ = wire_model(monkeypatch, [httpx.Response(status, json={
         "error": {"message": "secret-router-key private-provider-body", "type": "provider_error"},
     })])
     result = submit(app)
     company = assert_saved_financials(app, result)
-    assert company.review_status == "failed" and len(requests) == 1
+    attempts = 1 + DEFAULT_MAX_RETRIES if status in {429, 500} else 1
+    assert company.review_status == "failed" and len(requests) == attempts
     assert app.connections()["model"].check.status == "failed"
     assert len(result.report.model_calls) == 1
     call = result.report.model_calls[0]
@@ -218,11 +219,11 @@ def test_provider_failure_is_not_retried_and_keeps_financials(app, monkeypatch, 
     assert "private-provider-body" not in result.model_dump_json()
 
 
-def test_timeout_is_not_retried_or_reported_as_zero_cost(app, monkeypatch):
+def test_timeout_is_retried_and_not_reported_as_zero_cost(app, monkeypatch):
     requests, _ = wire_model(monkeypatch, [httpx.ReadTimeout("secret-router-key")])
     result = submit(app)
     assert assert_saved_financials(app, result).review_status == "failed"
-    assert len(requests) == 1
+    assert len(requests) == 1 + DEFAULT_MAX_RETRIES
     assert result.report.model_calls[0].cost_usd is None
     assert result.report.model_calls[0].error_code == "model_timeout"
 

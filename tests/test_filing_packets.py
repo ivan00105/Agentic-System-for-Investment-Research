@@ -11,6 +11,8 @@ from research_assistant.research import SecFact
 from research_assistant.store import Store
 
 PACKET = Path(__file__).resolve().parents[1] / "verification/packets/msft-fy2024/20261029T182734Z"
+# The packet holds 48 MB of real SEC files and is git-ignored, so fresh clones and CI skip these tests.
+needs_packet = pytest.mark.skipif(not PACKET.is_dir(), reason="needs the local SEC packet in verification/packets/")
 CUTOFF = datetime(2025, 3, 1, tzinfo=timezone.utc)
 
 
@@ -18,6 +20,7 @@ def annual():
     return SecFact(start="2023-07-01", end="2024-06-30", val="245122000000", accn="0000950170-24-087843", filed="2024-07-30", form="10-K")
 
 
+@needs_packet
 def test_real_packet_retrieval_preserves_bytes(tmp_path):
     def handler(request):
         name = "sec-index.html" if request.url.path.endswith("-index.htm") else "sec-filing.html"
@@ -31,6 +34,7 @@ def test_real_packet_retrieval_preserves_bytes(tmp_path):
     assert store.snapshot_bytes(packet.documents[1].snapshot_hash) == (PACKET / "raw/sec-filing.html").read_bytes()
 
 
+@needs_packet
 @pytest.mark.parametrize("mutation,code", [("issuer", "issuer_mismatch"), ("accession", "issuer_mismatch"), ("date", "source_format"), ("external", "source_format")])
 def test_index_identity_and_link_boundary(tmp_path, mutation, code):
     raw = (PACKET / "raw/sec-index.html").read_bytes()
@@ -49,6 +53,7 @@ def test_index_identity_and_link_boundary(tmp_path, mutation, code):
     assert caught.value.code == code
 
 
+@needs_packet
 def test_packet_cutoff_rejected_before_filing_download(tmp_path):
     calls = []
     def handler(request):
@@ -88,6 +93,7 @@ def test_sec_requests_are_paced(monkeypatch):
     assert pauses == [0.11, 0.11, 0.11]
 
 
+@needs_packet
 def test_real_research_frozen_replay_and_immutable_records(tmp_path, monkeypatch):
     from decimal import Decimal
     import time
@@ -168,6 +174,7 @@ def test_source_download_is_evidence_scoped_and_byte_stable(tmp_path):
         assert client.get(base + other.snapshot_hash).status_code == 404
 
 
+@needs_packet
 def test_original_document_wrong_period_or_amendment_rejected(tmp_path):
     for field in ("dei:DocumentPeriodEndDate", "dei:AmendmentFlag"):
         filing = (PACKET / "raw/sec-filing.html").read_bytes()
@@ -177,7 +184,7 @@ def test_original_document_wrong_period_or_amendment_rejected(tmp_path):
         new = old.replace(b"2024", b"2025") if field.endswith("EndDate") else old.replace(b"false", b"true")
         changed = filing.replace(old, new)
         assert filing != changed
-        def handler(request):
+        def handler(request, changed=changed):
             return httpx.Response(200, content=(PACKET / "raw/sec-index.html").read_bytes() if request.url.path.endswith("-index.htm") else changed)
         with httpx.Client(transport=httpx.MockTransport(handler)) as client:
             with pytest.raises(DomainError, match="period/amendment"):
