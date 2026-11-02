@@ -8,7 +8,7 @@ Rules for everyone who changes this repo: people, Claude Code, Codex and any oth
 
 ## Rules
 
-1. **One task per branch.** Name the branch after the task. Small PRs. Never commit to `main` directly.
+1. **Your own branch, one commit per subtask, then a PR.** Keep working on your personal branch (e.g. `ivan`); no new branch per phase or task. Two people never share a branch. Each commit finishes one checkbox or slice, passes the tests and names it in the message. When you're ready, open a PR to `main`; the repo owner reviews and merges it. Never commit to `main` directly.
 2. **Layout and dependency direction.** New code goes in the target layout (PROJECT_GUIDE §8): `finance` ← `data` ← `tools` ← `agents` ← `api`. `finance/` does no I/O. Tools never call an LLM. Agents never make HTTP calls; they use tools. The old pipeline (`application.py`, `research.py`, …) is baseline A: build beside it, don't rewrite it, and delete parts only when they block you.
 3. **Adopt before you build.** Before writing a tool or adding a dependency, check the adopt-or-build table in REFERENCE §10. Licences don't matter (academic project). Pin exact versions (`==`) of anything new in `pyproject.toml`.
 4. **No hidden caps.** No output-token caps, token quotas or cost budgets unless the user opts in. Retry 429/5xx with the SDK defaults. Never hard-code tickers, sectors or result counts. Never silently truncate input or output.
