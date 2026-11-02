@@ -338,7 +338,8 @@ flowchart LR
 - **Prices:** yfinance works with no key; Tiingo goes first when its key is set.
 
 Licences don't matter here (it's an academic project): calling a library and copying its logic are both fine, whichever is easier. If you find a better library, add a row to that table, not a new doc.
-- [ ] `config.py`, `data/sec.py` with a disk cache, `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
+- [x] `config.py`, `data/sec.py`: one SEC client with a disk cache (archived filings kept forever, JSON APIs refreshed after a day) and one 10 requests/second limiter shared by the whole process.
+- [ ] `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
 - [ ] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
 - [ ] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
 - [ ] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
