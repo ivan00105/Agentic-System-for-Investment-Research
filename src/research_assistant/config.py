@@ -100,3 +100,26 @@ AGENT_MAX_STEPS = 30
 def trace_dir() -> Path:
     # One append-only JSONL trace per run, written step by step so a crash still leaves the trace.
     return data_dir() / "traces"
+
+
+# --- Report checker -----------------------------------------------------------------------
+
+# Digits the model may type because they name something rather than state a figure: form types,
+# Item numbers, years, dates, quarters, index names. Any other digit outside a {fact:ID}/{calc:ID}
+# placeholder is flagged (never removed) as a number no tool result backs.
+CHECKER_ALLOWED_NUMBER_PATTERNS = (
+    r"\b(?:10-K|10-Q|8-K|20-F|40-F|6-K|S-1|DEF 14A)(?:/A)?\b",  # SEC form types
+    r"\bItems? \d{1,2}[A-C]?(?:\.\d{2})?\b",  # Item 1A, Item 7, Item 2.02
+    r"\b(?:19|20)\d{2}-\d{2}-\d{2}\b",  # ISO dates (period ends)
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+    r" \d{1,2}(?:, (?:19|20)\d{2})?\b",  # September 27, 2025
+    r"\bFY ?(?:19|20)?\d{2}\b",  # FY2025, FY25
+    r"\b(?:19|20)\d{2}\b",  # calendar and fiscal years
+    r"\bQ[1-4]\b|\b[1-4]Q\d{2}\b",  # quarters
+    r"\bS&P 500\b",
+)
+
+# Decimals shown when the checker fills a placeholder: percentages, percentage points, multiples and
+# amounts in millions/billions. One decimal is how equity research quotes them (45.6%, 28.4x);
+# per-share amounts keep two, as filed. The exact value stays in the cited record.
+REPORT_DECIMALS = 1
