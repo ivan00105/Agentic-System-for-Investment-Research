@@ -351,6 +351,7 @@ Licences don't matter here (it's an academic project): calling a library and cop
 ### Phase 2: Single agent loop
 - [ ] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
   - The trace is one append-only JSONL file per run in `data/traces/` (every model call, tool call, result and token count). It moves into SQLite when the UI needs it (Phase 7).
+  - Condition B includes REFERENCE §7's one self-review pass: when the checker flags the draft, the flags go back to the model once (`AGENT_SELF_REVIEW_PASSES`); leftover flags stay visible in the report. The report already uses the Phase 3 shape (summary, key numbers, bull vs bear, risks, what would change the view, limitations) so A–D compare like for like.
 - [ ] CLI: `python -m research_assistant.cli "question"`.
 - **Done when:** the Check and Compare examples give sensible, fully cited reports. This set-up is evaluation condition **B**.
 

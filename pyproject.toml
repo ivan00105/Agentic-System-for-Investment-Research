@@ -22,6 +22,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "research_assistant.prompts" = ["*.txt"]
+"research_assistant.agents.prompts" = ["*.md"]
 
 [tool.ruff]
 line-length = 120

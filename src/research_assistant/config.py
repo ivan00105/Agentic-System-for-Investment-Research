@@ -95,6 +95,9 @@ TRADING_DAYS_PER_YEAR = 252
 # Compare question needs roughly 8-20 calls. Reaching the guard asks the model once for its best
 # report from what it has, marked "stopped at limit"; it never errors.
 AGENT_MAX_STEPS = 30
+# Condition B's self-review (REFERENCE §7): when the checker flags the draft, the flags go back to
+# the model this many times so it can fix them. They share the step guard above.
+AGENT_SELF_REVIEW_PASSES = 1
 
 
 def trace_dir() -> Path:
