@@ -10,7 +10,7 @@ Revised 2 November 2026 after reviewing the code, the course guideline and every
 
 - **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
 - **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
-- **Where we are:** the data plumbing, storage and UI work (201 tests pass). **The agent itself hasn't been built.** Today's flow is a fixed pipeline plus two LLM calls that only add comments, and the course says that is not enough.
+- **Where we are:** the data plumbing, storage and UI work, and the Phase 1 tools are built (`tools/`, 8 tools). **The agent itself hasn't been built.** Today's flow is a fixed pipeline plus two LLM calls that only add comments, and the course says that is not enough.
 - **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
 - **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A and as a fallback when no API key is set.
 - **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
@@ -288,7 +288,7 @@ tests/             # mirrors src/; network always mocked
 - **CI on every push/PR** (GitHub Actions): `pytest`, `ruff` lint/format and `tsc`. Red CI means no merge.
 - **Pre-commit hook** running ruff, so formatting arguments never happen.
 - **PR template** with a 4-item checklist: tests added, config not bypassed, no new docs, guide checkbox updated.
-- **Branch per task, small PRs**, and protect `main`.
+- **One personal branch per person (no new branch per phase or task), one commit per subtask**, then a PR to `main` that the repo owner reviews, and protect `main`.
 
 "Scaling" here means more tickers and parallel evaluation runs: cache SEC and price responses, respect SEC's 10 req/s, run tool calls concurrently. It does **not** mean microservices, queues or vector DBs.
 
@@ -296,7 +296,7 @@ tests/             # mirrors src/; network always mocked
 Switch whenever a quota runs out. Nothing in the project is tied to one tool. What makes switching safe is that **the repo holds the context, not the chat**:
 1. **One rules file.** `AGENTS.md` has the rules, and `CLAUDE.md` only imports it. Never keep two copies.
 2. **Decisions go into this guide or REFERENCE before you switch.** Chat history and each tool's private memory don't carry over.
-3. **Switch at a clean point.** Commit the current task (a WIP commit on its branch is fine) and tick its checkbox. Avoid switching in the middle of a design discussion.
+3. **Switch at a clean point.** Commit the current subtask (a WIP commit is fine) and tick its checkbox. Avoid switching in the middle of a design discussion.
 4. **Give the new tool one checkbox, not "continue the project".** For example: *"Read AGENTS.md and PROJECT_GUIDE.md. Do the Phase 1 task `get_prices` as described in docs/REFERENCE.md §10. Done when its fixture test passes. Don't create new docs."*
 5. **One tool per branch at a time.** Two agents in the same working tree overwrite each other; use separate branches or git worktrees.
 6. **Review when you switch back.** Have the next tool, or a teammate, review the previous tool's commits before merging, with CI green. Unreviewed AI output is how the doc sprawl and the hidden token cap happened.
@@ -339,13 +339,14 @@ flowchart LR
 
 Licences don't matter here (it's an academic project): calling a library and copying its logic are both fine, whichever is easier. If you find a better library, add a row to that table, not a new doc.
 - [x] `config.py`, `data/sec.py`: one SEC client with a disk cache (archived filings kept forever, JSON APIs refreshed after a day) and one 10 requests/second limiter shared by the whole process.
-- [ ] `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
-- [ ] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
-- [ ] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
-- [ ] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
-- [ ] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
-- [ ] Commit small, trimmed SEC fixtures (a few KB each) so CI covers filing parsing. Today 20 tests read the 48 MB local packet and are skipped in CI.
+- [x] `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
+- [x] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
+- [x] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
+- [x] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
+- [x] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
+- [x] Commit small, trimmed SEC fixtures so CI covers filing parsing: `tests/fixtures/` (rebuilt by `build_sec_fixtures.py`); the old packet tests now run in CI on a 64 KB trimmed copy.
 - **Done when:** every tool gives correct, cited output for 10+ companies, including a bank and a foreign filer (which must come back "unsupported", not crash).
+  - Checked live on 3 Nov 2026 for 13 companies (AAPL, MSFT, NVDA, AMZN, GOOGL, KO, JNJ, WMT, XOM, JPM, C, TSM, BABA): every revenue figure `verify_against_filing` checked matched the original filing; bank operating income and TSM (IFRS) come back unsupported. Known cases: XOM's ticker now points to a new holding company with no 10-K yet (history is under predecessor CIK 34088, and `find_company` says so); BABA's USD figures are convenience translations of CNY and are flagged; one-year betas from Yahoo look low (KO −0.28, XOM −0.72; the maths matches numpy), so cross-check them with Tiingo before the evaluation.
 
 ### Phase 2: Single agent loop
 - [ ] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
