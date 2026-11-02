@@ -1,0 +1,38 @@
+{
+ "taxonomy": "us-gaap",
+ "tag": "Revenues",
+ "ccp": "CY2023",
+ "uom": "USD",
+ "label": "Revenues",
+ "description": "Amount of revenue recognized from goods sold, services rendered, insurance premiums, or other activities that constitute an earning process. Includes, but is not limited to, investment and interest income before deduction of interest expense when recognized as a component of revenue, and sales and trading gain (loss).",
+ "pts": 2679,
+ "data": [
+  {
+   "accn": "0001628280-26-008131",
+   "cik": 19617,
+   "entityName": "JPMorgan Chase & Co",
+   "loc": "US-NY",
+   "start": "2023-01-01",
+   "end": "2023-12-31",
+   "val": 158104000000
+  },
+  {
+   "accn": "0001045810-26-000021",
+   "cik": 1045810,
+   "entityName": "NVIDIA CORP",
+   "loc": "US-CA",
+   "start": "2023-01-30",
+   "end": "2024-01-28",
+   "val": 60922000000
+  },
+  {
+   "accn": "0001652044-26-000018",
+   "cik": 1652044,
+   "entityName": "Alphabet Inc.",
+   "loc": "US-CA",
+   "start": "2023-01-01",
+   "end": "2023-12-31",
+   "val": 307394000000
+  }
+ ]
+}

@@ -1,0 +1,92 @@
+{
+ "cik": "0001046179",
+ "entityType": "other",
+ "sic": "3674",
+ "sicDescription": "Semiconductors & Related Devices",
+ "ownerOrg": "04 Manufacturing",
+ "insiderTransactionForOwnerExists": 0,
+ "insiderTransactionForIssuerExists": 1,
+ "name": "TAIWAN SEMICONDUCTOR MANUFACTURING CO LTD",
+ "tickers": [
+  "TSM",
+  "TSMWF"
+ ],
+ "exchanges": [
+  "NYSE",
+  "OTC"
+ ],
+ "category": "Large accelerated filer",
+ "fiscalYearEnd": "1231",
+ "stateOfIncorporation": "",
+ "stateOfIncorporationDescription": "",
+ "formerNames": [],
+ "filings": {
+  "recent": {
+   "accessionNumber": [
+    "0001046179-26-000724",
+    "0001628280-26-025362"
+   ],
+   "filingDate": [
+    "2026-10-08",
+    "2026-04-16"
+   ],
+   "reportDate": [
+    "2026-10-07",
+    "2025-12-31"
+   ],
+   "acceptanceDateTime": [
+    "2026-10-08T10:35:58.000Z",
+    "2026-04-16T10:05:49.000Z"
+   ],
+   "act": [
+    "",
+    "34"
+   ],
+   "form": [
+    "4",
+    "20-F"
+   ],
+   "fileNumber": [
+    "",
+    "001-14700"
+   ],
+   "filmNumber": [
+    "",
+    "26865574"
+   ],
+   "items": [
+    "",
+    ""
+   ],
+   "core_type": [
+    "4",
+    "XBRL"
+   ],
+   "size": [
+    6932,
+    41479898
+   ],
+   "isXBRL": [
+    0,
+    1
+   ],
+   "isInlineXBRL": [
+    0,
+    1
+   ],
+   "isXBRLNumeric": [
+    0,
+    1
+   ],
+   "primaryDocument": [
+    "xslF345X06/wk-form4_1791455755.xml",
+    "tsm-20251231.htm"
+   ],
+   "primaryDocDescription": [
+    "FORM 4",
+    "20-F"
+   ]
+  },
+  "files": []
+ }
+}
