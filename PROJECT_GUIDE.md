@@ -1,0 +1,430 @@
+# Project Guide
+
+**The one page to read.** It covers what we're building, where we are and what to do next. Details (rules, finance cautions, evaluation protocol, forecast spec, every external link) live in [docs/REFERENCE.md](docs/REFERENCE.md). Everything older is history.
+
+Revised 2 November 2026 after reviewing the code, the course guideline and every old doc.
+
+---
+
+## TL;DR
+
+- **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
+- **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
+- **Where we are:** the data plumbing, storage and UI work (201 tests pass). **The agent itself hasn't been built.** Today's flow is a fixed pipeline plus two LLM calls that only add comments, and the course says that is not enough.
+- **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
+- **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A and as a fallback when no API key is set.
+- **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
+- **Lesson from the Codex budget-cap mess:** no hidden token, cost or universe caps. Every limit lives in one config file, is generous by default, and finishes gracefully instead of failing (see §5).
+
+---
+
+## 1. What we're building
+
+### Your original idea, checked against reality
+
+> *"Check and forecast any stock or asset, or discover one or more stocks for users to trade or invest in the best way."*
+
+Most of the idea holds up. Three parts need adjusting so the result is professionally defensible:
+
+| Your idea | Keep / adjust | Why |
+|---|---|---|
+| **Check** any stock | ✅ Keep. "Any" means any US company that files with the SEC (about 6,000+), not 5 hard-coded tickers. | Fundamentals come from SEC filings. |
+| Any **asset** (ETF, crypto, FX…) | ⚠️ Stocks get full analysis. ETFs could later get price-only analysis. Crypto and FX are out of scope. | They have no filings, so the fundamentals and risk-factor tools don't apply. They would need a different system. |
+| **Forecast** | ⚠️ Keep as an **Outlook**: a statistical probability that the stock beats SPY over about a month, scored honestly. Not an LLM guess or a price target. **Parked until the core works.** | Short-horizon returns are close to a coin flip. An LLM can't be backtested fairly because it already "knows" the future of historical dates. A calibrated probability that we evaluate is defensible; "the stock will go up" isn't. |
+| **Discover** stocks | ✅ Keep. Plain-English criteria → visible screen → research the top candidates → shortlist with reasons. | This is the strongest agentic demo: planning, tools, replacing candidates that fail. |
+| Help users **trade/invest the best way** | ⚠️ Reframe as **decision support**. The user states preferences (horizon, risk appetite, style); the system gives a shortlist, a thesis, risks and what would change the view. No personal buy/sell advice. | "Best" can't be proven or evaluated in a course, and personalised investment advice is regulated. Decision support is honest, evaluable and still useful. |
+
+**Something the original plan missed:** valuation and risk. A stock can be an excellent business and still a bad investment at its price. The original plan only used prices for the forecast. We add a **market & valuation analyst**: P/E, P/S, FCF yield, volatility, drawdown, beta vs SPY.
+
+### What a user can do
+
+| Mode | Example |
+|---|---|
+| Check | "Is NVIDIA's profitability sustainable? What are the main risks? What's the outlook?" |
+| Compare | "Compare Apple and Microsoft: growth, margins, valuation." |
+| Discover | "Find large US tech companies with operating margin above 25%, growing revenue and a reasonable valuation. Explain the top 3." |
+| Honest failure | "What was this company's margin?" with a cutoff before the filing. The answer is "not available as of that date", not a guess. |
+
+### How it meets the course rubric
+
+| Course asks for | We provide |
+|---|---|
+| Planning / decomposition | The coordinator writes a plan and dispatches analysts. Discover mode interprets the criteria into a visible screen spec. |
+| Tool use & selection | Analysts choose among SEC, price, calculation, filing-text and screening tools. |
+| Multi-step execution | An agent loop per analyst plus coordinator orchestration. |
+| Verification & self-correction | A deterministic citation and number checker, a critic, and a revision loop with defended / corrected / withdrawn / unresolved outcomes. |
+| Multi-agent (optional) | The analyst team. We also test whether it beats a single agent. |
+| Memory / state | Run trace and evidence stored in SQLite; reopenable history. |
+| External data | SEC EDGAR APIs and a price data source. |
+| Evaluation | Four conditions (A–D) on frozen cases, reporting accuracy, support, critic benefit and harm, cost and latency. |
+
+---
+
+## 2. How it works (target architecture)
+
+```mermaid
+flowchart TD
+    U[User question<br/>Check / Compare / Discover<br/>+ optional cutoff & preferences] --> CO[Coordinator<br/>plans, dispatches, synthesizes]
+    CO -->|Discover| SS[Screen spec shown to user<br/>vague terms → ask or define]
+    SS --> SC[screen tool → ranked candidates]
+    SC --> CO
+    CO --> FA[Fundamentals analyst]
+    CO --> FE[Filings & events analyst]
+    CO --> MV[Market & valuation analyst]
+    CO --> OM[Outlook model<br/>statistical, not LLM]
+    FA & FE & MV & OM -->|findings with IDs| DR[Draft report]
+    DR --> CK[Checker: deterministic<br/>every number/citation resolves]
+    CK --> CR[Critic: objections per claim]
+    CR -->|material objection + feasible fix| CO
+    CR -->|nothing left to fix| FIN[Final report + trace<br/>supported / qualified / abstained]
+    FIN --> DB[(SQLite: runs, trace, evidence)]
+```
+
+**Tools** (each one plain Python; the LLM only picks one and fills in its arguments):
+
+| Tool | Data | Status |
+|---|---|---|
+| `find_company` | SEC `company_tickers.json` + SIC sector | new |
+| `get_financials` | SEC companyfacts: revenue, operating income, net income, cash flow, capex, shares, multiple years | extend `research.py` |
+| `calculate` | margins, growth, FCF, valuation and risk ratios (pure functions) | extend `financials.py` |
+| `read_filing_section` | 10-K Item 1A (risks), Item 7 (MD&A), split along section boundaries | new: `filings.py` fetches, edgartools parses |
+| `list_filings` | recent 8-K events from SEC submissions | new |
+| `get_prices` | daily raw + adjusted prices (Tiingo, yfinance backup; swappable, source always labelled) | new |
+| `screen` | pass / fail / unknown over a universe, ranked by a stated rule | fix `screening.py` |
+| `verify_against_filing` | cross-check a number against the 10-K's tagged financial data | **reuse the existing XBRL code as a critic tool** |
+| `get_outlook` | statistical probability from the outlook model | later phase |
+
+Role contracts, objection outcomes, discover rules and security rules: [REFERENCE §2–4, §8](docs/REFERENCE.md).
+
+---
+
+## 3. Original plan vs what was built vs what we'll do
+
+The last column says whether the earlier choice was good practice. Where it wasn't, the proposal fixes it.
+
+| Aspect | Original plan (18 Oct) | Built so far | Proposed now | Why the change |
+|---|---|---|---|---|
+| User input | Research + Discovery forms | Form, 5 hard-coded tickers | One plain-English question box, any SEC-filing US stock | Forms aren't agentic; a fixed universe isn't a product |
+| AI | Central | **Optional, off by default** | **Always on**. A no-LLM mode exists only as baseline A and as a fallback banner when no key is set. | It was only optional because it wasn't built yet |
+| Analyst roles | Coordinator, filings, event, quant, critic | Names on log lines only | Coordinator, fundamentals, filings & events, market & valuation, critic | Same idea; quant split into numbers vs market |
+| LLM tool use | Typed tools picked by the model | None | Core of the work | Course requirement |
+| Review | Critic, ≤2 rounds, 4 outcomes | Critic records objections only; fake "check" | Real revision loop, 4 outcomes, stop when nothing is fixable | A fixed round count is arbitrary |
+| Report content | Facts, interpretations, risks | Metrics + LLM comments without numbers | Facts, analysis with cited numbers (placeholders), **bull case vs bear case**, risks, what would change the view | Standard equity-research format (also used by TradingAgents) |
+| LLM and numbers | Numbers must come from tools | LLM forbidden to write any digit | LLM writes `{calc:ID}` placeholders that the host fills in | The no-digit rule caused failures and unreadable text |
+| Events | 8-K event specialist | None | `list_filings` in the filings & events analyst; news later | |
+| Valuation & risk | Not covered | None | **Added** | A good business can be a bad investment at its price |
+| Discover ranking | By forecast probability `p0` | Alphabetical | By the user's stated criteria. The outlook is shown, never used to rank. | `p0` is close to a coin flip; ranking on it is noise. Alphabetical is a bug. |
+| Forecast | Required for completion | Stub that says "unavailable" | **Parked** Outlook component; spec kept in REFERENCE §6 | Optional add-on; don't block the core on it |
+| Run modes | Fresh / frozen / replay | Shown to the user as choices | **Internal**: evidence cache (for evaluation) + "open saved run". The user just asks. | Implementation detail leaked into the UI |
+| Cutoff date | Required | Required; defaults to yesterday | Defaults to **now**; a historical cutoff is an advanced option | Most users want today's view |
+| LLM API | Responses API mandated | Responses API | Chat Completions + tools (works with OpenRouter, DeepSeek, Azure/HKU) | Portability. Responses is fine if staying on OpenAI. |
+| Limits | 12 LLM / 20 tool calls | Caps added, broke calls, removed | One config file, generous, graceful (§5) | Unmeasured caps break things |
+| Run control | No cancel | One run at a time, no cancel | Cancel button; eval runs in parallel outside the API | Agent runs take minutes |
+| Precision & IDs | Decimal, hashed IDs, immutable tables | All built | Keep where it already exists; don't add more | Not harmful, just heavy |
+| Evaluation | A–D, 80 cases, double-labelled | None | A–D, about 40 cases (dev + held-out), a sample double-checked | 80 is unrealistic for the team |
+| Process | — | C0–C10 lanes, R0–R10 resource packs, handoff ledgers | Phases + 5 roles + AGENTS.md + CI | Process overhead buried the goal |
+| Stack | React + FastAPI + SQLite | Built | Keep | Good choice |
+
+Nothing important from the original is dropped (everything is in [REFERENCE](docs/REFERENCE.md), including all resources). Valuation and the bull/bear framing are the additions.
+
+---
+
+## 4. Where we are: is it correct?
+
+**Works and is reusable:** SEC companyfacts fetch with cutoff filtering (the fact selection logic is sound: it uses real period dates, not the misleading `fy` field), the 10-K download, the margin calculation, pass/fail/unknown screening, the SQLite store, History, the evidence viewer and the FastAPI + React shell. Token and cost tracking will be useful for the evaluation.
+
+**Wrong or misleading today:**
+
+| Problem | Where | Fix |
+|---|---|---|
+| The "tool check" after the critic recomputes the same number from the same inputs, so it can never disagree | [application.py:355](src/research_assistant/application.py:355) | Replaced by the revision loop + `verify_against_filing` |
+| The MSFT "3% → 15% correction" in the UI is hard-coded fake data | [fixtures.py:26](src/research_assistant/fixtures.py:26) | Remove it once a real correction case exists |
+| The interpretation prompt is just the words "Filings interpretation" | [prompts/interpretation.txt](src/research_assistant/prompts/interpretation.txt) | New role prompts |
+| Any digit rejects the whole LLM answer (a big part of the ~40% live failures) | [application.py:339](src/research_assistant/application.py:339) | Numbers become `{calc:ID}` placeholders; the checker flags strays instead of rejecting everything |
+| Screen picks winners **alphabetically** | [screening.py:18](src/research_assistant/screening.py:18) | Rank by the stated rule |
+| "Qualified" badge shown but never computed | [contracts.py:201](src/research_assistant/contracts.py:201) | Compute support status |
+| Only valuation-free quality metrics | — | Market & valuation analyst |
+
+**Defaults and choices that made no sense** (like the "optional AI" one):
+
+| Choice today | Why it's odd | Fix |
+|---|---|---|
+| AI analysis optional, unchecked by default | The AI *is* the product | Always on; no-LLM mode only as baseline/fallback |
+| App opens on **replay of a synthetic example** | First impression is fake data | Opens on an empty question box + recent real runs |
+| User must choose fresh / frozen / replay | Internal concept | "Ask" or "open saved"; cache handled internally |
+| Model "connection test" asks for consent to send evidence and incur charges | Ceremony around a ~$0.002 call | A simple "Test connection" in settings |
+| Forecast card always says "Unavailable" | Shows a non-feature | Hide until the Outlook exists |
+| Model failure is treated as fine because "financials are preserved" | In an agent, the LLM is the driver | Retry, then mark the run partial/failed clearly |
+| Interpretations must be "qualitative only" | Analysis without numbers is useless | Numbers via placeholders |
+| Cutoff required, defaults to yesterday | Odd for a "what's the situation now" question | Default to now |
+| Separate Research and Discovery forms | Users don't think in modes | One box; the coordinator decides |
+
+**Finance scope limits to state openly:** banks and insurers (no operating income line), foreign filers (IFRS), restated values (today's SEC data, not the original vintage) and survivorship (today's ticker list). See [REFERENCE §5](docs/REFERENCE.md#5-finance-and-data-cautions).
+
+---
+
+## 5. Caps and hidden assumptions (the Codex budget-cap lesson)
+
+What went wrong before: a 2,000-output-token cap cut off reasoning-model answers, so calls "failed". The cap was never measured and nobody chose it on purpose.
+
+### Rules from now on
+1. **No output-token caps, and no token or cost quotas by default.** Record usage, and let the provider's own limits apply. A cost budget is opt-in only.
+2. **Loop guards are not quality caps.** Agents need a max-step guard against infinite loops. Make it generous (about 30–40 steps). When it's reached, **write the best partial report and mark it "stopped at limit"**. Never error out.
+3. **Every tunable lives in one file** (`config.py`) with a comment saying why. No magic numbers in the code.
+4. **Retry transient errors** (429/5xx) with the SDK defaults. Don't fail on the first network blip.
+5. **Never hard-code the universe**, the sector list or result counts.
+6. **Flag, don't reject.** A small problem in an LLM answer becomes a flagged item, not a thrown-away answer.
+7. **Never silently truncate** input or output. If something is too big, say so.
+8. **Missing configuration degrades; it never crashes.** A data provider without its key is skipped and shown as "not configured" on the status page. A fallback to another provider is always labelled ([REFERENCE: data providers](docs/REFERENCE.md#data-providers-by-kind-options-and-order)).
+
+### Current code: what limits things, and how hard is it to fix?
+
+| Hard-coded limit / assumption | Where | Effect | Fix effort |
+|---|---|---|---|
+| 5 tickers (`UNIVERSE`, `Ticker` Literal) | [contracts.py:8-15](src/research_assistant/contracts.py:8), used in ~8 files | No other stock possible | Medium. The new tools use `find_company`; the old pipeline can keep its 5. |
+| Store re-validates every fact against `UNIVERSE[ticker]` | [store.py:122-165](src/research_assistant/store.py:122) | **Breaks any new ticker** | Done (Phase 0) |
+| Sector Literal (4 values) hard-coded per ticker | [contracts.py:38](src/research_assistant/contracts.py:38) | Wrong for most companies | Easy: SIC code from SEC |
+| Screen: margin only, 1–5 results | [contracts.py:39-40](src/research_assistant/contracts.py:39) | Can't express real criteria | Easy (new `screen` tool) |
+| `max_retries=0` on the LLM client | [model_access.py:42](src/research_assistant/model_access.py:42) | One network blip = failed call | Done (Phase 0): SDK default retries |
+| No-digit rejection | [application.py:339](src/research_assistant/application.py:339) | Throws away whole answers | Easy |
+| Exactly one interpretation + one critic call | [application.py:284](src/research_assistant/application.py:284) | No loop | This *is* the agent work |
+| One worker, one active run at a time | [application.py:128](src/research_assistant/application.py:128), store index | Evaluation can't run cases in parallel through the API | Easy: the eval runner calls agents directly |
+| Annual 10-K, USD, `us-gaap`, `OperatingIncomeLoss` only | [research.py:53](src/research_assistant/research.py:53) | Banks and foreign filers come back "unknown" | Keep, but report "unsupported" clearly |
+| Responses API + strict per-request schema | [application.py:303](src/research_assistant/application.py:303) | Many providers don't support it | Agents use Chat Completions + tools |
+| 25 MB SEC response cap | [filings.py:13](src/research_assistant/filings.py:13) | Probably fine | Move to config |
+
+### Limits in our own plans, made explicit
+
+| Limit | Default | Why it exists | On reaching it |
+|---|---|---|---|
+| Agent steps per analyst | ~30 | Infinite-loop guard | Finalize partial, mark it |
+| Critic rounds | stop when no material objection has a feasible fix (guard: 3) | More rounds can hurt quality | Remaining objections → unresolved |
+| Discover candidates researched | top-k + a few replacements, user-adjustable | Time and cost | Return fewer, with the reason |
+| Filing chunks | split on section/table boundaries, not a fixed character count | Retrieval granularity | Agent can request more chunks |
+
+---
+
+## 6. Old scaffolding: does it get in the way?
+
+| Scaffolding | Gets in the way? | Decision |
+|---|---|---|
+| Fact provenance re-check against the fixed universe | **Yes**: breaks new tickers | Removed in Phase 0 (the check against the source filing stays) |
+| XBRL 10-K re-parse on every fetch (3 extra downloads; fails if basis/scope text is missing) | **Yes**: slow, and makes many companies "unavailable" | Make it optional: becomes the `verify_against_filing` tool |
+| Strict contracts (`extra="forbid"`, Literals) + legacy migration | Somewhat: every new field touches 3+ files | New agent code uses its own simple models; leave the old ones alone |
+| Idempotency keys, single worker, process lock | Slightly: only the API path | Keep for the UI; eval bypasses it |
+| Fresh / frozen / replay | No, it's useful | Keep; simplify into an evidence cache + replay |
+| Connections page | No | Hide later |
+| Token, cost and status telemetry | No, it's useful | Keep (needed for cost/latency metrics) |
+| CSRF / host middleware | No | Leave |
+
+**Approach: build beside it, don't rewrite.** The new `tools/` and `agents/` packages call into existing code where it helps. The old pipeline stays as baseline A. Delete old pieces only when they block something.
+
+---
+
+## 7. Advanced techniques: needed or not?
+
+Rule: add a technique when a **measured** problem calls for it, not because it's popular.
+
+| Technique | Needed? | Decision and trigger |
+|---|---|---|
+| **RAG over filings** | Yes, a simple version | Split 10-Ks by section (Item 1A, 7, …). If a section fits the model's context, **just give it the whole section**. Otherwise use keyword search (SQLite FTS5 / BM25) within that company's filings. Phase 1. |
+| **Vector DB / embeddings** | Not now | Add only if the evaluation shows keyword retrieval missing relevant passages, or for cross-company semantic questions ("who mentions Taiwan supply risk?"). Then use `sqlite-vec` or plain numpy, not a separate DB server. |
+| Hybrid search + reranker | Not now | Only after embeddings, if precision is a measured problem |
+| GraphRAG / knowledge graph | No | Our data is already structured (XBRL) |
+| Function calling + structured outputs | **Yes** | Core (Phase 2) |
+| Plan-and-execute (coordinator) + ReAct loop (analysts) | **Yes** | Core (Phases 2–3) |
+| Reflection / critic | **Yes** | Phase 4 |
+| Human-in-the-loop clarification | **Yes** | Discover asks about vague terms (Phase 5) |
+| Agent framework (LangGraph, CrewAI, AutoGen, OpenAI Agents SDK) | Not now | A plain loop is ~150 lines and easy to explain. Reconsider if pause/resume or complex branching becomes painful; then pydantic-ai is the first to try (it has an OpenRouter provider). |
+| Parallel analysts (asyncio) | Later | When latency annoys; easy once tools are pure functions |
+| Streaming trace to the UI (SSE) | Later | Polling first |
+| Memory across runs ("what changed since last check", watchlist) | Later | Nice extension; reuse saved runs |
+| Model routing (cheap model for analysts, stronger for coordinator/critic) | Later | Worth an evaluation row if cost matters |
+| Prompt caching | Later | Cuts evaluation cost |
+| Expose tools as an **MCP server** | Optional | Cheap once `tools/registry.py` exists; lets Claude/other clients use our tools. Good demo bonus. |
+| LLM-as-judge | Evaluation triage only | Never the sole ground truth |
+| Tracing platforms (Langfuse, LangSmith) | No | Our SQLite trace is enough |
+| Fine-tuning, RL, factor mining, trading execution | No | Out of scope |
+
+---
+
+## 8. Codebase structure for a team
+
+Teammates (and their AI coding tools) won't always read docs, so **the structure itself has to guide them**.
+
+### Target layout (grow into it; no big-bang move)
+
+```text
+src/research_assistant/
+  config.py        # ALL tunables + model names, with comments
+  data/            # external data only: providers.py (registry + status), sec.py, prices_<vendor>.py, cache.py
+  finance/         # pure calculations (no I/O): margins, growth, valuation, risk
+  tools/           # one file per tool + registry.py (name, schema, function)
+  agents/          # loop.py (generic tool loop), roles.py, coordinator.py, critic.py
+    prompts/       # one .md per role
+  outlook/         # statistical model: train offline, predict as a tool
+  pipeline.py      # today's deterministic flow = baseline A
+  store.py         # SQLite runs, trace, evidence
+  api/             # FastAPI routes only
+eval/
+  cases/           # one YAML per case (question, cutoff, gold answers)
+  run_eval.py      # runs conditions A–D
+  score.py
+frontend/src/
+  pages/  components/  api.ts   # split the 47 KB App.tsx
+tests/             # mirrors src/; network always mocked
+```
+
+**Dependency direction:** `finance` ← `data` ← `tools` ← `agents` ← `api`. `finance` never does I/O, tools never call an LLM, and agents never call HTTP directly. This one rule keeps the modules swappable.
+
+### Recipes (make the right thing the easy thing)
+- **Add a tool:** create `tools/<name>.py` with a typed input model and a function, register it in `tools/registry.py`, and add one test with a fixture. Agents pick it up automatically.
+- **Add an analyst:** add `agents/prompts/<role>.md` plus one entry in `roles.py` listing its tools. No new loop code.
+- **Add an eval case:** add a YAML file in `eval/cases/`.
+- **Add a data provider:** write `data/<kind>_<vendor>.py` with `fetch()` and `check()`, register it in `data/providers.py` with its tier and required env variables, and add those variables to `.env.example`. It appears on the status page automatically and is skipped until it's configured.
+
+### Guardrails that work without anyone reading docs
+- **`AGENTS.md`** (read automatically by Codex and most other coding agents) **+ `CLAUDE.md`** (one line, `@AGENTS.md`, so Claude Code imports the same file) holding about 10 rules: layout, dependency direction, the "no hidden caps" rules, check the adopt-or-build table before adding a dependency, pin versions, tests required, mock the network, keep files small, update `PROJECT_GUIDE.md` checkboxes and don't create new docs.
+- **CI on every push/PR** (GitHub Actions): `pytest`, `ruff` lint/format and `tsc`. Red CI means no merge.
+- **Pre-commit hook** running ruff, so formatting arguments never happen.
+- **PR template** with a 4-item checklist: tests added, config not bypassed, no new docs, guide checkbox updated.
+- **Branch per task, small PRs**, and protect `main`.
+
+"Scaling" here means more tickers and parallel evaluation runs: cache SEC and price responses, respect SEC's 10 req/s, run tool calls concurrently. It does **not** mean microservices, queues or vector DBs.
+
+### Switching between AI coding tools (Claude Code, Codex, …)
+Switch whenever a quota runs out. Nothing in the project is tied to one tool. What makes switching safe is that **the repo holds the context, not the chat**:
+1. **One rules file.** `AGENTS.md` has the rules, and `CLAUDE.md` only imports it. Never keep two copies.
+2. **Decisions go into this guide or REFERENCE before you switch.** Chat history and each tool's private memory don't carry over.
+3. **Switch at a clean point.** Commit the current task (a WIP commit on its branch is fine) and tick its checkbox. Avoid switching in the middle of a design discussion.
+4. **Give the new tool one checkbox, not "continue the project".** For example: *"Read AGENTS.md and PROJECT_GUIDE.md. Do the Phase 1 task `get_prices` as described in docs/REFERENCE.md §10. Done when its fixture test passes. Don't create new docs."*
+5. **One tool per branch at a time.** Two agents in the same working tree overwrite each other; use separate branches or git worktrees.
+6. **Review when you switch back.** Have the next tool, or a teammate, review the previous tool's commits before merging, with CI green. Unreviewed AI output is how the doc sprawl and the hidden token cap happened.
+
+---
+
+## 9. Plan
+
+```mermaid
+flowchart LR
+    P0[0 Tidy + guardrails] --> P1[1 Tools]
+    P1 --> P2[2 Single agent loop]
+    P2 --> P3[3 Analyst team]
+    P3 --> P4[4 Critic + revise]
+    P4 --> P5[5 Discover]
+    P1 --> P6[6 Outlook model]
+    P4 --> P7[7 UI]
+    P5 --> P7
+    P2 --> P8[8 Evaluation]
+    P5 --> P8
+    P6 --> P8
+    P7 --> P9[9 Report + demo]
+    P8 --> P9
+```
+
+### Phase 0: Tidy + guardrails
+- [x] Commit the current tree as a checkpoint ("chore: checkpoint before agent work").
+- [x] Add `AGENTS.md` + `CLAUDE.md`, CI (pytest, ruff, tsc) and a PR template.
+- [x] Move old planning docs (STATUS, design, workstreams, sources, c1-handoff, integration, tasks/) into `docs/archive/`. Cut the README down to "what + how to run + link here".
+- [x] Add `.archify/`, `graphify-out/` and `verification/packets/` to `.gitignore` (keep them locally). Tests that read the packet skip when it's missing, so CI skips them.
+- [x] Quick fixes: `max_retries` default, remove the store's UNIVERSE re-check.
+- [ ] Optional, any time: run `ruff format` once over the old code in its own commit, then enforce it in CI and a pre-commit hook. Until then CI runs only bug-catching lint rules.
+- [ ] Protect `main` on GitHub (Settings → Branches): require a PR and green CI.
+
+### Phase 1: Tools
+**Adopt before you build.** Before writing a tool or adding a dependency, check the [adopt-or-build table](docs/REFERENCE.md#adopt-or-build-tool-by-tool-survey-of-2-nov-2026). Most tools are ours, built over SEC JSON. The exceptions:
+- **Filing sections:** parsed with edgartools, pinned, over bytes we fetch ourselves.
+- **Valuation formulas:** copied from FinanceToolkit.
+- **Prices:** yfinance works with no key; Tiingo goes first when its key is set.
+
+Licences don't matter here (it's an academic project): calling a library and copying its logic are both fine, whichever is easier. If you find a better library, add a row to that table, not a new doc.
+- [ ] `config.py`, `data/sec.py` with a disk cache, `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
+- [ ] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
+- [ ] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
+- [ ] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
+- [ ] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
+- [ ] Commit small, trimmed SEC fixtures (a few KB each) so CI covers filing parsing. Today 20 tests read the 48 MB local packet and are skipped in CI.
+- **Done when:** every tool gives correct, cited output for 10+ companies, including a bank and a foreign filer (which must come back "unsupported", not crash).
+
+### Phase 2: Single agent loop
+- [ ] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
+- [ ] CLI: `python -m research_assistant.cli "question"`.
+- **Done when:** the Check and Compare examples give sensible, fully cited reports. This set-up is evaluation condition **B**.
+
+### Phase 3: Analyst team
+- [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
+- **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).
+
+### Phase 4: Critic + revision
+- [ ] Critic objections (issue types in REFERENCE §3) → coordinator → analyst follow-up → defended / corrected / withdrawn / unresolved. Claim versions kept.
+- **Done when:** an injected wrong-period or wrong-unit error is caught and corrected, and a clean case stays unchanged (condition **D**).
+
+### Phase 5: Discover
+- [ ] Question → visible screen spec (ask about vague terms) → `screen` → research top-k → replace failures → shortlist with counts.
+- **Done when:** the Discover example works on a declared universe of about 50–100 companies.
+
+### Phase 6: Outlook model (parked)
+Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). The one thing to remember early is that a prospective log (predictions saved now, scored later) is the only clean test, so the sooner it starts the more data it collects.
+
+### Phase 7: UI
+- [ ] One question box (no mode, model or cutoff toggles up front; advanced options folded away) + preferences → live trace timeline + cancel button → report with clickable citations and statuses. Opens on an empty box plus recent runs, not a synthetic example. Reuse the evidence panel and History. Split `App.tsx`.
+- [ ] **Setup & status page** (extends today's Connections page): one card per data kind, listing its providers with a status:
+  - Ready (no key needed).
+  - Configured.
+  - Not configured, showing which `.env` variable to set.
+  - Last check failed.
+
+  Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
+
+### Phase 8: Evaluation (start writing cases during Phase 2)
+- [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample double-checked. Sources:
+  - ~15 adapted from the FinanceBench open sample.
+  - ~8–10 from the Vals Finance Agent public set.
+  - ~5 fiscal-period traps in the style of FinRetrieval.
+  - The rest hand-built (injection, bank, foreign filer, unknown ticker, restatement). See [REFERENCE §10](docs/REFERENCE.md#evaluation-datasets-and-papers).
+- [ ] `eval/run_eval.py` runs A–D on frozen evidence and produces tables: accuracy, support, critic fixes vs damage, cost, latency, failures ([REFERENCE §7](docs/REFERENCE.md#7-evaluation-protocol)).
+
+### Phase 9: Report + demo
+- [ ] Report: problem → design → tools/agents → evaluation → failure cases → limitations and trade-offs.
+- [ ] Demo: one Discover question live, one injected-error correction, one honest "not available"; cached runs as fallback.
+
+**Out of scope** (list as future work): crypto/FX, news feeds beyond SEC 8-K (free options are listed in REFERENCE §10), trading or portfolio optimisation, factor mining, fine-tuning. Vector DB, MCP, memory and other add-ons follow the triggers in §7. Every resource from the earlier research is catalogued with a Now/Later/Ref verdict in [REFERENCE §10](docs/REFERENCE.md#10-resource-catalogue).
+
+---
+
+## 10. Team split (3–5 people)
+
+| Role | Owns | Phases |
+|---|---|---|
+| Data & tools | `data/`, `finance/`, `tools/` | 1 |
+| Agents | `agents/`, prompts, critic loop, discover | 2–5 |
+| Outlook | `outlook/`, prospective log | 6 |
+| UI | `frontend/` | 7 |
+| Evaluation & report | `eval/`, gold cases, report, keeps this guide current | 0, 8, 9 |
+
+With 3 people: merge Data + Outlook, merge UI + Evaluation/report, and keep Agents on its own.
+
+---
+
+## 11. Open decisions
+
+| Decision | Recommendation |
+|---|---|
+| Price data source | Several providers (see [REFERENCE: data providers](docs/REFERENCE.md#data-providers-by-kind-options-and-order)). The zero-key default is **yfinance**. When `TIINGO_API_KEY` is set, **Tiingo** goes first, because it has raw (as-traded) prices plus split and dividend fields. Every result is labelled with its source. Get the free Tiingo key before the evaluation is frozen. |
+| LLM | Keep OpenRouter with a cheap tool-calling model. Freeze the model ID before the evaluation. Check whether the HKU ITS quota supports function calling. |
+| Framework | Plain Python loop. LangGraph only if the team already knows it. |
+| Discover universe | A declared list (e.g. today's S&P 500 or a sector list), stated as a survivorship-biased snapshot |
+| Outlook in the final demo? | Decide after Phase 4. If built, show it as a clearly labelled statistical card, never used for ranking. |
+
+---
+
+## 12. Docs map
+
+| File | Purpose |
+|---|---|
+| `README.md` | What it is, how to run it |
+| `PROJECT_GUIDE.md` | This file: vision, status, plan. **The only status doc.** |
+| `docs/REFERENCE.md` | Rules, finance cautions, evaluation, forecast spec, resources, and the **adopt-or-build table** (check it before writing a tool or adding a dependency) |
+| `AGENTS.md` / `CLAUDE.md` | Rules for humans and AI coding tools (Phase 0). `CLAUDE.md` only imports `AGENTS.md`. |
+| `docs/archive/` | Old plans and records, kept for history; never the current instruction |
+| `.archify/`, `graphify-out/` | Local visual aids, git-ignored; regenerate after the architecture changes |

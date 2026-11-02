@@ -1,0 +1,59 @@
+{
+  "recorded_date": "2026-11-01",
+  "timezone": "Asia/Hong_Kong",
+  "schema_version": "financial-review-v3",
+  "observed": {
+    "run_id": "d9ba8919-5a05-47ae-acf9-8c1587d30a9a",
+    "company": "AAPL",
+    "provider_status": "completed",
+    "output_tokens": 5638,
+    "error_code": "invalid_model_output",
+    "message": "Critic output referenced a claim or evidence outside this company.",
+    "limitation": "The old rejected answer was not retained, so the exact invalid reference cannot be recovered."
+  },
+  "changes": [
+    "Publish per-request valid claim/evidence IDs in the critic response schema while retaining host validation.",
+    "Clarify separate claim/evidence namespaces in packaged critic instructions without changing action labels or interpretation text.",
+    "Preserve parsed structured answers in the existing content-addressed snapshot store before semantic validation, including rejected answers.",
+    "Persist and display sanitized per-call failure messages; distinguish unsupplied claim IDs from evidence IDs."
+  ],
+  "checks": [
+    {
+      "name": "pre-edit focused baseline",
+      "passed": 83
+    },
+    {
+      "name": "full backend regression",
+      "passed": 201,
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .tmp/critic-references-20261101/full-tests",
+      "notes": "Providers mocked, credentials disabled; one existing Starlette/httpx deprecation warning."
+    },
+    {
+      "name": "production frontend build",
+      "result": "passed"
+    },
+    {
+      "name": "browser failure detail and accessibility",
+      "passed": 1,
+      "notes": "Isolated local server, mocked provider results, no existing server reused or stopped."
+    }
+  ],
+  "live_inference_performed": false,
+  "remaining": [
+    "Old failed runs remain immutable.",
+    "Provider support for constrained decoding and semantic research quality are not established by mocked tests.",
+    "Host validation still rejects invalid references; no retries or fuzzy reference repair."
+  ],
+  "sha256": {
+    "src/research_assistant/application.py": "664678a8e20abf46005a9fddf664e3a7d55f8602cd272348928050c0dded0d3a",
+    "src/research_assistant/contracts.py": "b022951be83390d84392350658ab498e2fd294474e95cc88844af1225b9d3660",
+    "src/research_assistant/model_access.py": "b439e4fc04ffcf36a647d91b8f1bcb639ba1be5de186268f1f71ae130132b7e7",
+    "src/research_assistant/prompts/__init__.py": "044fec9f57e69c3b82cc4253063e13afded1e77ad57bded27affdc704be2bb48",
+    "src/research_assistant/prompts/critic.txt": "a0d64e55043a6d84ae7706197c65849e1f37d96b17c37b3bea2afa6821113e65",
+    "frontend/src/App.tsx": "c48de6546d78a4638d78e593714bc3168bfd63ddb9f076b70cda02da1ecbbf39",
+    "frontend/src/api.ts": "a813228ff102fac00b54df4dc1283a03960fa6852f2909e91c31604001cc7103",
+    "frontend/tests/workspace.spec.ts": "eccb595d1336421660e8b41aa0388598086c0a3a81252dc172bb7323993ec7f1",
+    "tests/test_model_checks.py": "9b0b73fa85a4254da63572347837484446c298131bdac7a66251ca1de70541e9",
+    "tests/test_model_access.py": "c079c2e877000911fb18ab527fef72ceed2f22d76e1222aef3e95c30dbb2839b"
+  }
+}

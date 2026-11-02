@@ -1,3 +1,5 @@
+> Archived on 27 October 2026. Historical design/review context; it may describe unimplemented behavior. For current guidance use [Start](../../README.md), [Status](../../STATUS.md), [Design](../design.md) and [Sources](../sources.md).
+
 # Implementation plan: evidence-grounded stock research and discovery
 
 Prepared 18 October 2026, Hong Kong time. This is a proposed implementation specification, not a claim that the system has been built or evaluated.
@@ -7,6 +9,8 @@ The starting point is the final response in the [shared conversation](https://ch
 Added 19 October: the [technical blueprint](./technical_blueprint.md) specifies implementation boundaries and runtime behavior; the [Codex build playbook](./codex_build_playbook.md) provides staged coding tasks, review prompts, and model/effort recommendations.
 
 Implementation update: the [Fieldnote application](../../README.md) now provides the custom React/TypeScript/Vite interface, FastAPI, persistent local runs, evidence inspection and synthetic teaching examples. This replaces the Streamlit choice. The full methodology below remains a research roadmap: the current app has a narrow SEC annual-facts path and bounded interpretation/critic workflow, but no validated forecast artifact, five-role coordinator, or held-out research evaluation. See the README for exact implemented boundaries and verification.
+
+25 October alignment decision: [STATUS.md](../../STATUS.md) is the authoritative current state and remaining work order. Complete evidence correctness, bounded correction and research evaluation before the forecast/factor stage. The four-week schedule and team allocations below are historical planning assumptions, not current commitments. See the [alignment review](alignment_review_2026-10-25.md) for the code review and presentation policy.
 
 ## 1. Product and contribution
 

@@ -1,8 +1,12 @@
+> Archived on 27 October 2026. Historical design/review context; it may describe unimplemented behavior. For current guidance use [Start](../../README.md), [Status](../../STATUS.md), [Design](../design.md) and [Sources](../sources.md).
+
 # Technical blueprint: from specification to running application
 
 19 October 2026. This supplements the [implementation plan](./implementation_plan.md). It specifies proposed interfaces and implementation behavior; snippets are design examples, not a delivered or tested application. The [Codex build playbook](./codex_build_playbook.md) describes task prompts, models, effort levels and development order.
 
 Custom-web implementation update: [Fieldnote](../../README.md) now implements the frontend, HTTP/run lifecycle, evidence store, labelled synthetic demonstrations and a narrow live-data/model integration path. The remaining research modules below are still proposed; their presence in this specification is not a claim of implementation. Forecasting and the full multi-role evaluation remain unavailable. The frontend design contract and verification evidence are under `stock_research/verification/`.
+
+25 October: follow [STATUS.md](../../STATUS.md) for capability and milestone order, and the [alignment review](alignment_review_2026-10-25.md) for current decisions. Extend the present modules when the next invariant needs them; the module table below is a target responsibility map, not an instruction to scaffold each file. The existing Responses integration already supports mocked tests; actual provider access remains unverified.
 
 ## 1. Concrete technology choices
 
@@ -250,7 +254,7 @@ uv run research-assistant evaluate --manifest <heldout.json>
 
 The application functions run in one background worker. Validate and persist the request before execution; one active-run index and a process lock enforce local ownership. `POST /api/runs` requires a durable idempotency key; changed payloads under an existing key fail. GET endpoints provide paginated history, run status/report, and run-scoped evidence. The frontend keeps the run ID in the URL, retains uncertain submission intents across refresh, and polls every two seconds while active. A restart marks unfinished runs interrupted without automatic retry. Cancellation and checkpoint resumption are not implemented. SDK and retrieval timeouts bound individual external operations.
 
-Show sources, calculations, probability target, objections, qualifications, and action/usage history. Fresh retrieval, inference over frozen evidence, and saved-run replay must have visibly different labels. Errors should expose the missing source or operation, not credentials or raw secret-bearing request headers.
+Show results, periods, sources, calculation inputs, objections and qualifications first. Use plain action labels for fresh research, reviewing saved sources again and opening a saved report. Keep technical provenance and action/usage history behind disclosure; setup commands and implementation details belong in documentation. Preserve explicit unavailable forecasts and actionable errors without raw credential or request details.
 
 ## 10. Proof and handover
 
@@ -258,4 +262,4 @@ For each completed increment, require: the actual command run, exit/result summa
 
 Before the final demonstration, another group member should install from the lockfile and run the fixture demo using only the README. Then run a small live model/provider smoke test with the team's actual account. Record model IDs, effort, source hashes, prompts, target version and actual usage in every evaluation artifact.
 
-The first deliverable is small: a fixture-backed CLI report with a traceable operating-margin calculation and an explicit mismatch failure. The finished project adds eligible live sources, the agent workflow, forecasting, review, discovery, UI and held-out evaluation around that proven path.
+The local web foundation already exceeds the original fixture-CLI starting point. The next deliverable is one independently checked annual source packet with typed facts/calculations, followed by a bounded correction path and research evaluation. Forecasting comes afterward; do not rebuild the existing interface or initialization scaffolding.

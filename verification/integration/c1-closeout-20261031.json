@@ -1,0 +1,104 @@
+{
+  "client_date": "2026-10-31",
+  "timezone": "Asia/Hong_Kong",
+  "recorded_at_utc": "2026-10-30T20:11:34.508681+00:00",
+  "scope": "C1 implementation documentation closeout and disposable C0 test cleanup",
+  "implementation": {
+    "3.1_packet_preparation": "complete",
+    "3.2": "complete",
+    "4.1": "complete",
+    "4.2": "complete"
+  },
+  "remaining_acceptance": {
+    "3.1_separate_person_table_value_review": "pending",
+    "C0_0.2_integration_acceptance": "pending"
+  },
+  "new_runtime_work": "none",
+  "existing_proof": "verification/integration/checks-20261031.json",
+  "regression_tests_rerun": false,
+  "reason": "Only documentation and regenerable test outputs changed; C1 code, tests and evidence match the verified baseline. Prior 195-pass regression, production build and offline-verifier results remain applicable.",
+  "preservation": {
+    "protected_code_test_evidence_files": 32,
+    "changed_protected_files": [],
+    "original_backup_files_rehashed": 35,
+    "index_entries_unchanged": true,
+    "pre_edit_document_backup": ".tmp/c0/c1-closeout-20261031/documents"
+  },
+  "documents": [
+    {
+      "path": "README.md",
+      "before_sha256": "514b7f8cfb154d93765715661a47e85e62dfacc27bf9bbde6c5e1eacb013040d",
+      "after_sha256": "2cc182c68af90fc92682198a5eae5f3b60829e6bc9029587546a456e3ce730be"
+    },
+    {
+      "path": "STATUS.md",
+      "before_sha256": "39c4bdf08842cd4d7d2e625605e36494e399244d4f41dc602dacfc5c08f1b6bc",
+      "after_sha256": "778fd4348f9105464368ee95fce32826e345295ae3db75200ef6c7788f0ceb55"
+    },
+    {
+      "path": "docs/workstreams.md",
+      "before_sha256": "ed7b4af400435b0836b6072023b23b20a69bb51e7dea10287086adeb402d0571",
+      "after_sha256": "84d818bfb83804f96968046794b4315bdb0386fdc471ef49eada39412706021d"
+    },
+    {
+      "path": "docs/integration.md",
+      "before_sha256": "568ef59d6b0ae8a4ec4169e7af6ef6aa68e2ca641a74501de227ff5f651381fe",
+      "after_sha256": "82aba2ea20e6142eeb26b310e83a92d7a0fe0598ae738bc495e08ca157f0d0e5"
+    },
+    {
+      "path": "docs/c1-handoff.md",
+      "before_sha256": "eeba275505e4327ab9277f7bc98fd52a2d16a0e2095e0415fd9c5dcd814a5e22",
+      "after_sha256": "1b1cef704dc10597fd69c6277bcc3cc1884b7095a41dd929d4917fa7b4f65c7d"
+    },
+    {
+      "path": "docs/sources.md",
+      "before_sha256": "07e89712db9dc952fade99ec8e28888d0936f8e21ddbe1f58cd66be07c88ea56",
+      "after_sha256": "61ed58c110e2e9889776e3417896db69d0e54af6ba5f69d17333660d48e50890"
+    },
+    {
+      "path": "docs/design.md",
+      "before_sha256": "729740f390c71cb2f63e711f3c6be70157b7380f4c91b965e473ff17e245622c",
+      "after_sha256": "eb2a405631a8752da1d3dab2299e0b582565e54677055da5da2a47a3c02839d0"
+    }
+  ],
+  "cleanup": {
+    "removed": [
+      {
+        "directory": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.tmp\\c0\\20261031-9b62d98b\\pytest",
+        "files": 0,
+        "bytes": 0
+      },
+      {
+        "directory": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.tmp\\c0\\20261031-9b62d98b\\pytest-retry",
+        "files": 0,
+        "bytes": 0
+      },
+      {
+        "directory": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.tmp\\c0\\20261031-9b62d98b\\pytest-diagnosis",
+        "files": 0,
+        "bytes": 0
+      },
+      {
+        "directory": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.tmp\\c0\\20261031-9b62d98b\\pytest-unrestricted",
+        "files": 682,
+        "bytes": 31529783
+      }
+    ],
+    "files_removed": 682,
+    "bytes_reclaimed": 31529783,
+    "retained": [
+      "verification/packets/msft-fy2024/20261029T182734Z",
+      "verification/c1-runtime.json",
+      ".tmp/c0/20261031-9b62d98b/files",
+      "verification/integration/checks-20261031.json",
+      ".tmp/c1-runtime-* and other saved experiments"
+    ]
+  },
+  "checks": {
+    "local_document_links": "passed",
+    "new_section_anchors": "passed",
+    "diff_whitespace": "passed",
+    "C1_code_tests_evidence_hashes": "passed",
+    "retained_baseline_backup_hashes": "passed"
+  }
+}

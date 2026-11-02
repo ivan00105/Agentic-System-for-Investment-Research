@@ -7,16 +7,29 @@ name = "stock-research"
 version = "0.1.0"
 description = "Local evidence-grounded research workspace"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1", "openai>=2,<3", "tzdata>=2025.1"]
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1", "openai>=2,<3", "python-dotenv>=1.2,<2", "tzdata>=2025.1"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
+dev = ["pytest==9.1.1", "ruff==0.17.1"]
 
 [project.scripts]
 stock-research = "research_assistant.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"research_assistant.prompts" = ["*.txt"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".archify", "graphify-out", "verification", "docs/archive"]
+
+[tool.ruff.lint]
+# Bug-catching rules only. Style rules wait until the old code is reformatted in one go.
+select = ["E4", "E7", "E9", "F", "B"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

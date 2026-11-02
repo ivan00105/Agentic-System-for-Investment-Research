@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 UNIVERSE = {
@@ -19,6 +19,21 @@ class Record(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+class ConnectionCheck(Record):
+    status: Literal["not_tested", "passed", "failed"] = "not_tested"
+    checked_at: AwareDatetime | None = None
+    run_id: str | None = None
+    message: str | None = None
+
+
+class ConnectionInfo(Record):
+    configured: bool
+    provider: str
+    model: str | None = None
+    configuration_error: str | None = None
+    check: ConnectionCheck = Field(default_factory=ConnectionCheck)
+
+
 class Screen(Record):
     sector: Literal["All", "Technology", "Consumer discretionary", "Communication services"] = "All"
     min_operating_margin: Decimal = Field(default=Decimal("0.10"), ge=-10, le=10)
@@ -32,6 +47,11 @@ class RunRequest(Record):
     cutoff: AwareDatetime
     source_run_id: str | None = Field(default=None, max_length=100, pattern=r"^[a-zA-Z0-9-]+$")
     screen: Screen | None = None
+    model_analysis: bool = True  # Preserve older clients; the UI submits an explicit choice. Replay ignores it.
+    connection_check: Literal["sec", "model"] | None = None
+    # Preserve old saved requests and exact-key recovery; these fields no longer control execution.
+    spending_limit_usd: Decimal | None = Field(default=None, deprecated=True)
+    provider_limit_confirmed: bool = Field(default=False, deprecated=True)
 
     @model_validator(mode="after")
     def validate_request(self):
@@ -46,7 +66,31 @@ class RunRequest(Record):
             raise ValueError("Frozen inference and replay require a saved run.")
         if self.mode == "fresh" and self.source_run_id:
             raise ValueError("Fresh retrieval cannot use a saved run.")
+        if self.connection_check == "sec" and (self.kind != "research" or self.mode != "fresh" or self.ticker != "MSFT" or self.model_analysis):
+            raise ValueError("The SEC connection check retrieves Microsoft facts without model analysis.")
+        if self.connection_check == "model":
+            if self.kind != "research" or self.mode != "frozen" or not self.model_analysis:
+                raise ValueError("The model connection check requires saved company evidence and model analysis.")
         return self
+
+
+class SourceDocument(Record):
+    role: Literal["filing_index", "filing", "table"]
+    source_url: str
+    snapshot_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    byte_length: int = Field(ge=1)
+    media_type: str
+    retrieved_at: AwareDatetime
+
+
+class FilingPacket(Record):
+    cik: str = Field(pattern=r"^\d{10}$")
+    accession: str = Field(pattern=r"^\d{10}-\d{2}-\d{6}$")
+    form: Literal["10-K", "10-K/A"]
+    filed: date
+    period_end: date
+    accepted_at: AwareDatetime | None = None
+    documents: list[SourceDocument]
 
 
 class Evidence(Record):
@@ -61,6 +105,8 @@ class Evidence(Record):
     locator: str
     snapshot_hash: str
     synthetic: bool = False
+    source_kind: Literal["legacy", "companyfacts", "filing_table"] = "legacy"
+    packet: FilingPacket | None = None
 
 
 class Metric(Record):
@@ -73,6 +119,52 @@ class Metric(Record):
     inputs: list[str] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
     unavailable_reason: str | None = None
+    fact_id: str | None = None
+    calculation_id: str | None = None
+
+
+class FinancialFact(Record):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
+    id: str
+    issuer_cik: str = Field(pattern=r"^\d{10}$")
+    concept: str
+    raw_value: str
+    normalized_value: Decimal
+    raw_unit: str
+    unit: str
+    scale: int
+    decimals: str
+    period_kind: Literal["duration", "instant"] = "duration"
+    start: date | None
+    end: date
+    basis: Literal["US_GAAP", "unknown"]
+    scope: Literal["consolidated", "unknown"]
+    accession: str = Field(pattern=r"^\d{10}-\d{2}-\d{6}$")
+    form: Literal["10-K", "10-K/A"]
+    filed: date
+    available_at: AwareDatetime
+    retrieved_at: AwareDatetime
+    evidence_id: str
+    snapshot_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    locator: str
+
+
+class Calculation(Record):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
+    id: str
+    formula: Literal["operating_income / revenue"] = "operating_income / revenue"
+    formula_version: Literal["operating-margin-v1"] = "operating-margin-v1"
+    input_fact_ids: tuple[str, ...]
+    precision: Literal[28] = 28
+    rounding: Literal["ROUND_HALF_EVEN"] = "ROUND_HALF_EVEN"
+    result: Decimal | None
+    failure: Literal["missing_input", "invalid_fact", "incompatible_inputs", "nonpositive_revenue"] | None
+
+    @model_validator(mode="after")
+    def result_or_failure(self):
+        if (self.result is None) == (self.failure is None):
+            raise ValueError("A calculation contains either a result or a typed failure.")
+        return self
 
 
 class Claim(Record):
@@ -100,7 +192,7 @@ class Forecast(Record):
     benchmark: str = "SPY"
     horizon: str = "20 exchange sessions"
     model_version: str | None = None
-    reason: str = "No validated forecast artifact or point-in-time price features have been installed."
+    reason: str = "A return forecast is not available. These financial results do not predict future performance."
 
 
 class CompanyReport(Record):
@@ -113,6 +205,11 @@ class CompanyReport(Record):
     reviews: list[Review]
     forecast: Forecast = Field(default_factory=Forecast)
     limitations: list[str]
+    source_limitations: list[str] | None = None  # None identifies saved reports from before source/review separation.
+    review_status: Literal["not_requested", "pending", "completed", "unavailable", "failed", "not_recorded"] = "not_recorded"
+    review_error: str | None = None
+    facts: list[FinancialFact] = Field(default_factory=list)
+    calculations: list[Calculation] = Field(default_factory=list)
 
 
 class Candidate(Record):
@@ -125,6 +222,32 @@ class Candidate(Record):
     selected: bool = False
 
 
+class ModelRunInfo(Record):
+    provider: str
+    model: str | None
+    schema_version: str = "financial-review-v1"
+    max_output_tokens: int | None = Field(default=None, gt=0)  # None delegates to the provider/model default.
+
+
+class ModelCall(Record):
+    role: str
+    provider: str
+    requested_model: str
+    returned_model: str | None = None
+    response_id: str | None = None
+    input_tokens: int | None = Field(default=None, ge=0, strict=True)
+    output_tokens: int | None = Field(default=None, ge=0, strict=True)
+    total_tokens: int | None = Field(default=None, ge=0, strict=True)
+    reasoning_tokens: int | None = Field(default=None, ge=0, strict=True)
+    provider_status: str | None = None
+    incomplete_reason: Literal["max_output_tokens", "content_filter", "other"] | None = None
+    cost_usd: Decimal | None = Field(default=None, ge=0)
+    status: Literal["running", "completed", "failed", "incomplete"]
+    error_code: str | None = None
+    error_message: str | None = None
+    output_snapshot_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 class Report(Record):
     title: str
     synthetic: bool
@@ -132,6 +255,8 @@ class Report(Record):
     candidates: list[Candidate] = Field(default_factory=list)
     ranking: str | None = None
     limitations: list[str] = Field(default_factory=list)
+    model_run: ModelRunInfo | None = None
+    model_calls: list[ModelCall] = Field(default_factory=list)
 
 
 class Action(Record):
@@ -139,6 +264,22 @@ class Action(Record):
     at: AwareDatetime
     role: str
     message: str
+
+
+class RunMetadataPatch(Record):
+    label: str | None = Field(default=None, max_length=120)
+    archived: bool = Field(default=False, strict=True)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def normalize_label(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set:
+            raise ValueError("Provide a name or archive state to update.")
+        return self
 
 
 class Run(Record):
@@ -152,6 +293,8 @@ class Run(Record):
     report: Report | None = None
     error: str | None = None
     synthetic: bool = False
+    label: str | None = None
+    archived: bool = False
 
 
 class DomainError(Exception):

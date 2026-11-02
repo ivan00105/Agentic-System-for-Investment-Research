@@ -1,6 +1,8 @@
+> Archived on 27 October 2026. Historical design/review context; it may describe unimplemented behavior. For current guidance use [Start](../../README.md), [Status](../../STATUS.md), [Design](../design.md) and [Sources](../sources.md).
+
 # Correctness audit and resource decisions
 
-Checked 18 October 2026, Hong Kong time. Read alongside the [implementation plan](./implementation_plan.md).
+Initial methodology review: 18 October 2026. Resource and stewardship review refreshed: 25 October 2026, Hong Kong time. Read alongside the [implementation plan](./implementation_plan.md); [STATUS.md](../../STATUS.md) owns current implementation and acceptance status.
 
 Implementation note, 19 October: the custom-web milestone now exists under [stock_research](../../README.md). The audit statements below describe the earlier source review, not validation of the new application. Current SEC/model live access remains unverified; synthetic replay and mocked transport tests must not be cited as evidence of real provider access or investment performance.
 
@@ -9,6 +11,8 @@ Implementation note, 19 October: the custom-web milestone now exists under [stoc
 I read the final response in the [shared ChatGPT conversation](https://chatgpt.com/share/6ad4955b-b618-83ea-afcc-303b0e8e8767) through its browser view, along with the conversation context visible there. I also extracted the local course guideline and inspected all ten linked repositories plus the linked arXiv directory. Relevant methodological claims were checked against primary papers and official documentation.
 
 This is a documentation and methodology review, not a code-security audit or independent reproduction of the repositories' experiments. No project packages were installed or benchmarked. Repository READMEs describe intended/current functionality; they do not establish that every implementation path is correct.
+
+The 25 October refresh covers the user's 13 unique repository suggestions (QuantStats was listed twice), retaining earlier decisions where still applicable. It uses current README-level evidence and the OpenBB announcement, OpenBQ site and repository licence. It does not repeat the original conversation or course-guideline audit. The resource list is sufficient for the next milestone; validated evidence and evaluation are the current bottlenecks.
 
 The original/revised/FINAGENT/FIN/BAK proposal files and the previous answer's downloadable plan/ZIP/PDF were not present in the local workspace and were not inspected. Consequently, its judgments about which draft is better, diagram overlaps, duplicate documents, fallback LaTeX styles, compilation success and page count remain **unverified**. This review does not repeat them as established facts.
 
@@ -73,8 +77,22 @@ These are recommendations for this particular stock-research application, not ra
 | [FinanceDatabase](https://github.com/JerBouma/FinanceDatabase) | Instrument symbols and descriptive metadata | Potential one-time universe/identity seed, followed by manual validation and versioning | It explicitly is not an up-to-date fundamentals/price database; a current catalog is not historical membership. |
 | [FinanceToolkit](https://github.com/JerBouma/FinanceToolkit) | Financial ratios, indicators and analysis functions with data integrations | Useful formula reference or selected checked calculations over your normalized inputs | Provider coverage and accounting definitions still need validation. Its documented FMP→Yahoo fallback can change provenance unless controlled. |
 | [OpenBB](https://github.com/openbq-org/OpenBB) | Data integration platform connecting multiple sources to downstream applications | Conditional choice if several providers demonstrably justify a shared integration layer; unnecessary for SEC plus one price source initially | An integration platform does not grant underlying data subscriptions, licences or point-in-time correctness. |
+| [Vibe-Trading](https://github.com/HKUDS/Vibe-Trading) | Broad agent workflows for research, factors, strategies, backtesting and trading | Inspect bounded tool use, grounded outputs, missing-value handling and factor-evaluation patterns | Its full platform and reported performance are not validated dependencies or results for Fieldnote. |
+| [vnpy](https://github.com/vnpy/vnpy) | Trading framework; `vnpy.alpha` includes feature, model and strategy research | Later factor-research reference only | Adopting its execution framework is unnecessary for the current research application. |
+| [QuantDinger](https://github.com/OpenByteInc/QuantDinger) | AI trading platform with strategy generation, backtesting and execution | Selective workflow/UI reference | Its trading and distributed-service stack would substantially expand local application scope. |
+| [QUANTAXIS](https://github.com/yutiansut/QUANTAXIS) | Market-data, account, backtesting and factor-research ecosystem | Consult factor-testing concepts if a later experiment needs them | Broad ecosystem support does not establish data suitability for the selected US issuers. |
+| [quant-trading](https://github.com/je-suis-tm/quant-trading) | Educational strategy and indicator scripts | Use as learning examples or candidate baseline ideas | The README assumes frictionless trading without fees, slippage or illiquidity; results are not deployable trading evidence. |
+| [awesome-ai-in-finance](https://github.com/georgezouq/awesome-ai-in-finance) | Index of financial AI research and tools | Find original papers or tools when a specific gap appears | Inclusion is not an accuracy, maintenance or performance assessment. |
 
-The formerly common [OpenBB-finance/OpenBB URL](https://github.com/OpenBB-finance/OpenBB) redirected to the user-supplied `openbq-org/OpenBB` repository during this check. The supplied link is therefore not a typo that needs replacing based on older documentation.
+### OpenBB / OpenBQ: awareness required, migration unnecessary
+
+The [25 August announcement, updated 1 October](https://openbb.co/blog/openbb-belongs-to-everyone/) describes the business wind-down and OpenBQ stewardship. It separately announces planned FINOS stewardship of the Workspace codebase and BrightQuery's hosted workspace initiative. These are distinct from the data-platform repository and should not be treated as one completed product migration.
+
+[OpenBQ](https://openbq.org/) describes an independent foundation backed by BrightQuery; its site still marks Workspace and Agents source releases as in progress. The inspected [platform LICENSE](https://github.com/openbq-org/OpenBB/blob/develop/LICENSE) is Apache 2.0. Older licence descriptions should not override the licence at the revision actually adopted. Provider subscriptions and data rights remain separate.
+
+Fieldnote has no OpenBB dependency or runtime integration, so no package migration is required. Keep the current direct SEC path. Reconsider OpenBQ only when multiple concrete provider needs justify it; check the selected release, licence, endpoints and maintenance then. The old [OpenBB-finance/OpenBB URL](https://github.com/OpenBB-finance/OpenBB) redirects to `openbq-org/OpenBB`; the supplied URL is valid.
+
+### Selective reuse
 
 TradingAgents' current README describes dated-data handling and newer backtesting behavior. Those are useful areas to inspect, but this review has not exercised or audited those implementations. If used as a baseline, pin the repository revision, disable or isolate cross-run memory, use the same eligible evidence/cutoff, and align the output target. Its [research paper](https://arxiv.org/abs/2412.20138) evaluates a different trading framework; a full implementation replication is optional and should not delay the core application.
 
@@ -83,6 +101,21 @@ QuantMind's typed provenance ideas fit well, but even its own timestamped artifa
 For FinanceToolkit, enforce one chosen source or supply validated input data. Do not silently replace missing historical fundamentals with current Yahoo statements. Verify ratio formulas, period transformations and missing-value behavior against hand calculations. The [README](https://github.com/JerBouma/FinanceToolkit) documents configurable source enforcement; this is a useful control, not proof of data correctness.
 
 Do not add all these packages. The initial dependency set can remain ordinary Python data/model/UI tooling, a small SEC integration, and one price adapter. Add a project-specific library only when it reduces implementation and maintenance work without obscuring the invariants.
+
+### Factor research: useful later, not a prerequisite for reliable reports
+
+A **factor/feature** is an input or candidate signal, not proof of excess returns. **Beta** measures exposure to a specified market or factor. **Alpha** is performance unexplained by a specified risk model; beating SPY alone does not establish it. Trading literature also uses “alpha” informally for candidate signals, so label that usage explicitly. The [Fama–French factor definitions](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html) illustrate constructed factor returns, distinct from a company's raw financial ratio.
+
+| Factor family | Role in this project | Timing and evidence requirement |
+|---|---|---|
+| Fundamental: financial and valuation metrics | Explain company performance and support deterministic screening | Annual revenue, operating income and margin first. Valuation needs aligned prices, share counts and accounting dates; a financial statement alone is insufficient. |
+| Technical: price/volume features | Inputs to a small statistical forecasting baseline | Later: fixed return, volatility and volume features from validated historical prices. Compare against a base rate before adding feature search. |
+| ML: genetic programming (GP), neural networks | Search for candidate transformations or predictive relationships | Separate later experiment after the data and baseline work. More trials increase overfitting risk; record every trial and reserve an untouched test set. |
+| LLM-derived features | Extract cited, dated events or financial attributes; propose testable hypotheses | First validate extraction against source evidence. Deterministic code computes values; held-out tests assess predictive value. Narrative agents must not invent or revise forecast probabilities. |
+
+Before factor mining, require chronological splits across all issuers, matured outcome labels, training-only transformations and selection, a trial registry, baseline comparisons, and an untouched final test. Report uncertainty and failed hypotheses. Five teaching companies cannot establish broad cross-sectional alpha. Strategy-performance claims additionally need declared positions, transaction costs, turnover and execution assumptions. Historical LLM knowledge leakage remains a separate limitation even with correctly dated source inputs.
+
+The next milestone therefore uses fundamental metrics for explanation and research correctness. Forecasting follows with fixed price features; GP/neural-network/LLM mining stays deferred. QuantStats can summarize a later return series, but cannot validate citations, probability calibration or the search procedure.
 
 ## 5. Data-source decision matrix
 

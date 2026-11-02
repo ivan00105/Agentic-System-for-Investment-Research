@@ -1,0 +1,189 @@
+{
+  "client_date": "2026-10-31",
+  "timezone": "Asia/Hong_Kong",
+  "captured_at_utc": "2026-10-30T18:55:26.387926+00:00",
+  "head": "2c7f20378ae0667d9d3336758854234e9cacf211",
+  "branch": "ivan",
+  "upstream": "origin/ivan",
+  "status_v2": "# branch.oid 2c7f20378ae0667d9d3336758854234e9cacf211\n# branch.head ivan\n# branch.upstream origin/ivan\n# branch.ab +0 -0\n1 .M N... 100644 100644 100644 c35d40fcaf813882489cc19cbbbf754f2e1e7ba7 c35d40fcaf813882489cc19cbbbf754f2e1e7ba7 docs/design.md\n1 .M N... 100644 100644 100644 4780ce69baa7317cfb001d21181e4624700f1012 4780ce69baa7317cfb001d21181e4624700f1012 docs/sources.md\n1 .M N... 100644 100644 100644 82dcd27d0fa13a3b1a4ee7a1b8f5b946a4c83a63 82dcd27d0fa13a3b1a4ee7a1b8f5b946a4c83a63 src/research_assistant/api.py\n1 .M N... 100644 100644 100644 7cabb5d90195f3205448e38f22a15de2fa43a66c 7cabb5d90195f3205448e38f22a15de2fa43a66c src/research_assistant/application.py\n1 .M N... 100644 100644 100644 bb1378f35793d1b185c85f9a3fbbe2f7c80e2a68 bb1378f35793d1b185c85f9a3fbbe2f7c80e2a68 src/research_assistant/contracts.py\n1 .M N... 100644 100644 100644 86e7c7b82796ff1d7db55b21b322d0e87f195914 86e7c7b82796ff1d7db55b21b322d0e87f195914 src/research_assistant/research.py\n1 .M N... 100644 100644 100644 a8a296261aa687b6a707a0f9a4e4a67602a7fa12 a8a296261aa687b6a707a0f9a4e4a67602a7fa12 src/research_assistant/store.py\n1 .M N... 100644 100644 100644 49b2026c21e4129129d32fe758030e41e1de71e5 49b2026c21e4129129d32fe758030e41e1de71e5 tests/test_connections.py\n1 .M N... 100644 100644 100644 a850d1856e558ed248a2460db5ab749f5c0bc383 a850d1856e558ed248a2460db5ab749f5c0bc383 tests/test_system.py\n? docs/c1-handoff.md\n? src/research_assistant/filings.py\n? src/research_assistant/financials.py\n? tests/sec_fixture.py\n? tests/test_filing_packets.py\n? tests/test_financial_records.py\n? verification/c1-runtime.json\n? verification/packets/\n",
+  "index_entries_sha256": "a7b30edd09958160a553dc7110065d90e557ec285c84167c0d374921e61478f0",
+  "index_bytes_sha256": "aa4ba971fd1945867c336951c9836a0d55f44e54517e39cca3274e812dbe0f75",
+  "backup_directory": "D:\\HKU\\COMP7608_Large_language_models\\stock_research\\.tmp\\c0\\20261031-9b62d98b",
+  "files": [
+    {
+      "path": "docs/c1-handoff.md",
+      "bytes": 4899,
+      "sha256": "eeba275505e4327ab9277f7bc98fd52a2d16a0e2095e0415fd9c5dcd814a5e22"
+    },
+    {
+      "path": "docs/design.md",
+      "bytes": 19867,
+      "sha256": "729740f390c71cb2f63e711f3c6be70157b7380f4c91b965e473ff17e245622c"
+    },
+    {
+      "path": "docs/sources.md",
+      "bytes": 29873,
+      "sha256": "07e89712db9dc952fade99ec8e28888d0936f8e21ddbe1f58cd66be07c88ea56"
+    },
+    {
+      "path": "src/research_assistant/api.py",
+      "bytes": 6745,
+      "sha256": "29f54c34c26a96d819dce5f98184dde8e08e27dc5938ea3e21f5320d7488fba9"
+    },
+    {
+      "path": "src/research_assistant/application.py",
+      "bytes": 21892,
+      "sha256": "0350d474ff5d6503c4576bfb300220d5ad4d625535f4a024550136e2b98c148b"
+    },
+    {
+      "path": "src/research_assistant/contracts.py",
+      "bytes": 10733,
+      "sha256": "50b217a5f880d0ef58287d648f68ca81a45ffd973b556ddb4d792e0921e7071c"
+    },
+    {
+      "path": "src/research_assistant/filings.py",
+      "bytes": 8571,
+      "sha256": "4a344c13251d4a8ba0c5e667286f47c0f0e0fc43e40fa36897ceb7be7f60a8a7"
+    },
+    {
+      "path": "src/research_assistant/financials.py",
+      "bytes": 7079,
+      "sha256": "0ed911de1cc622bfc5e018399341832d21ada38500748a5b369f45ad0fa8af82"
+    },
+    {
+      "path": "src/research_assistant/research.py",
+      "bytes": 10515,
+      "sha256": "64b54194950c2c35748108a3b328e367e156effabd29363faa2de818724f0e7c"
+    },
+    {
+      "path": "src/research_assistant/store.py",
+      "bytes": 16330,
+      "sha256": "4faec1bccab47009090d1fd0c8e4a7505ef2ca2c0ca7677c8c258149220a0c85"
+    },
+    {
+      "path": "tests/sec_fixture.py",
+      "bytes": 2172,
+      "sha256": "d2d2d1f343306eab874e844b7244eec19d5cf16e75e7d2988c927da9efd5013c"
+    },
+    {
+      "path": "tests/test_connections.py",
+      "bytes": 13650,
+      "sha256": "1811261d46f448ae09b8f52c2e1dac2fe3bd1b1f1b50a3339230048fb9fe7348"
+    },
+    {
+      "path": "tests/test_filing_packets.py",
+      "bytes": 12566,
+      "sha256": "6d64cf6134a2ed3a11f96c2caa6eda2c3ce8bc2f380b4949d676fb54d7902ac3"
+    },
+    {
+      "path": "tests/test_financial_records.py",
+      "bytes": 4934,
+      "sha256": "d74346dffece623509768b69b3e4a9e4fffb0fdbaa5934e27e50920a1907f339"
+    },
+    {
+      "path": "tests/test_system.py",
+      "bytes": 24472,
+      "sha256": "0973875b406f5a7c313010349b27c23b176a4b2286333a1b8a02976d39a2dc09"
+    },
+    {
+      "path": "verification/c1-runtime.json",
+      "bytes": 13333,
+      "sha256": "ff5cbd029cc5095a9924e06ddb52bc025d4325c8258556274d306b1d3bb39a3f"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/README.md",
+      "bytes": 6836,
+      "sha256": "bbe6df55f68ccfad88640c16c423a8bb893036cd359f60183f00a8e19fe64d96"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/SHA256SUMS.txt",
+      "bytes": 1528,
+      "sha256": "8e6d570667db75a857917b27ef2d08afd337e1ff80fe398da1136d3ff04a9c82"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/acquire.py",
+      "bytes": 5182,
+      "sha256": "d5d69bd8fd3e7269c13c0ab7e90d4008059f1b9cd7a8a6b5095aa9e0cd09cf80"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/acquisition.json",
+      "bytes": 3194,
+      "sha256": "639dfc4b87baf906db94efc3a80de8b32e12bb379e899b1e41bee26bc7414ece"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/baseline.json",
+      "bytes": 2974,
+      "sha256": "a0f5ff53d6926df4318c6da93c960c2a738b8fb3644905cc5b3506c39e770fb7"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/comparison.json",
+      "bytes": 10949,
+      "sha256": "c02334f485c61699be107a35bd4a6cee9bbf198d9ea97a023ed5fbb232500106"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/manifest.json",
+      "bytes": 6926,
+      "sha256": "20994161bdc2068fa5d822c6d2840a690928f2320cc3d79b5b4467c8e535e7a1"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/mismatch-cases.json",
+      "bytes": 1425,
+      "sha256": "18ca80d15a1ab13ca2b9b83134dafc82910da2b174ef35e37ba252829cf0f9c0"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/preservation.json",
+      "bytes": 1184,
+      "sha256": "35203d9587981bb104bb1eae1a691f86ec43ac7c2aaa7bcd587ab622fef9af2d"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/companyfacts.json",
+      "bytes": 4888108,
+      "sha256": "dd0308149a8e96497989ed7c690b5a49a00bef9ceafbb24638bda41e8ae938dd"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/microsoft-annual-report.html",
+      "bytes": 486883,
+      "sha256": "2b49e38b25f3bea8634b603ad5db64ba0803f27e27f93cc406884e6990974065"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/original-10k.html",
+      "bytes": 6860911,
+      "sha256": "43829a12cc9cd7198474b3d735c4fc1aba1f871fb637d237aa5979d57e6b8c95"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/sec-filing.html",
+      "bytes": 6861023,
+      "sha256": "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/sec-index.html",
+      "bytes": 12516,
+      "sha256": "f8266d4636052bf338adc526865741d0369e5f2f5bb37385c54f56a8d6dddffc"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/raw/sec-submission.txt",
+      "bytes": 30375960,
+      "sha256": "56c7efc2d90a2372035653cc9fd873829b83f4adb178c1f32e484a48e0d809bb"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/saved-selection.json",
+      "bytes": 3057,
+      "sha256": "9b9226b4bfe7f2bc692ccdab95012d5875d01c7ddb3b1e03ceb9c92678636d7b"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/statement.txt",
+      "bytes": 881,
+      "sha256": "771b629daa6870311734eb2607bb8b048582ab32ab6cfa732b9163a5fd5039a5"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/verification.json",
+      "bytes": 490,
+      "sha256": "47e41ac1d374794f07b2bf3d461f124233f1127e8382caeee26e6eec26431a33"
+    },
+    {
+      "path": "verification/packets/msft-fy2024/20261029T182734Z/verify.py",
+      "bytes": 20273,
+      "sha256": "5999f7b28f1aad9016b8c6b1eb3eb2d7e9f8bce2a1f5cef44b0fcc139fe41121"
+    }
+  ]
+}
