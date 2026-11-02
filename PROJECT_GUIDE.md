@@ -323,7 +323,7 @@ flowchart LR
 ```
 
 ### Phase 0: Tidy + guardrails
-- [x] Commit the current tree as a checkpoint and tag it `pre-agent`.
+- [x] Commit the current tree as a checkpoint ("chore: checkpoint before agent work").
 - [x] Add `AGENTS.md` + `CLAUDE.md`, CI (pytest, ruff, tsc) and a PR template.
 - [x] Move old planning docs (STATUS, design, workstreams, sources, c1-handoff, integration, tasks/) into `docs/archive/`. Cut the README down to "what + how to run + link here".
 - [x] Add `.archify/`, `graphify-out/` and `verification/packets/` to `.gitignore` (keep them locally). Tests that read the packet skip when it's missing, so CI skips them.
@@ -343,6 +343,7 @@ Licences don't matter here (it's an academic project): calling a library and cop
 - [ ] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
 - [ ] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
 - [ ] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
+- [ ] Commit small, trimmed SEC fixtures (a few KB each) so CI covers filing parsing. Today 20 tests read the 48 MB local packet and are skipped in CI.
 - **Done when:** every tool gives correct, cited output for 10+ companies, including a bank and a foreign filer (which must come back "unsupported", not crash).
 
 ### Phase 2: Single agent loop

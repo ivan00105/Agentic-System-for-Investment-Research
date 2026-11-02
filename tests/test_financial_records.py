@@ -7,8 +7,10 @@ from research_assistant.contracts import DomainError, FilingPacket, FinancialFac
 from research_assistant.filings import Document
 from research_assistant.financials import identified, operating_margin, parse_filing_facts
 from research_assistant.research import conservative_availability
-from test_filing_packets import PACKET, annual
+from test_filing_packets import PACKET, annual, needs_packet
 
+# Every test here parses the real 10-K in the git-ignored packet.
+pytestmark = needs_packet
 
 def parse(raw=None):
     source = (PACKET / "raw/original-10k.html").read_bytes() if raw is None else raw
