@@ -1,0 +1,67 @@
+{
+  "recorded_date": "2026-11-01",
+  "timezone": "Asia/Hong_Kong",
+  "scope": "Remove prototype request/output truncation and preserve model failure diagnostics; no live inference or research-quality validation.",
+  "policy": {
+    "app_output_token_cap": null,
+    "app_run_time_token_call_tool_quotas": null,
+    "model_timeout": "SDK default; no app override",
+    "selected_table_text": "complete normalized text; no 12000-character clipping",
+    "response_schema": "financial-review-v2; no character/list maxima",
+    "workflow": "one finite interpretation/critic pass per selected company; no retries or provider fallback"
+  },
+  "retained": [
+    "source/claim reference validation",
+    "host-owned calculations",
+    "qualitative-only interpretation guard",
+    "SEC download byte/time/rate protection",
+    "single worker and data-directory lock",
+    "saved evidence and replay compatibility"
+  ],
+  "checks": [
+    {
+      "name": "focused model baseline before edits",
+      "result": "passed",
+      "count": 79
+    },
+    {
+      "name": "full backend regression",
+      "result": "passed",
+      "count": 198,
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .tmp/restriction-policy-20261101/full-regression",
+      "notes": "Ran outside sandbox because Windows asyncio socketpair creation stalled before application startup inside sandbox; one existing Starlette/httpx deprecation warning."
+    },
+    {
+      "name": "production frontend build",
+      "result": "passed",
+      "command": "npm.cmd --prefix frontend run build"
+    },
+    {
+      "name": "focused browser interaction and accessibility",
+      "result": "passed",
+      "count": 1,
+      "command": "npm.cmd --prefix frontend test -- --config ../.tmp/restriction-policy-20261101/playwright.config.mjs --grep \"model connection check requires source\"",
+      "notes": "Isolated store/server on allowed port 5173; mocked provider results; provider-default limit, reasoning usage, specific stop reason and Running-to-incomplete transition checked."
+    }
+  ],
+  "limitations": [
+    "Provider generation/context limits still apply.",
+    "Known structured context-overflow codes are classified; unrecognized provider errors stay sanitized.",
+    "Old clipped saved excerpts and missing provider diagnostics are not retroactively reconstructed.",
+    "No new live inference, prompt-quality evaluation or independent financial acceptance."
+  ],
+  "sha256": {
+    "src/research_assistant/application.py": "c453dc12d16788c14d82a24dc1f83d7c0a4a8e53f467985029badbc65aa2c62e",
+    "src/research_assistant/contracts.py": "6e2e8578da53c73d4f1d4e29632bf7222df19ad9f36e835be608bc48d30177ba",
+    "src/research_assistant/research.py": "9d25ba1d4113bca6c1bbb5b6811e0eb4847db123818715d2c737f256cb7f445d",
+    "src/research_assistant/model_access.py": "8690b64e03978b6d2d0d7cfa8acdff93e769f8d1eb56790010e9e5e7d925b8df",
+    "src/research_assistant/store.py": "5c1861e6c222b4d49fb787af600521aaf92cf3cc7446cef2e19795f506dea300",
+    "frontend/src/api.ts": "b3817556f2fd2eddcbc01e78e4640dc4c880de158bf9f0fd6bc5b530994e4662",
+    "frontend/src/App.tsx": "e124a4f4a2dcc9a560eae69652d3f749acde58790046d3fd82a3915c2fed15a1",
+    "frontend/tests/workspace.spec.ts": "03b5481cf9caa6d181ae9726b59d859568a3eddba3675e493934484f249a4edc",
+    "tests/test_model_checks.py": "34f72df177c0ac914b81d2869a5733d6da48d67d4f956029e67e05221688aa17",
+    "tests/test_model_access.py": "befc18e3a7d46132025bde9bb06d34ebec60961533ce6444fd7eff954ef2d118",
+    "tests/test_connections.py": "2c07b68c3d274271d80a629eba6870dc1eaf603593dc10fc498e307f45d712dc",
+    "tests/test_system.py": "59b91c6b1dc17dd1a80bb388b1cf791a7f15124766be2ba18e69fae20bb25a82"
+  }
+}

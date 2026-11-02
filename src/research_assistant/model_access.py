@@ -39,7 +39,6 @@ class ModelSettings:
         kwargs = {
             "api_key": self.api_key,
             "base_url": self.base_url,
-            "timeout": 45,
             "max_retries": 0,
         }
         if self.provider == "openrouter":
@@ -59,7 +58,7 @@ class ModelSettings:
         return {
             "provider": self.provider,
             "model": self.model,
-            "schema_version": "financial-review-v1",
+            "schema_version": "financial-review-v3",
         }
 
 
@@ -125,6 +124,10 @@ def load_model_settings() -> ModelSettings:
 
 def safe_model_error(exc: Exception) -> DomainError:
     """Translate failures without reflecting provider messages, headers or credentials."""
+    body = getattr(exc, "body", None)
+    error = body.get("error", body) if isinstance(body, dict) else {}
+    if isinstance(error, dict) and error.get("code") in ("context_length_exceeded", "context_window_exceeded", "input_too_long"):
+        return DomainError("The complete evidence exceeds the selected model's input context. Evidence was not silently truncated. Choose a model with a larger context or explicitly narrow the source selection.", "model_context_limit", 502)
     if isinstance(exc, (AuthenticationError, PermissionDeniedError)):
         return DomainError("Model authentication or access was rejected. Check the selected provider credentials and permissions.", "model_authentication", 502)
     if isinstance(exc, RateLimitError):

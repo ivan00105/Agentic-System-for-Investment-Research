@@ -2,30 +2,77 @@
 
 [Start](../README.md) · [Current status](../STATUS.md) · [Sources](sources.md)
 
-Keep one local application. Python owns evidence eligibility, calculations and run limits; model calls propose interpretations and checks. The research question is whether targeted review improves financial correctness without excessive cost or damage to correct claims.
+Keep one local application. Python owns evidence eligibility, calculations and execution control; model calls propose interpretations and checks. The research question is whether targeted review improves financial correctness without excessive cost or damage to correct claims. The application-level generation/run/spending quotas were removed on 1 November; provider limits and source protections remain.
 
-## System at a glance
+## Research workflow at a glance
 
 ```mermaid
-flowchart LR
-    UI[Research · Discovery · History] --> API[Local FastAPI server]
-    API --> WORK[One research worker]
-    API --> STORE[SQLite and saved source files]
-    WORK --> STORE
-    WORK --> CALC[SEC fact selection and calculations]
-    CALC --> SEC[SEC · fresh mode only]
-    CALC --> STORE
-    WORK --> MODEL[Model interpretation and critique · configured runs]
+flowchart TD
+    REQUEST[Request: Research or Discovery, cutoff and mode] --> MODE{Execution mode}
+    MODE -->|Replay| SAVED[Read saved output: no retrieval or inference]
+    MODE -->|Fresh or frozen| EVIDENCE[Retrieve or reuse evidence]
+    EVIDENCE --> FACTS[Validate annual facts, calculate and save financials]
+    FACTS -->|Research| REVIEW{Model analysis requested?}
+    FACTS -->|Discovery| SCREEN[Screen available companies; select eligible candidates]
+    SCREEN --> REVIEW
+    REVIEW -->|No / unavailable| RESULT[Saved result and audit trace]
+    REVIEW -->|Yes| PAIR[Interpretation then critic]
+    PAIR --> CHECKS[Host checks; current objections remain unresolved]
+    CHECKS --> RESULT
+    CHECKS -. Planned bounded follow-up .-> RESOLVE[Versioned corrected / unchanged / unresolved disposition]
+    RESOLVE -. Corrected input .-> RECOMPUTE[Recompute affected values and claims]
+    RECOMPUTE -. Discovery: same saved universe .-> SCREEN
+    RECOMPUTE -. Research: planned follow-up policy .-> REVIEW
+    RESOLVE -. Finalize or no feasible follow-up .-> RESULT
+    SAVED --> RESULT
 ```
 
-Explore the [Fieldnote system and next steps](../.archify/explainer-fieldnote-20261028-004223/fieldnote.html) for the current architecture, optional model review, connection checks and planned Discovery/correction work. This dated working-tree snapshot replaces the earlier diagram copies. Source snapshots and validation receipts accompany it; planned behavior is labelled separately.
+Open the [research workflow atlas](../.archify/index.html) to follow the complete current and intended execution, then drill into stages, mechanisms and engineering reference. Future steps share the graph with implemented steps and are explicitly marked. Forecast preparation/prediction and filing events are optional branches; evaluation consumes saved cases/results in a separate experiment workflow. Financial results are saved before model analysis, and available partial results survive a stopped run. A completed run does not establish research correctness.
+
+### Alignment with the archived implementation plan
+
+The [archived plan](archive/implementation_plan.md) preserves the original intent, not current implementation or an automatically accepted backlog. Code establishes actual execution; STATUS and Workstreams establish milestone state/scope; this document records stable behavior. In the table, **retained** describes intent, not proof that every proposed step exists.
+
+| Archived behavior | Alignment | Current behavior / intended continuation |
+|---|---|---|
+| Shared Research/Discovery evidence, calculation and reporting path | Retained | Research loads one company; Discovery loads company financials, screens/selects, then reviews selected companies. |
+| Coordinator chooses specialist tools and next actions | Implemented more narrowly | `Application` follows fixed host routing with bounded interpretation/critic calls. Five logical specialist roles and a general model-driven tool planner are not implemented or required by the core milestone. |
+| Filings, facts and deterministic arithmetic | Retained | C1 implements the narrow annual USD packet/fact/margin path; independent packet review and C0 acceptance remain separate. |
+| Up to two review rounds | Planned | Current code performs one finite interpretation/critic pass per reviewed company. Additional rounds and their stopping policy remain a design decision; the removed run quotas are not active gates. |
+| Defended / corrected / withdrawn / unresolved objections | Superseded | The current core target uses corrected / unchanged / unresolved dispositions. Live runtime currently records unresolved only; the saved corrected example is synthetic. Do not introduce the archived four-way taxonomy implicitly. |
+| Versioned correction, invalidation and candidate replacement | Planned | C4 must append resolutions, recompute affected dependencies and re-screen/replace within the saved universe and an agreed finite follow-up policy. None is established by current host recomputation text. |
+| Forecast probability ranking | Optional/deferred | Current selection is alphabetical among eligible companies; browser sorting changes display only. Probability ranking requires an accepted forecast artifact and a separately agreed rule. |
+| Statistical forecasts and event specialist in the initial complete design | Optional/deferred | C8/C9 are unselected extensions under current milestone order. Training/preparation is separate from request-time prediction; narrative review cannot alter immutable `p0`. |
+| Cancellation and action-level retry/resumption | Decision needed | No cancellation or automatic checkpoint resumption exists. Uncertain submission recovery reuses a request/key; it is not action resumption or exactly-once remote billing. These are not new core requirements. |
+| Research evaluation and independently checked cases | Retained | Protocol/case design, independent labels and held-out comparisons remain required evidence for research-quality claims; they are not a step in each user request. |
+| Streamlit, proposed module filenames and historical four-week/team schedule | Superseded | React/FastAPI/SQLite and existing module ownership govern implementation. Archived filenames are responsibility sketches, not scaffolding instructions; the schedule is not a current commitment. |
+
+### Original specialist roles and tools
+
+The archived plan's five specialists are logical responsibilities. They are not five separate deployed services, and a function or action-log label does not establish an autonomous model agent. The atlas's **Specialists & tools** view explicitly maps each role to present code and future behavior.
+
+| Original role | Present implementation | What remains proposed |
+|---|---|---|
+| Coordinator | `Application` validates requests and routes Research/Discovery through a fixed finite host workflow. | General model-selected next actions and full specialist delegation. |
+| Filings specialist | Host SEC retrieval/annual selection plus one model interpretation of supplied evidence. | An agent that chooses filing-search tools and follow-up sources. |
+| Quantitative specialist | Host-owned typed facts, `operating_margin`, immutable calculations and deterministic screening. | A separate tool-selecting Quant model role; forecasts remain unavailable. |
+| Event specialist | No current event-specialist implementation. | Optional dated filing-event/risk extraction and its evidence path. |
+| Critic | One structured model call with exact supplied claim/evidence references and allowlisted requested checks. | Version-targeted correction, resolution and automatic re-screening. Current objections remain unresolved. |
+
+The named tools in the archive are proposed interfaces, not necessarily current function names. `get_fact` has a host-side counterpart in `Store.fact`; `calculate_metric` is currently the narrow `financials.operating_margin` formula; `screen_universe` corresponds only to `screen_companies` over the fixed supported universe. Issuer resolution is a static `UNIVERSE` mapping. General `list_eligible_filings`, `search_evidence`, `get_price_features` and `get_forecast` tool interfaces are not implemented. Annual eligibility/packet retrieval supplies only a narrower part of the filing-listing responsibility. Models currently receive evidence/metrics and cannot directly fetch URLs or execute arbitrary Python/SQL.
+
+### Engineering reference
+
+Frontend/backend ownership, storage and deployment explain how the workflow is implemented; they are secondary to the execution map above.
 
 | Responsibility | Current owner | Why it stays here |
 |---|---|---|
 | Accessible screens, navigation and request recovery | [frontend/src](../frontend/src/) | Presentation never authorizes tools or computes authoritative financial values |
 | HTTP validation and local access restrictions | [api.py](../src/research_assistant/api.py) | One boundary for all callers; serves the production UI too |
-| Run lifecycle, shared research/discovery, model calls | [application.py](../src/research_assistant/application.py) | One worker and one shared budget avoid competing workflows |
-| Annual source selection and Decimal arithmetic | [research.py](../src/research_assistant/research.py) | Financial correctness belongs beside the inputs and formulas |
+| Run lifecycle, shared research/discovery, model calls | [application.py](../src/research_assistant/application.py) | One worker serializes finite research/discovery workflows |
+| Annual source selection and report assembly | [research.py](../src/research_assistant/research.py) | Select comparable annual inputs and assemble the saved report |
+| Accession-specific source retrieval and byte locators | [filings.py](../src/research_assistant/filings.py) | Bound retrieval and preserve original filing identity and bytes |
+| Typed fact normalization and versioned Decimal formulas | [financials.py](../src/research_assistant/financials.py) | Financial correctness belongs beside the inputs and formulas |
 | Pass/fail/unknown screening | [screening.py](../src/research_assistant/screening.py) | Missing data cannot silently qualify a candidate |
 | Transactions, idempotency and immutable source bytes | [store.py](../src/research_assistant/store.py) | Saved runs remain recoverable and inspectable |
 
@@ -38,11 +85,11 @@ No orchestration framework, vector database, broker connection or distributed wo
 | Financial inputs | Match issuer, concept, unit, period, accounting basis and scope. Missing or incompatible values are unavailable, never zero. |
 | Evidence time | Keep reporting period, source availability and retrieval time distinct. Later amendments cannot overwrite earlier source versions. |
 | Source trust | A URL or valid schema does not prove a claim. Retrieved text cannot change policy, disclose secrets or authorize tools. |
-| Review | Retain originals, unresolved concerns and resolution evidence. Reaching a limit cannot turn a claim into a supported one. |
-| Discovery | Unknown inputs never pass hard filters. Return fewer candidates when evidence or budget is insufficient. |
+| Review | Retain originals, unresolved concerns and resolution evidence. Provider failures or incomplete responses cannot turn a claim into a supported one. |
+| Discovery | Unknown inputs never pass hard filters. Return fewer candidates when supported evidence or eligible companies are insufficient. |
 | Presentation | Keep sources, dates, interpretations, corrections, uncertainty and partial results visible; put diagnostics behind disclosure. |
 
-Current annual facts compare three supported revenue tags by eligible recency, reject conflicting same-accession/period values and match income by accession and duration. This narrow mapping is not a general accounting parser. Current SEC aggregates plus cutoff filters do not reconstruct every historical data vintage.
+Fresh annual research compares three supported revenue tags by eligible recency, then checks the exact accession's original filing and undimensioned USD contexts. It persists typed facts and a versioned operating-margin calculation; unsupported or conflicting original inputs fail explicitly. Aggregates remain labelled separately. Legacy reports retain their saved provenance. This narrow mapping is not a general accounting parser, and current SEC aggregates plus cutoff filters do not reconstruct every historical data vintage. [C1 contracts and verification](c1-handoff.md) describe source downloads, immutable records and compatibility.
 
 ### Saved-run behavior
 
@@ -56,7 +103,7 @@ Synthetic sources remain labelled in every mode. Frozen discovery can change scr
 
 History supports optional names and archive/restore. These live in a separate `run_metadata` table, created alongside existing tables without rewriting old runs. Archive hides reports from ordinary history and new source selection; saved links, evidence, frozen/replay references and submission recovery still work. Names/archive state belong to each run and are not inherited by a replay copy. Organizing an active run does not cancel it or free the single-worker slot. No report-content edit or permanent-delete operation exists.
 
-The browser defaults model analysis off and submits `model_analysis` explicitly. Older API requests that omit it retain the previous default of `true`; replay never calls a model. Financial availability comes from metric values, independently of each company's `review_status` and `review_error`. Review status is `not_requested`, `pending`, `completed`, `unavailable`, or `failed`; legacy reports default to `not_recorded`. Missing setup/evidence and expected model errors preserve financial completion, while budget exhaustion still stops the run. Restart recovery marks pending analysis failed without changing saved figures or retrying. Completed model analysis does not establish source correctness.
+The browser defaults model analysis off and submits `model_analysis` explicitly. Older API requests that omit it retain the previous default of `true`; replay never calls a model. Financial availability comes from metric values, independently of each company's `review_status` and `review_error`. Review status is `not_requested`, `pending`, `completed`, `unavailable`, or `failed`; legacy reports default to `not_recorded`. Missing setup/evidence and expected model errors preserve financial completion, with no application token/time/call quotas terminating the finite workflow. Restart recovery marks pending analysis failed without changing saved figures or retrying. Completed model analysis does not establish source correctness.
 
 <details>
 <summary>Runtime, storage and API reference</summary>
@@ -67,16 +114,24 @@ On restart, unfinished runs become interrupted with saved results retained. Ther
 
 | Limit | Current value |
 |---|---|
-| Shared discovery/research budget | 12 model calls; 20 retrieval/check actions |
-| Admission deadline / token threshold | 180 seconds / 18,000 tokens |
-| Model request | 45-second timeout; no automatic retries |
+| Model generation | No application output-token cap; provider/model defaults and context limits apply |
+| Run execution | No application token/time/call/tool quota; the finite selected-company workflow bounds calls |
+| Model networking | Standard OpenAI SDK timeout; no automatic retries |
 | SEC request | 20-second read timeout; 5-second connect timeout; 25 MB response cap |
 
-In-flight calls may cross admission thresholds. Remote billing is not guaranteed exactly once. Persist per-call provider, requested/returned model, response ID, token counts, status and provider-reported USD cost; absent usage/cost stays unknown. Each company currently receives one interpretation/critic pass; an explicit model connection check allows at most that pair. The proposed maximum is two review rounds within the shared limits.
+The former 2,000-output-token, 18,000-total-token, 180-second, 12-call and 20-operation cutoffs are removed. Native provider generation limits can still stop a response, and provider account/key budgets still apply. Remote billing is not guaranteed exactly once. Persist per-call provider, requested/returned model, response ID, token counts (including reasoning when supplied), provider status, normalized incomplete reason and provider-reported USD cost; absent usage/cost stays unknown. Each company currently receives one interpretation/critic pass; an explicit model connection check allows at most that pair. Additional review rounds remain planned; there is no autonomous retry or open-ended agent loop.
+
+Fresh retrieval stores the complete selected filing-table text without the former 12,000-character clipping. The model receives the complete saved evidence text; this is the selected table, not the entire filing. Provider context rejection fails explicitly without a truncated retry; recognized context-overflow codes receive a distinct error. Existing saved excerpts and replay bytes are never rewritten.
+
+Financial-review schema v3 supplies critic reference choices and noninterchangeable ID instructions. Parsed structured answers are saved as content-addressed snapshots before semantic validation, including rejected answers; per-call snapshot hashes and sanitized failure messages support later diagnosis. Unsupplied claim IDs and evidence IDs have separate messages. Existing reports and missing historical answers are not rewritten or reconstructed.
+
+New calls are saved as `running`, then completed, failed or incomplete. Provider token exhaustion and content filtering have distinct messages; unknown stop reasons are normalized instead of exposing raw provider text. Restart recovery marks in-flight calls interrupted. A null saved `max_output_tokens` means no app override; legacy numeric limits remain readable.
 
 Model settings come from the server environment and are fixed until restart. `RESEARCH_MODEL_PROVIDER` selects OpenAI, OpenRouter or a trusted compatible endpoint. OpenRouter requires its own key and an explicit model, uses only `https://openrouter.ai/api/v1/responses`, and rejects `OPENAI_BASE_URL`, automatic model routing and online-search variants. All model requests set `store=False`; clients use `max_retries=0`. OpenRouter also sends `require_parameters=true` and `allow_fallbacks=false`. Structured output still passes the application's schema and evidence-reference validation. These request controls do not establish live compatibility, provider retention policy or research quality.
 
 Interpretation statements remain qualitative; figures appear in the deterministic metrics. The response schema publishes the host's existing no-digit rule, and the prompt explicitly excludes years and numbered filing names while allowing digits in evidence IDs. The host still rejects violations if a provider ignores the schema; no paid repair call runs automatically.
+
+Model instructions live in the packaged `src/research_assistant/prompts/` text files (`common`, `interpretation`, `critic`), loaded with `importlib.resources`. Schemas, validation, calculations and execution policy remain in Python. Interpretation text and action labels remain stable. The critic instructions distinguish claims[].id from evidence[].id; its per-request response schema enumerates the supplied claim/evidence IDs. The host still validates every reference if a provider ignores those choices. Financial-review schema v2 removes arbitrary statement/explanation lengths, interpretation/objection counts and evidence-reference count maxima; nonempty references, exact claim/evidence IDs, qualitative-text validation and strict output shapes remain enforced.
 
 | Endpoint | Behavior |
 |---|---|
@@ -99,13 +154,13 @@ At server startup, the project-root UTF-8 `.env` (with or without a byte-order m
 
 Connection outcomes are scoped to the current application instance and reset on restart. Only actual retrieval/review paths can record passed or failed outcomes; opening saved examples, replay, missing setup/evidence and unrelated host failures cannot establish provider access. A successful SEC response does not guarantee eligible financial coverage; a valid model review does not establish research correctness.
 
-Explicit check buttons submit ordinary saved runs through `POST /api/runs` and reuse idempotency/recovery safeguards. The SEC check is fixed to fresh MSFT retrieval with model analysis off. The model check selects finished saved company evidence and reuses its cutoff in frozen mode; the UI labels synthetic sources. It requires a positive USD allowance and explicit consent to send evidence/incur charges with confirmation that a provider/key spending cap is set. This records authorization, not an enforceable dollar guarantee: the app cannot ensure provider billing stays within the allowance. Automated provider checks use mocks; dated live attempts and actual outcomes are recorded in STATUS. Later data providers belong to their data type and must retain provenance without silent fallback.
+Explicit check buttons submit ordinary saved runs through `POST /api/runs` and reuse idempotency/recovery safeguards. The SEC check is fixed to fresh MSFT retrieval with model analysis off. The model check selects finished saved company evidence and reuses its cutoff in frozen mode; the UI labels synthetic sources and requires explicit consent to send evidence/incur charges. Spending limits are managed with the provider; there is no project dollar allowance or cost-based stop before the critic. Reported usage/cost and time/call/token/tool execution limits remain. Legacy `spending_limit_usd` and `provider_limit_confirmed` fields are readable metadata only, retained for old saved requests and exact-key recovery. Automated provider checks use mocks; dated live attempts and actual outcomes are recorded in STATUS. Later data providers belong to their data type and must retain provenance without silent fallback.
 
 </details>
 
 ## Next implementation boundary
 
-The [status page](../STATUS.md) owns work order. Extend existing modules only when their first real caller needs the new behavior.
+The [status page](../STATUS.md) owns work order. C1 implementation is complete and persists the fact and calculation records below; [its handoff](c1-handoff.md) records verification and the remaining integration/independent review. Next feature work covers company identity/selected screening and bounded claim correction; [the task sequence](workstreams.md#remaining-work-in-dependency-order) owns their dependency order. Extend existing modules only when their first real caller needs the new behavior.
 
 | Record | Information the next milestone must preserve |
 |---|---|
@@ -115,7 +170,7 @@ The [status page](../STATUS.md) owns work order. Extend existing modules only wh
 | Objection | Target claim **and version**, requested check, disposition and resolution evidence |
 | Run/action | Inputs, source hashes, actual model/settings, prompt/schema versions, usage and outcomes |
 
-Archive an independently checked filing/table packet, then implement objection → allowed check → corrected/unchanged/unresolved result. A corrected input invalidates dependent calculations and claims. Re-screen Discovery after corrections and replace an ineligible candidate within the same universe/budget. The model cannot execute arbitrary code or unrestricted URLs.
+Use the archived filing/table packet and immutable fact/calculation records to implement objection → allowed check → corrected/unchanged/unresolved result. A corrected input invalidates dependent calculations and claims. Re-screen Discovery after corrections and replace an ineligible candidate within the same universe/budget. The model cannot execute arbitrary code or unrestricted URLs.
 
 Keep operational run status separate from report support, candidate eligibility and forecast availability. A completed process does not establish financial correctness. Textual digit rejection is only a narrow output guard; quantitative claims must ultimately refer to host-owned facts/calculations.
 

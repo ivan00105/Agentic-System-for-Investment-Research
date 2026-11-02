@@ -2,18 +2,20 @@
 
 [Start](../README.md) · [Milestone status](../STATUS.md) · [Design](design.md) · [Resource packs](sources.md#resource-packs-for-work-chats)
 
-Prepared **29 October 2026**, from the current working tree. This is the assignment catalogue; STATUS owns milestone completion, Design owns invariants, and Sources owns external references. Task IDs below refine the existing milestone numbers. A task is planned until its result and checks are accepted; a chat or a document existing does not mean its work is done.
+Prepared **29 October 2026**; C1 implementation completion and remaining sequence recorded **31 October 2026**. This is the assignment catalogue; STATUS owns milestone completion, Design owns invariants, and Sources owns external references. Task IDs below refine the existing milestone numbers. Delivered implementation and accepted milestones are distinct; a chat or a document existing does not mean its work is done.
 
 ## The whole project
+
+**For the active MVP route, start at [STATUS: Follow this order](../STATUS.md#follow-this-order).** On 1 November the user selected company discovery and automatic claim correction for the MVP. First address the concrete model-limit, table-context and incomplete-response defects through C2/C0; this catalogue supplies the detailed briefs for the subsequent steps. C0-C10 are ownership lanes, not a requirement to launch ten chats.
 
 Fieldnote's core deliverable is a source-backed company report and a bounded company screen, with real claim correction and an experiment showing whether review helps. Keep the current local Python/React/SQLite architecture. Development chats are people/agent workspaces; they are separate from the proposed runtime research roles.
 
 | Direction / module | Current position | Remaining outcome | Owner |
 |---|---|---|---|
 | Local app, API, worker, storage | Implemented; regression coverage recorded in STATUS | Preserve recovery, local access, immutable sources and old reports as contracts evolve | C0 |
-| Setup, Connections, optional model review | Implemented controls; live SEC and model pair passed | Connection checkpoint complete; maintain existing guards | C2 |
-| Filing evidence | Current company-facts snapshots and generated excerpts | Independently checked original filing/table packet | C1 |
-| Financial facts and calculations | Narrow annual USD revenue/income/margin; Decimal arithmetic | Typed provenance, compatibility checks, immutable inputs and formula versions | C1 |
+| Setup, Connections, optional model review | Implemented controls; live SEC and model pair passed; saved critic calls can exhaust the fixed output allowance | Revisit output/reasoning policy and silent table clipping; retain precise incomplete reasons and preserve financial results | C2 with C0/shared-contract coordination |
+| Filing evidence | Packet preparation and accession-specific retrieval/replay implementation complete | Separate-person table/value review and C0 acceptance | C1 |
+| Financial facts and calculations | Implementation complete: typed annual USD facts, immutable inputs and versioned margin; regression checks passed | C0 acceptance of the shared contract before downstream runtime work | C1 |
 | Identity and company lookup | Five hardcoded issuers and ticker types | Searchable SEC US directory with explicit coverage | C3 |
 | Selected-company Discovery | Five-company screen; pass/fail/unknown; alphabetical selection | Up to ten explicitly selected companies, persisted universe and honest partial coverage | C3 |
 | Objections and corrections | One interpretation/critic pass; objections remain unresolved | Version-targeted checks, changed/unchanged/unresolved outcomes, dependent recomputation and re-screening | C4 |
@@ -30,11 +32,11 @@ Fieldnote's core deliverable is a source-backed company report and a bounded com
 
 Create chat titles from the table. Keep one integration chat and at most two active implementation chats; create later chats when their dependencies are ready. Read-only evaluation design can accompany implementation. A lane can contain several sessions, but each assignment is **one task ID**, not the entire lane.
 
-| Chat title | Start condition | First assignment | Resource pack |
+| Chat title | Start condition | Next assignment | Resource pack |
 |---|---|---|---|
-| **C0 — Integration and scope** | Now | 0.1: establish the shared baseline and assignments | R0 |
-| **C1 — SEC evidence and financial correctness** | Now, after baseline | 3.1: original MSFT FY2024 evidence packet | R1 |
-| **C2 — Model output and provider compatibility** | Checkpoint complete | Reopen for a concrete failure or agreed provider/model change | R2 |
+| **C0 — Integration and scope** | 0.1 baseline recorded | 0.2: review and accept the delivered C1 checkpoint | R0 |
+| **C1 — SEC evidence and financial correctness** | Implementation complete; maintenance only | No new feature assignment; independent packet review and concrete 0.2 findings only | R1 |
+| **C2 — Model output and provider compatibility** | Concrete incomplete-response failure found | Review request/evidence limits and diagnostics as the first MVP reliability task; coordinate shared changes through C0 | R2 |
 | **C3 — Company search and selected screening** | After 4.1; prototype identity decisions read-only earlier | 5.1: directory and identity rules | R3, R1 |
 | **C4 — Claim correction and re-screening** | After 4.2 | 7.1: versioned claim/objection records | R4, R1 |
 | **C5 — Evaluation and independent cases** | Now for protocol/case design | 8.1: case matrix and scoring rules | R5 |
@@ -44,7 +46,29 @@ Create chat titles from the table. Keep one integration chat and at most two act
 | **C9 — Prices and statistical forecasting** | Separate scope/budget selected; stable identity first | 10.1: one-provider price acceptance packet | R9 |
 | **C10 — Factor experiments and later directions** | C9 baseline evaluated; one hypothesis selected | F1: one preregistered factor experiment | R10 |
 
-**Recommended first wave:** C0 sets the baseline; C1 does 3.1 and C5 does 8.1. C2's live connection checkpoint is complete; proceed to original-table verification. C7 can outline delivery without writing an unsupported results section.
+**Current next work:** follow [STATUS's MVP route](../STATUS.md#follow-this-order). C2 2C.4 addresses the concrete request/evidence reliability failure with C0 coordination, followed by the remaining financial/UI acceptance and discovery/correction path. C1 implementation is done; independent packet review and C0 0.2 acceptance remain pending. C5 8.1 and C7 D1 can define evaluation and delivery requirements under the [recorded file/isolation boundaries](integration.md). No lane is dispatched by this catalogue update.
+
+## Remaining work in dependency order
+
+C1 implementation is complete. Its independent review and C0 acceptance are separate remaining checks. No follow-on lane has been dispatched.
+
+| When / owner | Task sequence | Finished result |
+|---|---|---|
+| **First: C2 with C0 coordination** | **2C.4** request/evidence reliability | Replace the unmeasured fixed output policy and silent table clipping; preserve precise incomplete reasons and actual settings. See the active MVP route for acceptance. This concrete defect reopens maintenance without repeating successful connection checks. |
+| **Next: C0 + independent reviewer** | **0.2** and the remaining **3.1 review** | Accept the saved evidence/fact/calculation contract, legacy/API/browser compatibility and limits; record the review and a feature commit containing the uncommitted C1 work. |
+| **Now, independently: C5 / C7** | **8.1** protocol/case matrix; **D1** delivery outline | Define scoring, development/held-out separation and course/demo requirements before experiments. Documentation-only isolated worktrees can start from the recorded base. |
+| **After C1 acceptance: C6** | **U1** evidence/calculation inspection | Accessible original-source, date, unit and immutable-input inspection; legacy and synthetic reports stay distinct. |
+| **After fact acceptance and identity agreement: C3 + C6** | **5.1 → 5.2 → 6.1**, with **U2** | Dated SEC directory → outside-five search-to-report → persisted 1–10-company screen, honest coverage, unknowns and partial results. |
+| **After calculation acceptance and version contract agreement: C4 + C6** | **7.1 → 7.2**, with **U3** | Versioned claims/objections → bounded allowed checks → corrected, unchanged or unresolved outcomes with dependent recomputation. |
+| **As reviewed cases become available: C5** | **8.2**, following **8.1** | Independently checked, frozen case IDs/inputs/labels; double-check a subset. No held-out answers enter implementation/tuning. |
+| **Join the screen and correction paths: C4** | **7.3**, after **6.1 + 7.2** | Re-screen affected candidates under the same universe/budget and preserve before/after selection and reasons. |
+| **Evaluate: C5** | **8.3**, after **8.2 + 7.3**, model access and experiment allowance | Compare deterministic, self-review and critic-follow-up conditions; report correctness, coverage, harmful revisions, selection changes, cost and latency. |
+| **Deliver: C7 + C0** | **D2 → D3 → 0.3**, after integrated **U1–U3**, with **8.3** required for D3 | Clean setup/restore and demo proof → measured final report/demo → core acceptance, including partial/unresolved behavior. |
+| **Optional: C8** | **9.1 → 9.2**, after core acceptance and scope choice | Declared automatic universe, then cited filing events/material risks. |
+| **Optional: C9** | **10.1 → 10.2 → 10.3**, once separately scoped and identity is stable | Accepted price data → frozen 20-session SPY-relative target → chronological baselines and calibration/uncertainty evaluation. Can remain separate from core delivery. |
+| **Optional: C10** | **F1**, after **10.3** and one hypothesis is selected | One preregistered factor experiment with availability, trial and held-out controls. |
+
+For the next implementation wave, prioritize **C3 5.1** and **C6 U1** after acceptance; keep C5 8.1 and C7 D1 independent. C4 can proceed in its own worktree once its version contract is agreed, but C0 serializes shared `contracts.py`/`store.py`/`application.py` integrations. Keep at most two implementation chats active; browser suites share port 8000 and remain serial. Deadline, team capacity, experiment allowance and submission format still need concrete decisions before scheduling.
 
 ```mermaid
 flowchart TD
@@ -68,6 +92,8 @@ flowchart TD
 UI tasks U1–U3 follow the respective agreed feature contracts; release also requires those integrated interactions. C9 may run separately once scoped; its research must not delay the core milestone by default.
 
 ## Assignment and handoff rules
+
+**Current 0.1 record (31 October 2026):** [baseline, active work, ownership and concurrency gates](integration.md). Base `2c7f203` is recorded with a preserved dirty C1 overlay; no integrated feature commit or dispatched follow-on chat is implied.
 
 1. **C0 records one baseline commit and the owner of each active task.** This checkout already contains staged, unstaged and untracked work. Review/preserve it first; do not reset, clean, bulk-stage or invent a clean baseline. Creating a baseline commit is a separate repository action, not something this catalogue has performed.
 2. **Use isolated worktrees for concurrent edits after the baseline exists.** A worktree contains committed content, not another checkout's uncommitted work. Until then, edit sequentially. Keep test databases/screenshots separate. Current Playwright config fixes port 8000; serialize browser suites unless an explicit isolated configuration is agreed. Keep the existing server running unless its owner coordinates a stop.
@@ -99,7 +125,7 @@ checks and evidence, unresolved limits and the next dependency. Stop at that bou
 
 | Task | Concrete output and acceptance | Verification / dependency |
 |---|---|---|
-| **0.1 Shared baseline** | Inventory existing changes without losing work; agree baseline/worktree and active file owners; record core vs selected extensions. | Review Git status/diff and active chats; no baseline claimed until recorded. First task. |
+| **0.1 Shared baseline — done** | Inventory existing changes without losing work; agree baseline/worktree and active file owners; record core vs selected extensions. | Review Git status/diff and active chats; no baseline claimed until recorded. First task. |
 | **0.2 Integration checkpoint** | After each feature, accept its contract, legacy-read behavior and consumer wiring; update STATUS only from proof. | Relevant backend checks; production build/browser checks when UI/API changed. Repeat per integration. |
 | **0.3 Core acceptance** | One real packet → checked facts → bounded correction → changed candidate selection is inspectable; evaluation and delivery artifacts resolve to saved inputs. | End-to-end core case plus partial/unresolved case; D2/D3 and 8.3. |
 
@@ -107,20 +133,22 @@ Resolve deadline, current group capacity, experiment allowance, final submission
 
 ## C1 — SEC evidence and financial correctness
 
+**Implementation complete; maintenance only.** The [packet](../verification/packets/msft-fy2024/20261029T182734Z/README.md), [runtime case](../verification/c1-runtime.json) and [handoff](c1-handoff.md) are delivered. C0 verified 195 backend tests, the build and packet verifier on 31 October; a subsequent hash comparison confirmed the code/tests/evidence are unchanged. Separate-person table/value review and C0 0.2 acceptance remain open, without reopening completed development. The table retains each task's acceptance criteria.
+
 **Owns:** evidence authenticity, eligibility and deterministic arithmetic. **Starting files:** research.py, Evidence/Metric in contracts.py, store.py snapshot/evidence methods, tests/test_system.py. **Boundary:** no company-directory rollout or narrative adjudication. Resources: [R1](sources.md#r1-sec-filings-and-financial-calculations).
 
-| Task | Concrete output and acceptance | Verification / dependency |
-|---|---|---|
-| **3.1 Original filing packet** | For MSFT FY2024, identify the original 10-K accession and statement table; independently check revenue and operating income, table scale and annual dates against the saved company-facts selection. Save raw bytes, URLs, locators, hashes, availability/retrieval dates, normalized values and discrepancies. | Recompute margin from the two checked figures; another person reviews the table/value mapping. Current aggregates remain labelled as such. No model dependency. |
-| **3.2 Packet retrieval and replay** | Extend the existing source path to preserve one accession-specific filing/table packet; surface the exact source instead of treating a generated excerpt as the original table. Historical saved reports still open. | Focused tests for accession/issuer, cutoff, failed/oversize retrieval and byte-stable replay with no network. Depends 3.1; agree storage/Evidence changes with C0. |
-| **4.1 Typed fact validation** | Persist raw/normalized value, unit/scale, concept, issuer, instant/duration, basis/scope, accession and evidence reference for the narrow supported concepts. Unknown scope is explicit; incompatible/ambiguous facts are rejected or unavailable. | Fixtures for wrong issuer/unit/duration/scope, duplicate/conflicting tags and amendment/cutoff. Legacy migration/read proof. Depends 3.2. |
-| **4.2 Calculation records** | A named/versioned margin formula references immutable validated input facts; result or typed failure persists. Old calculations remain reproducible without replacing their inputs with newer facts. | Known aligned result, zero/negative denominator, missing/incompatible inputs and old-run replay. Depends 4.1. |
+| Task | Implementation state | Concrete output and acceptance | Verification / dependency |
+|---|---|---|---|
+| **3.1 Original filing packet** | **Packet done; independent review pending** | For MSFT FY2024, identify the original 10-K accession and statement table; independently check revenue and operating income, table scale and annual dates against the saved company-facts selection. Save raw bytes, URLs, locators, hashes, availability/retrieval dates, normalized values and discrepancies. | Recompute margin from the two checked figures; another person reviews the table/value mapping. Current aggregates remain labelled as such. No model dependency. |
+| **3.2 Packet retrieval and replay** | **Done** | Extend the existing source path to preserve one accession-specific filing/table packet; surface the exact source instead of treating a generated excerpt as the original table. Historical saved reports still open. | Focused tests for accession/issuer, cutoff, failed/oversize retrieval and byte-stable replay with no network. Depends 3.1; agree storage/Evidence changes with C0. |
+| **4.1 Typed fact validation** | **Done** | Persist raw/normalized value, unit/scale, concept, issuer, instant/duration, basis/scope, accession and evidence reference for the narrow supported concepts. Unknown scope is explicit; incompatible/ambiguous facts are rejected or unavailable. | Fixtures for wrong issuer/unit/duration/scope, duplicate/conflicting tags and amendment/cutoff. Legacy migration/read proof. Depends 3.2. |
+| **4.2 Calculation records** | **Done** | A named/versioned margin formula references immutable validated input facts; result or typed failure persists. Old calculations remain reproducible without replacing their inputs with newer facts. | Known aligned result, zero/negative denominator, missing/incompatible inputs and old-run replay. Depends 4.1. |
 
 Handoff: one checked real packet plus mismatch fixtures and stable fact/calculation references. General XBRL coverage, quarterly metrics, valuation and a large ratio library are later scope, not prerequisites for this packet.
 
 ## C2 — Model output and provider compatibility
 
-**Checkpoint complete, 29 October 2026; maintenance only.** An initial live MSFT interpretation/critic pair passed with the existing configuration. A later schema/prompt fix made the existing no-digit rule explicit, and a live AAPL pair then passed. The original failed answer was not retained, so its exact wording/cause remains unknown. Source-reference and numerical-text rejection messages now explain the distinct failures. See [recorded checks](../STATUS.md#recorded-checks) for saved runs, responses and regression evidence. These checks establish access and validated output on those cases; broad reliability and research correctness remain unmeasured.
+**Historical connection checkpoint complete, 29 October 2026; reliability task 2C.4 implemented offline on 1 November; live validation pending.** An initial live MSFT interpretation/critic pair passed with the existing configuration. A later schema/prompt fix made the existing no-digit rule explicit, and a live AAPL pair then passed. The original failed answer was not retained, so its exact wording/cause remains unknown. Source-reference and numerical-text rejection messages now explain the distinct failures. See [recorded checks](../STATUS.md#recorded-checks) for saved runs, responses and regression evidence. These checks establish access and validated output on those cases; broad reliability and research correctness remain unmeasured.
 
 **Owns:** valid bounded model requests/outputs and observable provider failures. **Starting files:** application.py review_company/ask, model_access.py, tests/test_model_checks.py, tests/test_model_access.py. **Boundary:** preserve semantic/evidence validation; a passing provider check is not a quality result. Resources: [R2](sources.md#r2-model-contracts-and-provider-access).
 
@@ -131,6 +159,8 @@ Handoff: one checked real packet plus mismatch fixtures and stable fact/calculat
 | **2C.3 Qualitative-output fix** | Published the existing interpretation text restriction in the response schema and clarified dates/filing names versus evidence IDs in the prompt; retained the host guard. A live AAPL pair passed afterward. | Outgoing-schema and failure/workflow regression evidence plus saved AAPL responses in STATUS; one passing pair is not a reliability estimate. |
 
 Reopen C2 only for a concrete new failure or an agreed provider/model change. Start with the saved response, preserve usage and financial results, reproduce offline and add a focused regression; any new live check follows applicable authorization. C5 owns broad reliability measurement. Provider/model switching or new budgets require a concrete decision; no broad provider framework is needed.
+
+**2C.4 - Request/evidence reliability (implemented; live validation pending):** removed app generation/run quotas, arbitrary output size/count maxima, the model-timeout override and table clipping. Complete selected-table text is retained; provider limits still apply. New records preserve provider status, normalized stop reasons and reasoning usage, while old records/replay remain readable. Backend and browser proof is recorded in STATUS; no new paid check was run. The original failure was critic output exhaustion at the former fixed 2,000-token allowance. Use complete requests and model context/output behavior to assess the remaining live acceptance in [MVP step 1](../STATUS.md#follow-this-order), and cover token exhaustion, refusal, context overflow and financial preservation offline. Include `research.py` and packet tests for evidence-context changes, coordinate with C0/C1, and keep existing saved evidence immutable. Prompt task quality and the actual correction loop belong to C4, not this reliability patch.
 
 ## C3 — Company search and selected screening
 

@@ -1,0 +1,277 @@
+{
+  "kind": "saved-source runtime verification, not a new live SEC retrieval",
+  "generated_at": "2026-10-30T03:54:03.634253+00:00",
+  "baseline": "2c7f20378ae0667d9d3336758854234e9cacf211",
+  "original_acquisition": "verification/packets/msft-fy2024/20261029T182734Z/acquisition.json",
+  "transport": "httpx.MockTransport serving the unchanged retained SEC bodies; no model or remote calls",
+  "isolated_store": ".tmp/c1-runtime-a721155ad3a4",
+  "run": {
+    "id": "8cc8dafd-5ca7-4e38-ba9b-cc505e6d8879",
+    "request": {
+      "kind": "research",
+      "mode": "fresh",
+      "ticker": "MSFT",
+      "cutoff": "2025-03-01T00:00:00Z",
+      "source_run_id": null,
+      "screen": null,
+      "model_analysis": false,
+      "connection_check": null,
+      "spending_limit_usd": null,
+      "provider_limit_confirmed": false
+    },
+    "status": "completed",
+    "created_at": "2026-10-30T03:54:02.195187Z",
+    "updated_at": "2026-10-30T03:54:03.619534Z",
+    "stage": "Accepted",
+    "actions": [],
+    "report": {
+      "title": "Saved-source MSFT FY2024 C1 verification",
+      "synthetic": false,
+      "companies": [
+        {
+          "ticker": "MSFT",
+          "company": "Microsoft",
+          "support": "qualified",
+          "summary": "Annual operating margin is 44.6% for 2023-07-01 – 2024-06-30. Inspect the aligned inputs and source before interpreting this result.",
+          "metrics": [
+            {
+              "id": "revenue",
+              "label": "Annual revenue",
+              "value": "245122000000",
+              "unit": "USD",
+              "period": "2023-07-01 – 2024-06-30",
+              "formula": null,
+              "inputs": [],
+              "evidence_ids": [
+                "MSFT-0000950170-24-087843-filing-b9522c319164"
+              ],
+              "unavailable_reason": null,
+              "fact_id": "fact-dba1bda5a97dcec95b7d92b6b4cf02591b7ad9bb4bca5fc60706bfacf38d444c",
+              "calculation_id": null
+            },
+            {
+              "id": "operating_income",
+              "label": "Operating income",
+              "value": "109433000000",
+              "unit": "USD",
+              "period": "2023-07-01 – 2024-06-30",
+              "formula": null,
+              "inputs": [],
+              "evidence_ids": [
+                "MSFT-0000950170-24-087843-filing-b9522c319164"
+              ],
+              "unavailable_reason": null,
+              "fact_id": "fact-0430fa4d9f0e1601e94f43a1ef81c420808653da971c22b51db70a0957ce6123",
+              "calculation_id": null
+            },
+            {
+              "id": "operating_margin",
+              "label": "Operating margin",
+              "value": "0.4464429957327371676144940071",
+              "unit": "ratio",
+              "period": "2023-07-01 – 2024-06-30",
+              "formula": "operating_income / revenue",
+              "inputs": [
+                "operating_income",
+                "revenue"
+              ],
+              "evidence_ids": [
+                "MSFT-0000950170-24-087843-filing-b9522c319164"
+              ],
+              "unavailable_reason": null,
+              "fact_id": null,
+              "calculation_id": "calc-fe2e83ed069ae3977af0410d2ea115850604c4f372426a8571a2b761c8444f11"
+            }
+          ],
+          "claims": [
+            {
+              "id": "MSFT-margin",
+              "statement": "Annual operating margin is 44.6% for 2023-07-01 – 2024-06-30.",
+              "kind": "calculation",
+              "status": "supported",
+              "evidence_ids": [
+                "MSFT-0000950170-24-087843-filing-b9522c319164"
+              ],
+              "version": 1
+            },
+            {
+              "id": "MSFT-revenue",
+              "statement": "Annual revenue is USD 245,122,000,000 for 2023-07-01 – 2024-06-30.",
+              "kind": "fact",
+              "status": "supported",
+              "evidence_ids": [
+                "MSFT-0000950170-24-087843-filing-b9522c319164"
+              ],
+              "version": 1
+            }
+          ],
+          "reviews": [],
+          "forecast": {
+            "status": "unavailable",
+            "probability": null,
+            "benchmark": "SPY",
+            "horizon": "20 exchange sessions",
+            "model_version": null,
+            "reason": "A return forecast is not available. These financial results do not predict future performance."
+          },
+          "limitations": [
+            "This report covers annual financial figures in USD. It does not include news, events or price forecasts.",
+            "Filing availability is dated conservatively to the day after filing in New York; an exact publication time is unavailable.",
+            "These figures come from the SEC's current record. They may not reproduce exactly what investors could see at an earlier date."
+          ],
+          "source_limitations": [
+            "This report covers annual financial figures in USD. It does not include news, events or price forecasts.",
+            "Filing availability is dated conservatively to the day after filing in New York; an exact publication time is unavailable.",
+            "These figures come from the SEC's current record. They may not reproduce exactly what investors could see at an earlier date."
+          ],
+          "review_status": "not_requested",
+          "review_error": null,
+          "facts": [
+            {
+              "id": "fact-dba1bda5a97dcec95b7d92b6b4cf02591b7ad9bb4bca5fc60706bfacf38d444c",
+              "issuer_cik": "0000789019",
+              "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+              "raw_value": "245,122",
+              "normalized_value": "245122000000",
+              "raw_unit": "iso4217:USD",
+              "unit": "USD",
+              "scale": 6,
+              "decimals": "-6",
+              "period_kind": "duration",
+              "start": "2023-07-01",
+              "end": "2024-06-30",
+              "basis": "US_GAAP",
+              "scope": "consolidated",
+              "accession": "0000950170-24-087843",
+              "form": "10-K",
+              "filed": "2024-07-30",
+              "available_at": "2024-07-31T04:00:00Z",
+              "retrieved_at": "2026-10-30T03:54:02.603835Z",
+              "evidence_id": "MSFT-0000950170-24-087843-filing-b9522c319164",
+              "snapshot_hash": "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317",
+              "locator": "table[25]; row Total revenue 245,122 211,915 198,270; fact #F_3c083f9d-9cbe-4037-b6c1-310e199227a1; bytes [1435732,1436004)"
+            },
+            {
+              "id": "fact-0430fa4d9f0e1601e94f43a1ef81c420808653da971c22b51db70a0957ce6123",
+              "issuer_cik": "0000789019",
+              "concept": "us-gaap:OperatingIncomeLoss",
+              "raw_value": "109,433",
+              "normalized_value": "109433000000",
+              "raw_unit": "iso4217:USD",
+              "unit": "USD",
+              "scale": 6,
+              "decimals": "-6",
+              "period_kind": "duration",
+              "start": "2023-07-01",
+              "end": "2024-06-30",
+              "basis": "US_GAAP",
+              "scope": "consolidated",
+              "accession": "0000950170-24-087843",
+              "form": "10-K",
+              "filed": "2024-07-30",
+              "available_at": "2024-07-31T04:00:00Z",
+              "retrieved_at": "2026-10-30T03:54:02.603835Z",
+              "evidence_id": "MSFT-0000950170-24-087843-filing-b9522c319164",
+              "snapshot_hash": "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317",
+              "locator": "table[25]; row Operating income 109,433 88,523 83,383; fact #F_9f7b7768-a2fe-467b-a8b5-4ef00c08bfd6; bytes [1493710,1493950)"
+            }
+          ],
+          "calculations": [
+            {
+              "id": "calc-fe2e83ed069ae3977af0410d2ea115850604c4f372426a8571a2b761c8444f11",
+              "formula": "operating_income / revenue",
+              "formula_version": "operating-margin-v1",
+              "input_fact_ids": [
+                "fact-dba1bda5a97dcec95b7d92b6b4cf02591b7ad9bb4bca5fc60706bfacf38d444c",
+                "fact-0430fa4d9f0e1601e94f43a1ef81c420808653da971c22b51db70a0957ce6123"
+              ],
+              "precision": 28,
+              "rounding": "ROUND_HALF_EVEN",
+              "result": "0.4464429957327371676144940071",
+              "failure": null
+            }
+          ]
+        }
+      ],
+      "candidates": [],
+      "ranking": null,
+      "limitations": [],
+      "model_run": null,
+      "model_calls": []
+    },
+    "error": null,
+    "synthetic": false,
+    "label": null,
+    "archived": false
+  },
+  "evidence": [
+    {
+      "id": "MSFT-0000950170-24-087843",
+      "ticker": "MSFT",
+      "title": "MSFT annual facts aggregate · 10-K",
+      "excerpt": "Issuer: Microsoft (MSFT)\nForm: 10-K\nAccession: 0000950170-24-087843\nAnnual period: 2023-07-01 – 2024-06-30\nRevenueFromContractWithCustomerExcludingAssessedTax: 245122000000 USD\nOperatingIncomeLoss: 109433000000 USD\nFiled: 2024-07-30",
+      "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "available_at": "2024-07-31T04:00:00Z",
+      "retrieved_at": "2026-10-30T03:54:02.315830Z",
+      "period": "2023-07-01 – 2024-06-30",
+      "locator": "us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax and us-gaap/OperatingIncomeLoss; accession 0000950170-24-087843",
+      "snapshot_hash": "dd0308149a8e96497989ed7c690b5a49a00bef9ceafbb24638bda41e8ae938dd",
+      "synthetic": false,
+      "source_kind": "companyfacts",
+      "packet": null
+    },
+    {
+      "id": "MSFT-0000950170-24-087843-filing-b9522c319164",
+      "ticker": "MSFT",
+      "title": "MSFT original annual filing table · 10-K",
+      "excerpt": "(In millions, except per share amounts) Year Ended June 30, 2024 2023 2022 Revenue: Product $ 64,773 $ 64,699 $ 72,732 Service and other 180,349 147,216 125,538 Total revenue 245,122 211,915 198,270 Cost of revenue: Product 15,272 17,804 19,064 Service and other 58,842 48,059 43,586 Total cost of revenue 74,114 65,863 62,650 Gross margin 171,008 146,052 135,620 Research and development 29,510 27,195 24,512 Sales and marketing 24,456 22,759 21,825 General and administrative 7,609 7,575 5,900 Operating income 109,433 88,523 83,383 Other income (expense), net (1,646 ) 788 333 Income before income taxes 107,787 89,311 83,716 Provision for income taxes 19,651 16,950 10,978 Net income $ 88,136 $ 72,361 $ 72,738 Earnings per share: Basic $ 11.86 $ 9.72 $ 9.70 Diluted $ 11.80 $ 9.68 $ 9.65 Weighted average shares outstanding: Basic 7,431 7,446 7,496 Diluted 7,469 7,472 7,540",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm",
+      "available_at": "2024-07-31T04:00:00Z",
+      "retrieved_at": "2026-10-30T03:54:02.603835Z",
+      "period": "2023-07-01 – 2024-06-30",
+      "locator": "Original filing table bytes [1408511,1553739); table[25]; row Total revenue 245,122 211,915 198,270; fact #F_3c083f9d-9cbe-4037-b6c1-310e199227a1; bytes [1435732,1436004)",
+      "snapshot_hash": "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317",
+      "synthetic": false,
+      "source_kind": "filing_table",
+      "packet": {
+        "cik": "0000789019",
+        "accession": "0000950170-24-087843",
+        "form": "10-K",
+        "filed": "2024-07-30",
+        "period_end": "2024-06-30",
+        "accepted_at": "2024-07-30T20:06:22Z",
+        "documents": [
+          {
+            "role": "filing_index",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/0000950170-24-087843-index.htm",
+            "snapshot_hash": "f8266d4636052bf338adc526865741d0369e5f2f5bb37385c54f56a8d6dddffc",
+            "byte_length": 12516,
+            "media_type": "text/html",
+            "retrieved_at": "2026-10-30T03:54:02.488272Z"
+          },
+          {
+            "role": "filing",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm",
+            "snapshot_hash": "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317",
+            "byte_length": 6861023,
+            "media_type": "text/html",
+            "retrieved_at": "2026-10-30T03:54:02.603835Z"
+          },
+          {
+            "role": "table",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm",
+            "snapshot_hash": "fc5efca21ec8c9d32a8ba3dfb8ded6a7393a5125eb3f2fcb3a465d6dc24bdfe4",
+            "byte_length": 145228,
+            "media_type": "text/html",
+            "retrieved_at": "2026-10-30T03:54:02.603835Z"
+          }
+        ]
+      }
+    }
+  ],
+  "source_hashes_verified": [
+    "f8266d4636052bf338adc526865741d0369e5f2f5bb37385c54f56a8d6dddffc",
+    "b9522c319164e3024763d1adc102a4a6ba750567daa608b54d3e233bd7039317",
+    "fc5efca21ec8c9d32a8ba3dfb8ded6a7393a5125eb3f2fcb3a465d6dc24bdfe4"
+  ]
+}

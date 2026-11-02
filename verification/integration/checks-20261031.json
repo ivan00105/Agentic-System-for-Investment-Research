@@ -1,0 +1,59 @@
+{
+  "client_date": "2026-10-31",
+  "timezone": "Asia/Hong_Kong",
+  "recorded_at_utc": "2026-10-30T19:10:42.604459+00:00",
+  "task": "C0 0.1",
+  "scope": "baseline and coordination; C1 feature acceptance remains pending",
+  "baseline_manifest": "baseline-20261031-9b62d98b.json",
+  "head": "2c7f20378ae0667d9d3336758854234e9cacf211",
+  "checks": [
+    {
+      "name": "backend regression",
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .tmp/c0/20261031-9b62d98b/pytest-unrestricted",
+      "result": "passed",
+      "tests_passed": 195,
+      "seconds": 85.96,
+      "warnings": [
+        "StarletteDeprecationWarning: httpx use with starlette.testclient is deprecated"
+      ],
+      "environment": "Approved outside sandbox; test autouse fixtures isolate credentials and temporary stores. No live provider experiment."
+    },
+    {
+      "name": "frontend production build",
+      "command": "npm.cmd --prefix frontend run build",
+      "result": "passed"
+    },
+    {
+      "name": "sealed source packet offline verification",
+      "command": ".\\.venv\\Scripts\\python.exe verification\\packets\\msft-fy2024\\20261029T182734Z\\verify.py",
+      "result": "passed",
+      "verifies": "hashes, submission extraction, delivery difference, issuer/accession/period/units/scope, table locators, two saved facts, issuer cross-check, Decimal margin",
+      "limitation": "Artifact consistency verification; separate-person table/value review remains pending."
+    },
+    {
+      "name": "preexisting work and backup preservation",
+      "result": "passed",
+      "files_checked": 35,
+      "changed_files": [],
+      "changed_backup_files": [],
+      "index_entries_unchanged": true
+    }
+  ],
+  "sandbox_diagnostic": {
+    "result": "TestClient startup stalled in Windows asyncio socketpair accept; faulthandler confirmed stack before application test assertions. Approved unrestricted regression passed.",
+    "cleanup": "Stopped only Python processes matching the three exact C0 sandbox test directories; no existing application server was stopped."
+  },
+  "not_run": [
+    "Browser suite and visual interaction checks",
+    "Clean-environment setup/restore",
+    "Live SEC/model calls",
+    "Independent gold review"
+  ],
+  "coordination_files": [
+    "STATUS.md",
+    "docs/workstreams.md",
+    "docs/integration.md",
+    "verification/integration/baseline-20261031-9b62d98b.json",
+    "verification/integration/checks-20261031.json"
+  ]
+}

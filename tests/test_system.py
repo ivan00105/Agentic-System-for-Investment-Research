@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from research_assistant.api import create_app
-from research_assistant.application import Application, Budget, Critique, Draft, Interpretation, Objection, frozen_source_limitations
-from research_assistant.contracts import CompanyReport, DomainError, RunRequest, Screen
+from research_assistant.application import Application, Critique, Draft, Interpretation, Objection, frozen_source_limitations
+from research_assistant.contracts import CompanyReport, DomainError, ModelCall, ModelRunInfo, RunRequest, Screen
 from research_assistant.fixtures import FIXTURE_CUTOFF, seed
 from research_assistant.research import conservative_availability, extract_annual
 from research_assistant.screening import screen_companies
@@ -79,6 +79,7 @@ def test_restart_marks_pending_model_analysis_interrupted(store):
     run_id, _ = store.accept(frozen(), "review-crashed")
     report = store.get("example-msft").report
     report.companies[0].review_status = "pending"
+    report.model_calls = [ModelCall(role="critic", provider="openrouter", requested_model="test-model", status="running")]
     store.update(run_id, status="running", report=report)
     store.recover()
     run = store.get(run_id)
@@ -87,6 +88,8 @@ def test_restart_marks_pending_model_analysis_interrupted(store):
     assert company.review_status == "failed" and "restart" in company.review_error
     assert company.metrics == report.companies[0].metrics
     assert company.reviews == report.companies[0].reviews
+    assert run.report.model_calls[0].status == "incomplete"
+    assert run.report.model_calls[0].error_code == "model_interrupted"
     store.recover()
     assert store.get(run_id) == run
 
@@ -216,7 +219,7 @@ def test_legacy_frozen_limitations_preserve_source_cautions_without_rewriting_re
 
 
 def sec_payload():
-    annual = {"start": "2024-01-01", "end": "2024-12-31", "val": 100000000, "accn": "annual", "filed": "2025-02-01", "form": "10-K"}
+    annual = {"start": "2024-01-01", "end": "2024-12-31", "val": 100000000, "accn": "0000789019-25-000001", "filed": "2025-02-01", "form": "10-K"}
     quarterly = {**annual, "start": "2024-10-01", "val": 3000000}
     income = {**annual, "val": 15000000}
     return {"cik": 789019, "facts": {"us-gaap": {"Revenues": {"units": {"USD": [annual]}}, "OperatingIncomeLoss": {"units": {"USD": [quarterly, income]}}}}}
@@ -251,7 +254,7 @@ def test_sec_selects_latest_period_across_revenue_tags():
     older = {**latest, "start": "2023-01-01", "end": "2023-12-31", "filed": "2024-02-01", "accn": "older", "val": 50000000}
     facts["RevenueFromContractWithCustomerExcludingAssessedTax"] = {"units": {"USD": [older]}}
     revenue, income, tag = extract_annual(payload, "MSFT", FIXTURE_CUTOFF)
-    assert revenue.accn == income.accn == "annual"
+    assert revenue.accn == income.accn == latest["accn"]
     assert income.val / revenue.val == Decimal("0.15")
     assert tag == "Revenues"
 
@@ -277,17 +280,10 @@ def test_filing_date_availability_uses_eastern_calendar_including_dst():
     assert extract_annual(sec_payload(), "MSFT", datetime(2025, 2, 2, 2, tzinfo=timezone.utc))[0] is None
 
 
-def test_budget_termination_preserves_unresolved_results(store, monkeypatch):
-    def exhausted(self):
-        raise DomainError("Budget exhausted", "budget_exhausted")
-    monkeypatch.setattr(Budget, "check", exhausted)
-    app = Application(store)
-    try:
-        run = wait_terminal(app, app.submit(frozen(), "budget-intent").id)
-        assert run.status == "budget_exhausted"
-        assert run.report is None
-    finally:
-        app.close()
+def test_old_model_limits_remain_readable_and_new_runs_delegate_to_provider():
+    old = ModelRunInfo(provider="openrouter", model="test-model", max_output_tokens=2000)
+    assert ModelRunInfo.model_validate_json(old.model_dump_json()).max_output_tokens == 2000
+    assert ModelRunInfo(provider="openrouter", model="test-model").max_output_tokens is None
 
 
 @pytest.mark.parametrize("model_analysis", [False, True])
@@ -297,7 +293,8 @@ def test_sec_boundary_with_mocked_transport(store, monkeypatch, model_analysis):
     monkeypatch.setenv("SEC_USER_AGENT", "Research tests contact@example.invalid")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     real_client = httpx.Client
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=sec_payload()))
+    from sec_fixture import source_response
+    transport = httpx.MockTransport(lambda request: source_response(request, sec_payload()))
     monkeypatch.setattr(research.httpx, "Client", lambda **kw: real_client(transport=transport, **kw))
     app = Application(store)
     try:
@@ -309,6 +306,35 @@ def test_sec_boundary_with_mocked_transport(store, monkeypatch, model_analysis):
         assert result.report.companies[0].metrics[2].value == Decimal("0.15")
         evidence = store.all_evidence(result.id)[0]
         assert json.loads((store.root / "snapshots" / f"{evidence.snapshot_hash}.json").read_bytes())["cik"] == 789019
+    finally:
+        app.close()
+
+
+def test_fresh_source_retains_the_complete_original_table_text(store, monkeypatch):
+    from research_assistant import research
+    from research_assistant.filings import Document
+    from sec_fixture import source_response
+    tail = "Additional statement disclosure. " * 500 + "END OF ORIGINAL TABLE"
+    documents = []
+    def handler(request):
+        response = source_response(request, sec_payload())
+        if request.url.path.endswith("/annual.htm"):
+            html = response.text.replace("</table>", f"<tr><td>{tail}</td></tr></table>")
+            documents.append(html)
+            return httpx.Response(200, text=html)
+        return response
+    import httpx
+    real_client = httpx.Client
+    monkeypatch.setenv("SEC_USER_AGENT", "Test contact@example.invalid")
+    monkeypatch.setattr(research.httpx, "Client", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw))
+    app = Application(store)
+    try:
+        result = wait_terminal(app, app.submit(RunRequest(mode="fresh", ticker="MSFT", cutoff=FIXTURE_CUTOFF, model_analysis=False), "complete-source-table").id)
+        assert result.status == "completed", result.error
+        original = next(e for e in store.all_evidence(result.id) if e.source_kind == "filing_table")
+        expected = next(Document(documents[0].encode()).root.nodes("table")).text()
+        assert len(expected) > 12000
+        assert original.excerpt == expected and original.excerpt.endswith("END OF ORIGINAL TABLE")
     finally:
         app.close()
 
@@ -361,7 +387,7 @@ def test_model_failure_is_separate_and_preserves_financial_results(store, monkey
     calls = []
     class FakeClient:
         def __init__(self, **kwargs):
-            assert kwargs == {"api_key": "test-only-not-a-real-key", "base_url": "https://api.openai.com/v1", "timeout": 45, "max_retries": 0}
+            assert kwargs == {"api_key": "test-only-not-a-real-key", "base_url": "https://api.openai.com/v1", "max_retries": 0}
             self.responses = self
             self.with_raw_response = self
         def __enter__(self): return self

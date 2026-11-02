@@ -57,7 +57,7 @@ Access and advertised prices checked **27 October 2026**; documentation updated 
 
 | Need | Initial choice / alternatives | Cost or acceptance boundary |
 |---|---|---|
-| Filings / accounting | Direct [SEC](https://www.sec.gov/search-filings/edgar-application-programming-interfaces); original filing/table retrieval follows | Public access without an API key; contact identity required. Validate accession, dates, units and original table. |
+| Filings / accounting | Direct [SEC](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), accession-specific filing/table packets and typed annual USD checks; see [C1 handoff](c1-handoff.md) | Public access without an API key; contact identity required. Narrow original-filing behavior is covered with saved MSFT and synthetic cases; general extraction accuracy remains unmeasured. |
 | Company directory | Searchable SEC US directory planned after original filing evidence and typed validation; FinanceDatabase later for broader metadata | Current universe is five mappings. Directory identity/search is not financial evidence or ranking. Save the selected list/date; current metadata is not historical membership. |
 | Optional model review | OpenAI, [OpenRouter](https://openrouter.ai/docs/api_reference/responses/overview), or a trusted compatible endpoint | Server `.env` or environment configuration and explicit model choice; model check needs saved evidence, consent, a positive allowance and provider/key spending-cap confirmation. App limits cannot guarantee a dollar cap; missing reported cost remains unknown. An OpenRouter interpretation/critic pair passed with the current configuration; see STATUS for the recorded run. |
 | Historical prices | Evaluate [Massive](https://massive.com/pricing) when price research begins | Free individual tier advertises two years of end-of-day history and five calls/minute. Validate splits/dividends and usage rights. |
@@ -69,7 +69,7 @@ Access and advertised prices checked **27 October 2026**; documentation updated 
 
 No authenticated price/news entitlement or free-tier budget was established. No silent provider switch is permitted. Evaluate required coverage, adjustments, storage/replay and sharing rights before price. FinanceDatabase's inspected cache refreshes daily and can return older cached data on download failure: preserve a dated snapshot if adopted. A company announcement supports attribution to management, not the truth of a future outcome; syndicated stories are not independent confirmation.
 
-The next data milestones are one independently checked original annual filing packet, typed fact/calculation validation, broader company search, then a real financial screen over up to ten user-selected companies. Wider automatic candidate sourcing comes later. These steps do not require installing every listed integration; add price history or news when a defined research task needs it.
+The C1 packet and narrow typed fact/calculation path are delivered for integration; separate-person packet review remains pending. Next are broader company search and a real financial screen over up to ten user-selected companies. Wider automatic candidate sourcing comes later. These steps do not require installing every listed integration; add price history or news when a defined research task needs it.
 
 ## Resource packs for work chats
 
@@ -87,9 +87,11 @@ For each adopted data/tool source, record URL and version/access date, intended 
 
 ### R1 SEC filings and financial calculations
 
+**C1 implementation complete; maintenance/review pack.** Use the saved packet and [handoff](c1-handoff.md) for the remaining independent review or a concrete defect. Directory, correction and evaluation work belongs to R3–R5; this pack is not a new C1 implementation assignment.
+
 | Required reference / data | Use and acceptance boundary |
 |---|---|
-| [SEC API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), [developer/access guidance](https://www.sec.gov/about/developer-resources) | Submissions/company-facts endpoint semantics, client identification and access rules. Current direct SEC path is integrated; original filing packets remain planned. |
+| [SEC API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), [developer/access guidance](https://www.sec.gov/about/developer-resources) | Submissions/company-facts endpoint semantics, client identification and access rules. Direct SEC and narrow accession-specific packet paths are implemented; see [checked packet](../verification/packets/msft-fy2024/20261029T182734Z/README.md) and [runtime handoff](c1-handoff.md). |
 | [MSFT submissions](https://data.sec.gov/submissions/CIK0000789019.json), [MSFT company facts](https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json), [EDGAR company filings](https://www.sec.gov/edgar/browse/?CIK=789019&owner=exclude) | Locate the actual FY2024 10-K accession and its primary document/table; cross-check two values. Current endpoints change, so retain bytes and retrieval time. Resolve the exact filing URL rather than inventing an accession. |
 | [Microsoft FY2024 annual report](https://www.microsoft.com/investor/reports/ar24/index.html) | Issuer cross-check for statement names, annual dates and scale; SEC accession remains the filing identity. A company-hosted page is a separate source, not proof of the stored SEC bytes. |
 | [SEC Inline XBRL overview](https://www.sec.gov/structureddata/osd-inline-xbrl.html), [XBRL specifications](https://specifications.xbrl.org/) | Context, units, scale, duration/instant and dimensions. Consult for the narrow fields used; do not start by implementing a complete XBRL engine. |

@@ -1,5 +1,6 @@
 """Explicit paid checks run against an in-process HTTP transport, never a provider."""
 
+import hashlib
 import json
 import re
 import time
@@ -48,8 +49,7 @@ def check_request(**changes):
     return RunRequest(**{
         "mode": "frozen", "ticker": "MSFT", "cutoff": FIXTURE_CUTOFF,
         "source_run_id": "example-msft", "model_analysis": True,
-        "connection_check": "model", "spending_limit_usd": "0.10",
-        "provider_limit_confirmed": True, **changes,
+        "connection_check": "model", **changes,
     })
 
 
@@ -143,12 +143,20 @@ def test_openrouter_check_sends_strict_bounded_requests_and_persists_metadata(ap
         assert request.headers["authorization"] == "Bearer secret-router-key"
         assert not request.headers.get("openai-organization")
         assert not request.headers.get("openai-project")
-        assert settings["max_retries"] == 0 and settings["timeout"] == 45
+        assert settings["max_retries"] == 0 and "timeout" not in settings
         payload = json.loads(request.content)
+        assert payload["input"][0]["role"] == "system"
+        if index == 0:
+            # Interpretation text remains identical to the pre-extraction prompt.
+            assert hashlib.sha256(payload["input"][0]["content"].encode("utf-8")).hexdigest() == "51263fd195442cd89ffa48ca3fca6b64469f9fce7c1050bc7b8043828de862a3"
+        else:
+            assert "claims[].id" in payload["input"][0]["content"]
+            assert "evidence[].id" in payload["input"][0]["content"]
+            assert "do not interchange them" in payload["input"][0]["content"]
         assert payload["model"] == "vendor/requested-model"
         assert payload["store"] is False
         assert payload["provider"] == {"require_parameters": True, "allow_fallbacks": False}
-        assert 0 < payload["max_output_tokens"] <= 2000
+        assert "max_output_tokens" not in payload
         assert not payload.get("tools")
         format_ = payload["text"]["format"]
         assert format_["type"] == "json_schema" and format_["strict"] is True
@@ -160,9 +168,14 @@ def test_openrouter_check_sends_strict_bounded_requests_and_persists_metadata(ap
             assert re.fullmatch(statement["pattern"], "The annual filing needs business context.")
         packet = json.loads(payload["input"][1]["content"])
         assert {item["id"] for item in packet["evidence"]} == {"fixture-MSFT-annual"}
+        if index == 1:
+            fields = format_["schema"]["$defs"]["CompanyObjection"]["properties"]
+            assert fields["claim_id"]["enum"] == sorted(c["id"] for c in packet["claims"])
+            assert fields["evidence_ids"]["items"]["enum"] == sorted(e["id"] for e in packet["evidence"])
     assert result.report.model_run.provider == "openrouter"
     assert result.report.model_run.model == "vendor/requested-model"
-    assert result.report.model_run.schema_version == "financial-review-v1"
+    assert result.report.model_run.schema_version == "financial-review-v3"
+    assert result.report.model_run.max_output_tokens is None
     assert len(result.report.model_calls) == 2
     for call in result.report.model_calls:
         assert call.provider == "openrouter" and call.requested_model == "vendor/requested-model"
@@ -215,28 +228,45 @@ def test_timeout_is_not_retried_or_reported_as_zero_cost(app, monkeypatch):
 
 
 @pytest.mark.parametrize("refusal", [False, True])
-def test_incomplete_and_refused_responses_never_pass_check(app, monkeypatch, refusal):
-    body = response_body({"interpretations": []}, status="completed" if refusal else "incomplete")
+@pytest.mark.parametrize("call_index", [0, 1], ids=["interpretation", "critic"])
+def test_incomplete_and_refused_responses_never_pass_check(app, monkeypatch, refusal, call_index):
+    output = {"interpretations": []} if call_index == 0 else {"objections": []}
+    body = response_body(output, status="completed" if refusal else "incomplete")
     if refusal:
         body["output"][0]["content"] = [{"type": "refusal", "refusal": "Cannot review."}]
-    requests, _ = wire_model(monkeypatch, [httpx.Response(200, json=body)])
+    else:
+        body["incomplete_details"] = {"reason": "max_output_tokens"}
+        body["usage"].update(output_tokens=2000, total_tokens=2011)
+        body["usage"]["output_tokens_details"]["reasoning_tokens"] = 1900
+    responses = [httpx.Response(200, json=response_body({"interpretations": [{
+        "statement": "Margin needs business context.", "evidence_ids": ["fixture-MSFT-annual"],
+    }]}))] if call_index else []
+    responses.append(httpx.Response(200, json=body))
+    requests, _ = wire_model(monkeypatch, responses)
     result = submit(app)
-    assert assert_saved_financials(app, result).review_status == "failed"
-    assert len(requests) == 1 and app.connections()["model"].check.status == "failed"
-    call = result.report.model_calls[0]
-    assert call.status == "incomplete" and call.error_code == "model_incomplete"
-    assert call.total_tokens == 18 and call.cost_usd == Decimal("0.0012")
+    company = assert_saved_financials(app, result)
+    assert company.review_status == "failed"
+    assert len(requests) == call_index + 1 and app.connections()["model"].check.status == "failed"
+    if call_index:
+        assert result.report.model_calls[0].status == "completed"
+        assert any(claim.statement == "Margin needs business context." for claim in company.claims)
+    call = result.report.model_calls[call_index]
+    assert call.status == "incomplete" and call.error_code == ("model_incomplete" if refusal else "model_output_limit")
+    assert call.provider_status == ("completed" if refusal else "incomplete")
+    assert call.reasoning_tokens == (0 if refusal else 1900)
+    assert call.incomplete_reason == (None if refusal else "max_output_tokens")
+    assert call.total_tokens == (18 if refusal else 2011) and call.cost_usd == Decimal("0.0012")
 
 
-def test_reported_cost_reaching_allowance_stops_before_critic(app, monkeypatch):
+def test_legacy_allowance_does_not_stop_critic_and_cost_is_still_saved(app, monkeypatch):
     requests, _ = wire_model(monkeypatch)
     result = submit(app, check_request(spending_limit_usd="0.001"))
-    assert result.status == "budget_exhausted"
-    assert assert_saved_financials(app, result).review_status == "failed"
-    assert len(requests) == len(result.report.model_calls) == 1
+    assert result.status == "completed"
+    assert assert_saved_financials(app, result).review_status == "completed"
+    assert len(requests) == len(result.report.model_calls) == 2
     assert result.report.model_calls[0].status == "completed"
     assert result.report.model_calls[0].cost_usd == Decimal("0.0012")
-    assert app.connections()["model"].check.status == "not_tested"
+    assert app.connections()["model"].check.status == "passed"
 
 
 @pytest.mark.parametrize("cost", [None, "NaN", "-0.1", "unreported"])
@@ -287,14 +317,20 @@ def test_unparsable_output_retains_provider_usage_and_identity(app, monkeypatch,
     assert call.returned_model == "provider/actual-model" and call.response_id == "resp-test"
 
 
-def test_invalid_critic_keeps_valid_draft_and_deterministic_results(app, monkeypatch):
+@pytest.mark.parametrize("claim_id,evidence_ids,reason", [
+    ("unknown", ["fixture-MSFT-annual"], "claim ID not supplied"),
+    ("fixture-MSFT-annual", ["fixture-MSFT-annual"], "claim ID not supplied"),
+    ("MSFT-margin", ["MSFT-margin"], "evidence IDs not supplied"),
+    ("AAPL-margin", ["fixture-MSFT-annual"], "claim ID not supplied"),
+])
+def test_invalid_critic_keeps_valid_draft_and_deterministic_results(app, monkeypatch, claim_id, evidence_ids, reason):
     responses = [
         httpx.Response(200, json=response_body({"interpretations": [{
             "statement": "Margin needs context.", "evidence_ids": ["fixture-MSFT-annual"],
         }]})),
         httpx.Response(200, json=response_body({"objections": [{
-            "claim_id": "unknown", "explanation": "Check source support.",
-            "evidence_ids": ["fixture-MSFT-annual"], "requested_check": "source_support",
+            "claim_id": claim_id, "explanation": "Check source support.",
+            "evidence_ids": evidence_ids, "requested_check": "source_support",
         }]})),
     ]
     requests, _ = wire_model(monkeypatch, responses)
@@ -303,6 +339,11 @@ def test_invalid_critic_keeps_valid_draft_and_deterministic_results(app, monkeyp
     assert company.review_status == "failed" and len(requests) == 2
     assert any(c.statement == "Margin needs context." for c in company.claims)
     assert result.report.model_calls[-1].status == "failed"
+    call = result.report.model_calls[-1]
+    assert reason in call.error_message and call.error_message == company.review_error
+    rejected = json.loads(app.store.snapshot_bytes(call.output_snapshot_hash))
+    assert rejected["objections"][0]["claim_id"] == claim_id
+    assert rejected["objections"][0]["evidence_ids"] == evidence_ids
     assert app.connections()["model"].check.status == "failed"
 
 
@@ -338,14 +379,75 @@ def test_financials_only_run_and_reading_configuration_never_call_model(app, mon
 
 
 @pytest.mark.parametrize("changes", [
-    {"provider_limit_confirmed": False}, {"spending_limit_usd": None},
-    {"spending_limit_usd": "0"}, {"spending_limit_usd": "-1"},
     {"mode": "fresh", "source_run_id": None}, {"mode": "replay"},
     {"model_analysis": False},
     {"kind": "discovery", "ticker": None, "screen": {}},
-    {"connection_check": None},
     {"connection_check": "sec", "mode": "fresh", "source_run_id": None},
 ])
 def test_explicit_model_check_guards_are_enforced(changes):
     with pytest.raises(ValidationError):
         check_request(**changes)
+
+
+def test_model_check_needs_no_project_dollar_allowance_and_old_requests_roundtrip():
+    request = check_request()
+    assert RunRequest.model_validate_json(request.model_dump_json()) == request
+    old = check_request(spending_limit_usd="0.001", provider_limit_confirmed=True)
+    assert RunRequest.model_validate_json(old.model_dump_json()) == old
+
+
+def test_large_review_retains_complete_evidence_and_is_not_cut_off_by_prototype_caps(app, monkeypatch):
+    original = app.store.all_evidence("example-msft")[0]
+    long_excerpt = "Supplied disclosure context. " * 600 + "END OF COMPLETE EVIDENCE"
+    ids = []
+    for index in range(7):
+        item = original.model_copy(update={"id": f"additional-source-{index}", "excerpt": long_excerpt})
+        app.store.add_evidence("example-msft", item)
+        ids.append(item.id)
+    statement = "Margin alone needs business context. " * 60
+    draft = {"interpretations": [{"statement": statement, "evidence_ids": ids} for _ in range(4)]}
+    critique = {"objections": [{
+        "claim_id": "MSFT-interpretation-0", "explanation": "Inspect the supplied source support. " * 60,
+        "evidence_ids": ids, "requested_check": "source_support",
+    } for _ in range(6)]}
+    usage = {"input_tokens": 20000, "output_tokens": 6000, "total_tokens": 26000,
+             "output_tokens_details": {"reasoning_tokens": 5000}}
+    responses = [httpx.Response(200, json=response_body(output, usage=usage)) for output in (draft, critique)]
+    requests, _ = wire_model(monkeypatch, responses)
+    result = submit(app)
+    company = assert_saved_financials(app, result)
+    assert result.status == "completed" and company.review_status == "completed"
+    assert len(company.reviews) == 6
+    assert sum(claim.kind == "interpretation" for claim in company.claims) == 4
+    assert all(call.total_tokens == 26000 and call.reasoning_tokens == 5000 for call in result.report.model_calls)
+    for request in requests:
+        payload = json.loads(request.content)
+        assert "max_output_tokens" not in payload
+        packet = json.loads(payload["input"][1]["content"])
+        assert all(item["excerpt"] == long_excerpt for item in packet["evidence"] if item["id"] in ids)
+
+
+@pytest.mark.parametrize("reason,code", [("content_filter", "model_content_filter"), ("private-provider-value", "model_incomplete")])
+def test_provider_stop_reason_is_safe_and_saved_even_without_parseable_json(app, monkeypatch, reason, code):
+    body = response_body({}, status="incomplete")
+    body["incomplete_details"] = {"reason": reason}
+    body["output"][0]["content"][0]["text"] = "{unfinished JSON"
+    requests, _ = wire_model(monkeypatch, [httpx.Response(200, json=body)])
+    result = submit(app)
+    call = result.report.model_calls[0]
+    assert call.status == "incomplete" and call.error_code == code
+    assert call.incomplete_reason == (reason if reason == "content_filter" else "other")
+    assert "private-provider-value" not in result.model_dump_json()
+    assert len(requests) == 1
+    assert assert_saved_financials(app, result).review_status == "failed"
+
+
+def test_provider_context_limit_is_reported_without_truncating_or_retrying(app, monkeypatch):
+    requests, _ = wire_model(monkeypatch, [httpx.Response(400, json={
+        "error": {"message": "private-provider-body", "type": "invalid_request_error", "code": "context_length_exceeded"},
+    })])
+    result = submit(app)
+    assert result.report.model_calls[0].error_code == "model_context_limit"
+    assert "input context" in assert_saved_financials(app, result).review_error
+    assert "private-provider-body" not in result.model_dump_json()
+    assert len(requests) == 1

@@ -16,11 +16,14 @@ Open [Fieldnote](http://127.0.0.1:8000). First setup needs internet; saved examp
 
 ## Where to look
 
+**Follow the MVP in [STATUS: Follow this order](STATUS.md#follow-this-order).** It is the day-to-day route from review reliability through company discovery, automatic correction and delivery. The documents below are supporting references; the separate development-panel proposal is not a prerequisite.
+
 | You want to… | Read |
 |---|---|
-| See what works and what comes next | [Current status](STATUS.md) |
-| Assign a focused task to a separate work chat | [Work chats and task catalogue](docs/workstreams.md) — owners, dependencies, finish lines and starter prompt |
-| Understand the architecture, contracts or evaluation | [Design](docs/design.md) — diagrams first, detailed references expandable |
+| See what works and choose the next MVP step | [Current status and ordered MVP route](STATUS.md#follow-this-order) |
+| Inspect completed C1 evidence/fact/calculation implementation | [C1 handoff](docs/c1-handoff.md) — proof, coverage and remaining review |
+| Read acceptance criteria or assign a focused implementation task | [Work chats and task catalogue](docs/workstreams.md) — detailed briefs, owners and starter prompt; follow STATUS for the active route |
+| Understand how research executes, then inspect its implementation | [Workflow atlas](.archify/index.html) — current/planned paths, specialists and tools, stage drill-down and secondary engineering reference; [Design](docs/design.md) for rules and alignment |
 | Choose sources/tools or understand factor research | [Sources](docs/sources.md) |
 
 ## Try the example
@@ -70,7 +73,7 @@ For OpenRouter, set `RESEARCH_MODEL_PROVIDER=openrouter`, `OPENROUTER_API_KEY` a
 
 `.env` is ignored by Git; keep it private and do not commit or share credentials. Before a live experiment, check account/model capability and agree a small budget. Mocked input/output tests do not establish model quality or real provider access.
 
-Connections separates **Configured** from **Not tested / Check passed / Check failed**. **Test SEC connection** retrieves MSFT facts without a model call. **Test model connection** uses selected saved evidence for at most one interpretation and one critic call; it requires a positive USD allowance and consent to send evidence and incur charges, including confirmation that a provider/key spending cap is set. The app cannot guarantee that allowance as a dollar cap. An uncertain submission can be recovered with the same submission key.
+Connections separates **Configured** from **Not tested / Check passed / Check failed**. **Test SEC connection** retrieves MSFT facts without a model call. **Test model connection** uses selected saved evidence for at most one interpretation and one critic call; it requires consent to send evidence and incur charges. Manage spending limits with your model provider; the project does not enforce a dollar allowance. Reported usage and cost are still saved. An uncertain submission can be recovered with the same submission key.
 
 Results describe provider attempts in this server session, not source correctness; restarting clears them. Opening saved examples and replay do not count as checks. Saved reports retain per-call model, response ID, tokens and provider-reported cost; missing cost is **unknown**, never zero. The latest live SEC/model check outcomes and their limits are recorded in [STATUS](STATUS.md).
 

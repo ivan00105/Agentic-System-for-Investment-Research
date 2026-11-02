@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -114,6 +114,18 @@ def create_app(data_dir: Path | None = None):
     @app.get("/api/runs/{run_id}/evidence/{evidence_id}", response_model=Evidence)
     def evidence(run_id: str, evidence_id: str):
         return app.state.store.evidence(run_id, evidence_id)
+
+    @app.get("/api/runs/{run_id}/evidence/{evidence_id}/sources/{digest}")
+    def evidence_source(run_id: str, evidence_id: str, digest: str):
+        saved = app.state.store.evidence(run_id, evidence_id)
+        allowed = {saved.snapshot_hash}
+        if saved.packet:
+            allowed.update(d.snapshot_hash for d in saved.packet.documents)
+        if digest not in allowed:
+            raise DomainError("Source is unavailable for this evidence.", "not_found", 404)
+        return Response(app.state.store.snapshot_bytes(digest), media_type="application/octet-stream",
+                        headers={"Content-Disposition": f'attachment; filename="{digest}.bin"',
+                                 "X-Content-Type-Options": "nosniff"})
 
     dist = PROJECT / "frontend" / "dist"
     if (dist / "assets").is_dir():

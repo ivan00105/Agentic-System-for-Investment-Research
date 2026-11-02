@@ -368,7 +368,7 @@ test('Connections separates setup from attempts and navigation or refresh never 
   await expect(model.getByText('Not tested', {exact: true})).toBeVisible()
   await expect(model).toContainText('selected-model')
   await expect(page.getByRole('region', {name: 'Research controls'})).toHaveCount(0)
-  await expect(page.getByLabel('Spending allowance (USD)')).toHaveValue('')
+  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
   await expect(model.getByRole('checkbox')).not.toBeChecked()
   await expect(model.getByRole('button', {name: 'Test model connection'})).toBeDisabled()
   await expect(page.getByText('Tests run only when you explicitly click a test button.', {exact: false})).toBeVisible()
@@ -468,7 +468,7 @@ test('Connections supports legacy configuration, mobile keyboard access and coll
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
 })
 
-test('model connection check requires source, allowance and fresh consent, then saves usage', async ({page, request}) => {
+test('model connection check requires source and fresh consent without a local allowance, then saves usage', async ({page, request}) => {
   const config = await (await request.get('/api/config')).json()
   const source = await (await request.get('/api/runs/example-msft')).json()
   const real = {...source, id: 'real-saved-source', synthetic: false, request: {...source.request, ticker: 'AAPL'}, report: {...source.report, synthetic: false}}
@@ -488,8 +488,8 @@ test('model connection check requires source, allowance and fresh consent, then 
     const payload = route.request().postDataJSON()
     submissions.push({payload, key: route.request().headers()['idempotency-key']})
     saved = {...real, id: 'mock-model-check', request: payload, report: {...real.report,
-      model_run: {provider: 'openrouter', model: 'test/model', schema_version: 'test-v1', max_output_tokens: 2048},
-      model_calls: [{role: 'interpretation', provider: 'openrouter', requested_model: 'test/model', returned_model: 'resolved/model', response_id: 'response-example', input_tokens: 100, output_tokens: 20, total_tokens: 120, cost_usd: null, status: 'completed', error_code: null}, {role: 'critic', provider: 'openrouter', requested_model: 'test/model', returned_model: null, response_id: null, input_tokens: null, output_tokens: null, total_tokens: null, cost_usd: '0', status: 'failed', error_code: 'provider_failure'}]}}
+      model_run: {provider: 'openrouter', model: 'test/model', schema_version: 'financial-review-v2', max_output_tokens: null},
+      model_calls: [{role: 'interpretation', provider: 'openrouter', requested_model: 'test/model', returned_model: 'resolved/model', response_id: 'response-example', input_tokens: 100, output_tokens: 20, total_tokens: 120, cost_usd: null, status: 'completed', error_code: null}, {role: 'critic', provider: 'openrouter', requested_model: 'test/model', returned_model: null, response_id: null, input_tokens: null, output_tokens: 2000, total_tokens: null, reasoning_tokens: 1900, provider_status: 'incomplete', incomplete_reason: 'max_output_tokens', cost_usd: '0', status: 'incomplete', error_code: 'model_output_limit', error_message: 'The provider output limit stopped this response; financial results are preserved.'}]}}
     return route.fulfill({json: saved})
   })
   await page.route('**/api/runs/mock-model-check', route => route.fulfill({json: saved}))
@@ -497,17 +497,10 @@ test('model connection check requires source, allowance and fresh consent, then 
   const model = page.getByRole('region', {name: 'Optional model analysis'})
   const button = model.getByRole('button', {name: 'Test model connection'})
   const consent = model.getByRole('checkbox')
-  const amount = page.getByLabel('Spending allowance (USD)')
   const selector = page.getByLabel('Saved evidence for model check')
   await expect(model).toContainText('OpenRouter')
   await expect(model).toContainText('Synthetic teaching data: illustrative figures')
-  await expect(amount).toHaveValue('')
-  await expect(consent).not.toBeChecked()
-  await expect(button).toBeDisabled()
-  await amount.fill('0')
-  await consent.check()
-  await expect(button).toBeDisabled()
-  await amount.fill('0.10')
+  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
   await expect(consent).not.toBeChecked()
   await expect(button).toBeDisabled()
   await consent.check()
@@ -525,7 +518,7 @@ test('model connection check requires source, allowance and fresh consent, then 
   await button.click()
   await expect(page).toHaveURL(/view=research&run=mock-model-check/)
   expect(submissions).toHaveLength(1)
-  expect(submissions[0].payload).toEqual({kind: 'research', mode: 'frozen', ticker: 'AAPL', cutoff: source.request.cutoff, source_run_id: real.id, screen: null, model_analysis: true, connection_check: 'model', spending_limit_usd: '0.10', provider_limit_confirmed: true})
+  expect(submissions[0].payload).toEqual({kind: 'research', mode: 'frozen', ticker: 'AAPL', cutoff: source.request.cutoff, source_run_id: real.id, screen: null, model_analysis: true, connection_check: 'model'})
   await expect(page.locator('.run-banner')).toContainText('Model connection check')
   await expect(page.getByText('Run completion and provider success are separate;', {exact: false})).toBeVisible()
   await expect(page.locator('.model-usage')).not.toHaveAttribute('open', '')
@@ -533,7 +526,21 @@ test('model connection check requires source, allowance and fresh consent, then 
   await expect(page.locator('.model-usage')).toContainText('resolved/model')
   await expect(page.locator('.model-usage')).toContainText('Reported cost (USD)Unknown')
   await expect(page.locator('.model-usage')).toContainText('Reported cost (USD)0')
-  await expect(page.locator('.model-usage')).toContainText('Unknown / Unknown / Unknown')
+  await expect(page.locator('.model-usage')).toContainText('Unknown / 2000 / Unknown')
+  await expect(page.locator('.model-usage')).toContainText('Provider/model default (no app cap)')
+  await expect(page.locator('.model-usage')).toContainText('Output-token limit reached')
+  await expect(page.locator('.model-usage')).toContainText('Reasoning tokens (included in output)1900')
+  await expect(page.locator('.model-usage')).toContainText('Failure reasonThe provider output limit stopped this response; financial results are preserved.')
+  const finished = saved
+  saved = {...saved, status: 'running', report: {...saved.report, model_calls: [
+    saved.report.model_calls[0], {...saved.report.model_calls[1], status: 'running', provider_status: null, incomplete_reason: null, error_code: null},
+  ]}}
+  await page.reload()
+  await page.locator('.model-usage summary').click()
+  await expect(page.locator('.model-usage')).toContainText('critic · Running')
+  await expect(page.locator('.model-usage')).not.toContainText('Output-token limit reached')
+  saved = finished
+  await expect(page.locator('.model-usage')).toContainText('Output-token limit reached')
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
 })
 
@@ -589,14 +596,12 @@ test('lost model check response locks controls and explicitly recovers the exact
   })
   await page.route('**/api/runs/recovered-check', route => route.fulfill({json: {...source, id: 'recovered-check', request: requests[0].payload}}))
   await page.goto('/?view=connections')
-  await page.getByLabel('Spending allowance (USD)').fill('0.25')
   await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
   await page.getByRole('checkbox').check()
   await page.getByRole('button', {name: 'Test model connection'}).click()
   await expect(page.getByRole('alert')).toContainText('Connection interrupted')
   await expect(page.getByRole('button', {name: 'Test SEC connection'})).toBeDisabled()
   await expect(page.getByLabel('Saved evidence for model check')).toBeDisabled()
-  await expect(page.getByLabel('Spending allowance (USD)')).toBeDisabled()
   await page.reload()
   await expect(page.getByRole('button', {name: 'Retry same submission'})).toBeVisible()
   await expect(page.getByRole('button', {name: 'Test model connection'})).toBeDisabled()
@@ -631,7 +636,6 @@ for (const check of [true, false]) {
       const start = page.getByRole('button', {name: check ? 'Test model connection' : 'Start research →'})
       if (check) {
         await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
-        await page.getByLabel('Spending allowance (USD)').fill('0.25')
         await page.getByRole('checkbox').check()
       } else {
         await page.getByLabel('Research action').selectOption('frozen')
@@ -680,14 +684,13 @@ test('model check sends nothing and remains usable when recovery storage is unav
   })
   await page.goto('/?view=connections')
   await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
-  await page.getByLabel('Spending allowance (USD)').fill('0.25')
   await page.getByRole('checkbox').check()
   const button = page.getByRole('button', {name: 'Test model connection'})
   await button.click()
   await expect(page.getByRole('alert')).toContainText('No request was sent. Enable session storage')
   await expect(button).toBeEnabled()
   await expect(page.getByRole('button', {name: 'Test SEC connection'})).toBeEnabled()
-  await expect(page.getByLabel('Spending allowance (USD)')).toBeEnabled()
+  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
   await expect(page.getByRole('button', {name: 'Retry same submission'})).toHaveCount(0)
   expect(posts).toBe(0)
   expect(await page.evaluate(() => sessionStorage.getItem('fieldnote-pending-check'))).toBeNull()

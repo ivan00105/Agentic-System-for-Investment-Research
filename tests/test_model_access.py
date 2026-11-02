@@ -31,9 +31,9 @@ def test_legacy_openai_settings_are_explicit_and_private(monkeypatch):
     assert settings.provider == "openai"
     assert settings.label == "OpenAI"
     assert settings.model == "gpt-example"
-    assert settings.client_kwargs == {"api_key": "secret-openai", "base_url": "https://api.openai.com/v1", "timeout": 45, "max_retries": 0}
+    assert settings.client_kwargs == {"api_key": "secret-openai", "base_url": "https://api.openai.com/v1", "max_retries": 0}
     assert settings.request_kwargs() == {"store": False}
-    assert settings.metadata() == {"provider": "openai", "model": "gpt-example", "schema_version": "financial-review-v1"}
+    assert settings.metadata() == {"provider": "openai", "model": "gpt-example", "schema_version": "financial-review-v3"}
     assert "secret-openai" not in repr(settings)
     assert "https://api.openai.com" not in repr(settings)
     with pytest.raises(FrozenInstanceError):
@@ -54,7 +54,7 @@ def test_openrouter_uses_only_its_key_and_pins_request_policy(monkeypatch):
                          OPENAI_API_KEY="openai-secret", OPENAI_ORG_ID="openai-org", OPENAI_PROJECT_ID="openai-project")
     assert settings.configured
     assert settings.provider == "openrouter"
-    assert settings.client_kwargs == {"api_key": "router-secret", "base_url": "https://openrouter.ai/api/v1", "timeout": 45, "max_retries": 0, "organization": "", "project": ""}
+    assert settings.client_kwargs == {"api_key": "router-secret", "base_url": "https://openrouter.ai/api/v1", "max_retries": 0, "organization": "", "project": ""}
     assert settings.request_kwargs() == {"store": False, "extra_body": {"provider": {"require_parameters": True, "allow_fallbacks": False}}}
     assert settings.metadata()["model"] == "vendor/model:free"
     assert "router-secret" not in repr(settings)

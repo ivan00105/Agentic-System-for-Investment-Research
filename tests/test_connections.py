@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from research_assistant import research
 from research_assistant.api import create_app
-from research_assistant.application import Application, Budget, Critique, Draft, Interpretation, Objection
+from research_assistant.application import Application, Critique, Draft, Interpretation, Objection
 from research_assistant.contracts import ConnectionCheck, DomainError, RunRequest
 from research_assistant.fixtures import FIXTURE_CUTOFF, seed
 from research_assistant.store import Store
@@ -86,7 +86,7 @@ def model_transport(monkeypatch, failure=None):
                 raise ValueError("private-api-key")
             if failure == "host":
                 raise OSError("Unrelated local host failure")
-            if failure == "incomplete":
+            if failure == "incomplete" or (failure == "critic_incomplete" and len(calls) == 2):
                 return SimpleNamespace(http_response=SimpleNamespace(json=lambda: {}), parse=lambda: SimpleNamespace(status="incomplete", output_parsed=None))
             if len(calls) == 1:
                 output = Draft(interpretations=[Interpretation(statement="Margin needs context." if failure != "numbers" else "Margin is 20 percent.", evidence_ids=["unknown" if failure == "bad_refs" else "fixture-MSFT-annual"])])
@@ -135,7 +135,7 @@ def test_config_hides_secrets_endpoint_and_contact(tmp_path, monkeypatch, base_u
         assert config["connections"]["model"]["configured"] == (provider == "OpenAI")
 
 
-@pytest.mark.parametrize("payload", [{"cik": 789019, "facts": {}}, {"cik": 789019, "facts": {"us-gaap": {"Revenues": {"units": {"USD": [{"start": "2024-01-01", "end": "2024-12-31", "val": 100, "accn": "annual", "filed": "2025-02-01", "form": "10-K"}]}}}}}])
+@pytest.mark.parametrize("payload", [{"cik": 789019, "facts": {}}, {"cik": 789019, "facts": {"us-gaap": {"Revenues": {"units": {"USD": [{"start": "2024-10-01", "end": "2024-12-31", "val": 100, "accn": "annual", "filed": "2025-02-01", "form": "10-K"}]}}}}}])
 def test_validated_sec_response_passes_even_without_eligible_facts(app, monkeypatch, payload):
     sec_transport(monkeypatch, httpx.Response(200, json=payload))
     result = run(app, mode="fresh", source_run_id=None, model_analysis=False)
@@ -236,17 +236,14 @@ def test_missing_evidence_skips_model_without_touching_its_check(app, monkeypatc
     assert not calls and app.connections()["model"].check == ConnectionCheck()
 
 
-def test_budget_during_second_model_call_does_not_claim_provider_outcome(app, monkeypatch):
-    calls = model_transport(monkeypatch)
-    original = Budget.check
-    def stop_before_critic(self):
-        original(self)
-        if self.calls == 1:
-            raise DomainError("Budget exhausted", "budget_exhausted")
-    monkeypatch.setattr(Budget, "check", stop_before_critic)
+def test_incomplete_critic_records_failed_connection_and_preserves_draft(app, monkeypatch):
+    calls = model_transport(monkeypatch, "critic_incomplete")
     result = run(app)
-    assert result.status == "budget_exhausted" and len(calls) == 1
-    assert app.connections()["model"].check == ConnectionCheck()
+    assert result.status == "completed" and len(calls) == 2
+    assert result.report.companies[0].review_status == "failed"
+    assert result.report.model_calls[0].status == "completed"
+    assert result.report.model_calls[1].status == "incomplete"
+    checked(app, "model", "failed", result)
 
 
 @pytest.mark.parametrize("connection", ["sec", "model"])

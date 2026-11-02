@@ -1,6 +1,7 @@
 export type Mode = 'fresh' | 'frozen' | 'replay'
 export type View = 'research' | 'discovery' | 'history' | 'connections'
 export interface Screen { sector: string; min_operating_margin: string; limit: number }
+// Legacy spending fields remain readable for saved requests and exact-key recovery; new checks omit them.
 export interface RunRequest { kind: 'research' | 'discovery'; mode: Mode; ticker: string | null; cutoff: string; source_run_id: string | null; screen: Screen | null; model_analysis?: boolean; connection_check?: 'sec' | 'model' | null; spending_limit_usd?: string | null; provider_limit_confirmed?: boolean }
 export interface Metric { id: string; label: string; value: string | null; unit: 'USD' | 'ratio'; period: string; formula: string | null; inputs: string[]; evidence_ids: string[]; unavailable_reason: string | null }
 export interface Claim { id: string; statement: string; kind: string; status: string; evidence_ids: string[]; version: number }
@@ -8,8 +9,8 @@ export interface Review { claim_id: string; original: string; objection: string;
 export type ReviewStatus = 'not_requested' | 'pending' | 'completed' | 'unavailable' | 'failed' | 'not_recorded'
 export interface CompanyReport { ticker: string; company: string; support: string; summary: string; metrics: Metric[]; claims: Claim[]; reviews: Review[]; review_status?: ReviewStatus; review_error?: string | null; forecast: { status: string; probability: null; benchmark: string; horizon: string; model_version: string | null; reason: string }; limitations: string[]; source_limitations?: string[] | null }
 export interface Candidate { ticker: string; company: string; sector: string; eligibility: 'pass' | 'fail' | 'unknown'; reason: string; operating_margin: string | null; selected: boolean }
-export interface ModelCall { role: string; provider: string; requested_model: string; returned_model: string | null; response_id: string | null; input_tokens: number | null; output_tokens: number | null; total_tokens: number | null; cost_usd: string | null; status: 'completed' | 'failed' | 'incomplete'; error_code: string | null }
-export interface ModelRun { provider: string; model: string | null; schema_version: string; max_output_tokens: number }
+export interface ModelCall { role: string; provider: string; requested_model: string; returned_model: string | null; response_id: string | null; input_tokens: number | null; output_tokens: number | null; total_tokens: number | null; cost_usd: string | null; reasoning_tokens?: number | null; provider_status?: string | null; incomplete_reason?: 'max_output_tokens' | 'content_filter' | 'other' | null; status: 'running' | 'completed' | 'failed' | 'incomplete'; error_code: string | null; error_message?: string | null; output_snapshot_hash?: string | null }
+export interface ModelRun { provider: string; model: string | null; schema_version: string; max_output_tokens: number | null }
 export interface Report { model_run?: ModelRun | null; model_calls?: ModelCall[];  title: string; synthetic: boolean; companies: CompanyReport[]; candidates: Candidate[]; ranking: string | null; limitations: string[] }
 export interface Action { sequence: number; at: string; role: string; message: string }
 export interface Run { id: string; request: RunRequest; status: string; created_at: string; updated_at: string; stage: string; actions: Action[]; report: Report | null; error: string | null; synthetic: boolean; label?: string | null; archived?: boolean }
