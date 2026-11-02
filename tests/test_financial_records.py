@@ -9,7 +9,7 @@ from research_assistant.financials import identified, operating_margin, parse_fi
 from research_assistant.research import conservative_availability
 from test_filing_packets import PACKET, annual, needs_packet
 
-# Every test here parses the real 10-K in the git-ignored packet.
+# Every test here parses the real (trimmed) MSFT 10-K in tests/fixtures/msft-fy2024/.
 pytestmark = needs_packet
 
 def parse(raw=None):

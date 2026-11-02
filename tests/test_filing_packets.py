@@ -10,9 +10,10 @@ from research_assistant.filings import Document, fetch_source, retrieve_packet
 from research_assistant.research import SecFact
 from research_assistant.store import Store
 
-PACKET = Path(__file__).resolve().parents[1] / "verification/packets/msft-fy2024/20261029T182734Z"
-# The packet holds 48 MB of real SEC files and is git-ignored, so fresh clones and CI skip these tests.
-needs_packet = pytest.mark.skipif(not PACKET.is_dir(), reason="needs the local SEC packet in verification/packets/")
+# Real MSFT FY2024 SEC files, trimmed from the 48 MB local packet by tests/fixtures/build_sec_fixtures.py
+# and committed, so CI runs these tests too.
+PACKET = Path(__file__).resolve().parent / "fixtures/msft-fy2024"
+needs_packet = pytest.mark.skipif(not PACKET.is_dir(), reason="needs tests/fixtures/msft-fy2024/")
 CUTOFF = datetime(2025, 3, 1, tzinfo=timezone.utc)
 
 
