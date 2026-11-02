@@ -6,9 +6,7 @@ so tools running in parallel stay under the limit together. Responses are cached
 Archived filings never change, so they never expire. The JSON APIs expire after
 config.SEC_CACHE_MAX_AGE_HOURS.
 """
-import hashlib
 import json
-import logging
 import os
 import re
 import threading
@@ -17,25 +15,21 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
-from uuid import uuid4
 
 import httpx
 
 from .. import config
+from .cache import DiskCache
+from .errors import DataError
 
-LOG = logging.getLogger(__name__)
 SEC_HOSTS = {"data.sec.gov", "www.sec.gov"}
 # Everything under an accession folder is an immutable filing.
 ARCHIVE_PREFIX = "/Archives/edgar/data/"
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 
-class SecError(Exception):
-    """SEC gave no usable answer. `code` is stable, so tools can map it to a status."""
-
-    def __init__(self, message: str, code: str, status: int | None = None):
-        super().__init__(message)
-        self.code, self.status = code, status
+class SecError(DataError):
+    """SEC gave no usable answer."""
 
 
 @dataclass(frozen=True)
@@ -84,7 +78,7 @@ class SecClient:
                  transport: httpx.BaseTransport | None = None, limiter: RateLimiter | None = None, sleep=time.sleep):
         agent = (os.getenv("SEC_USER_AGENT", "") if user_agent is None else user_agent).strip()
         self.user_agent = agent if "@" in agent else None
-        self.cache_dir = Path(cache_dir) if cache_dir else config.data_dir() / "sec_cache"
+        self.cache = DiskCache(Path(cache_dir) if cache_dir else config.data_dir() / "sec_cache")
         self._limiter = limiter or LIMITER
         self._sleep = sleep
         self._http = httpx.Client(transport=transport, timeout=config.SEC_TIMEOUT_SECONDS, follow_redirects=False)
@@ -103,14 +97,15 @@ class SecClient:
         parts = urlsplit(url)
         if parts.scheme != "https" or parts.hostname not in SEC_HOSTS:
             raise ValueError(f"Not an SEC URL: {url}")
-        cached = self._read_cache(url)
+        immutable = parts.path.startswith(ARCHIVE_PREFIX)
+        cached = self.cache.get(url, None if immutable else timedelta(hours=config.SEC_CACHE_MAX_AGE_HOURS))
         if cached is not None:
-            return cached
+            return SecResponse(url, cached[0], cached[1], from_cache=True)
         if not self.configured:
             raise SecError("SEC access is not configured: set SEC_USER_AGENT to a name and contact email.",
                            "not_configured")
         response = SecResponse(url, self._fetch(url), datetime.now(timezone.utc), from_cache=False)
-        self._write_cache(response)
+        self.cache.put(url, response.body, response.retrieved_at)
         return response
 
     def close(self):
@@ -140,43 +135,6 @@ class SecClient:
                 if last:
                     raise SecError(f"SEC did not respond for {url} after {attempts} tries: {exc}", "network") from exc
         raise AssertionError("unreachable")
-
-    def _paths(self, url: str) -> tuple[Path, Path]:
-        key = hashlib.sha256(url.encode()).hexdigest()
-        return self.cache_dir / f"{key}.body", self.cache_dir / f"{key}.json"
-
-    def _read_cache(self, url: str) -> SecResponse | None:
-        body_path, meta_path = self._paths(url)
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            body = body_path.read_bytes()
-            retrieved_at = datetime.fromisoformat(meta["retrieved_at"])
-        except (OSError, ValueError, KeyError, TypeError):
-            return None
-        # A hash mismatch means a torn or concurrent write: treat it as a miss.
-        if meta.get("url") != url or meta.get("sha256") != hashlib.sha256(body).hexdigest():
-            return None
-        max_age = timedelta(hours=config.SEC_CACHE_MAX_AGE_HOURS)
-        if not urlsplit(url).path.startswith(ARCHIVE_PREFIX) and datetime.now(timezone.utc) - retrieved_at > max_age:
-            return None
-        return SecResponse(url, body, retrieved_at, from_cache=True)
-
-    def _write_cache(self, response: SecResponse):
-        body_path, meta_path = self._paths(response.url)
-        meta = {"url": response.url, "retrieved_at": response.retrieved_at.isoformat(),
-                "sha256": hashlib.sha256(response.body).hexdigest()}
-        # Body first, then metadata; each replaced atomically so readers never see half a file.
-        for path, data in ((body_path, response.body), (meta_path, json.dumps(meta).encode())):
-            temporary = path.parent / f"{path.name}.{uuid4().hex}.tmp"
-            try:
-                self.cache_dir.mkdir(parents=True, exist_ok=True)
-                temporary.write_bytes(data)
-                os.replace(temporary, path)
-            except OSError as exc:
-                # The fetch succeeded, so a cache problem must not fail the tool call.
-                LOG.warning("SEC cache write failed for %s: %s", response.url, exc)
-                temporary.unlink(missing_ok=True)
-                return
 
 
 def _read_body(url: str, response: httpx.Response) -> bytes:

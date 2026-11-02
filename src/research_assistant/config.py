@@ -35,3 +35,56 @@ SEC_CACHE_MAX_AGE_HOURS = 24
 # Protects memory from a broken response. The largest companyfacts files are tens of MB, so this
 # is generous. Going over it is an error naming this setting, never a silent truncation.
 SEC_MAX_RESPONSE_BYTES = 200_000_000
+
+# --- Other HTTP data providers (Tiingo, ...) ----------------------------------------------
+
+# Same reasons as the SEC settings above: one blip must not fail a tool call.
+HTTP_RETRIES = 3
+HTTP_RETRY_BACKOFF_SECONDS = 1.0
+HTTP_TIMEOUT_SECONDS = 30
+
+# --- Tools --------------------------------------------------------------------------------
+
+# Name searches can match dozens of companies. More matches than this are counted in a warning,
+# never dropped silently; the agent can retry with a ticker or CIK.
+FIND_COMPANY_MAX_MATCHES = 10
+# rapidfuzz WRatio score (0-100) a name must reach to count as a match. Below ~80 the matches
+# are mostly unrelated companies that share one word.
+FIND_COMPANY_MIN_SCORE = 80
+
+# Fiscal years returned when the agent doesn't ask: enough for growth and trends. Older years are
+# counted in a warning and the agent can ask for them.
+FINANCIALS_DEFAULT_YEARS = 5
+
+# Filings returned per list_filings call. More are counted in a warning; the agent narrows with
+# `forms` or `since`, or pages with `before`.
+LIST_FILINGS_MAX_RESULTS = 50
+
+# read_filing_section returns whole paragraphs until this many characters (~15k tokens), then
+# says where the next page starts. A paragraph is never cut.
+SECTION_PAGE_CHARS = 60_000
+# Lines shorter than this are headings; they are merged into the paragraph that follows.
+SECTION_HEADING_MAX_CHARS = 200
+# Keyword-search hits returned per query, best first. More are counted in a warning.
+SECTION_SEARCH_MAX_CHUNKS = 15
+
+# Screen candidates returned when the request doesn't say how many.
+SCREEN_DEFAULT_TOP_K = 5
+# A calendar year's SEC frame is used once this many days have passed after 31 December: large
+# filers file their 10-K within 60-90 days, so earlier frames are mostly empty.
+SCREEN_FRAME_LAG_DAYS = 100
+
+# --- Prices -------------------------------------------------------------------------------
+
+# Provider order, best first; PRICE_PROVIDERS in .env overrides it (e.g. "yfinance,tiingo").
+# Tiingo has raw and adjusted prices but needs a free key; yfinance needs no key.
+PRICE_PROVIDERS = ("tiingo", "yfinance")
+# Adjusted prices change whenever a dividend or split happens, so cached series refresh daily.
+PRICE_CACHE_MAX_AGE_HOURS = 24
+# History fetched when the agent gives no start date: three years covers volatility, drawdown and beta.
+PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
+# A day's close counts as known from this New York hour on: the close is 16:00 and end-of-day
+# vendors publish final prices about two hours later.
+PRICE_CLOSE_AVAILABLE_HOUR = 18
+# Annualisation for volatility: US exchanges trade about 252 days a year.
+TRADING_DAYS_PER_YEAR = 252
