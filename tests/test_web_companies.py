@@ -46,3 +46,8 @@ def test_search_without_sec_access_says_what_to_set(web, tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "sec_client", lambda: SecClient("", tmp_path / "empty"))
     response = web.get("/api/companies", params={"q": "apple"})
     assert response.status_code == 409 and "SEC_USER_AGENT" in response.json()["error"]["message"]
+
+
+def test_the_bundled_discover_universes_are_listed_with_their_size(web):
+    [tech] = [u for u in web.get("/api/universes").json()["items"] if u["id"] == "sp500_tech"]
+    assert tech["companies"] > 50 and tech["name"].startswith("S&P 500") and tech["as_of"]

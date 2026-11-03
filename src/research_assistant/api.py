@@ -116,6 +116,7 @@ def create_app(data_dir: Path | None = None):
 
     app.include_router(agent_api.router)
     app.include_router(companies_api.router)
+    app.include_router(companies_api.universes)
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):
