@@ -1,4 +1,5 @@
 """get_prices: a daily price series as of the cutoff, stored whole under one ID for calculate."""
+import json
 from datetime import date, timedelta
 
 from pydantic import BaseModel, Field
@@ -39,7 +40,9 @@ def run(args: GetPricesInput, context: ToolContext) -> ToolResult:
     except DataError as exc:
         cik = None
         warnings.append(f"Could not look up which company {ticker} is ({exc}); calculate can't check it.")
-    record = {"id": make_id("prices", source, ticker, rows[0]["date"], rows[-1]["date"], len(rows)), "kind": "prices",
+    # The ID covers the rows themselves: fetched again, Yahoo's adjusted closes can differ by float noise, and a new
+    # ID keeps the rows an earlier calculation used frozen beside the new ones (evidence.py rechecks from them).
+    record = {"id": make_id("prices", source, ticker, json.dumps(rows, sort_keys=True)), "kind": "prices",
               "ticker": ticker, "cik": cik, "source": source, "start": rows[0]["date"], "end": rows[-1]["date"], "rows": rows}
     context.remember(record)
     last = rows[-1]

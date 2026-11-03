@@ -4,6 +4,7 @@ SEC, price provider or model call. Files are enough for now; SQLite waits for th
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
+from itertools import product
 from pathlib import Path
 
 from ..tools import calculate
@@ -15,7 +16,10 @@ from .draft import SECTIONS, Draft
 @dataclass
 class SavedRun:
     events: list[dict]
-    records: dict[str, dict]  # every record the run's tools returned, by ID
+    records: dict[str, dict]  # every record the run's tools returned, by ID (its latest version)
+    # Each distinct version written under an ID, oldest first. Traces saved before price IDs covered their rows
+    # (3 Nov 2026) can hold a refetched series twice under one ID, with float noise in Yahoo's adjusted closes.
+    versions: dict[str, list[dict]]
     start: dict | None  # the run_start and run_end events, if the run got that far
     end: dict | None
 
@@ -30,11 +34,15 @@ class Recheck:
 def load(path: Path) -> SavedRun:
     events = [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
     records: dict[str, dict] = {}
+    versions: dict[str, list[dict]] = {}
     for event in events:
-        records.update(event.get("records") or {})
+        for key, record in (event.get("records") or {}).items():
+            records[key] = record
+            if record not in versions.setdefault(key, []):
+                versions[key].append(record)
     start = next((e for e in events if e["kind"] == "run_start"), None)
     end = next((e for e in reversed(events) if e["kind"] == "run_end"), None)
-    return SavedRun(events, records, start, end)
+    return SavedRun(events, records, versions, start, end)
 
 
 def recheck(path: Path) -> Recheck:
@@ -46,12 +54,11 @@ def recheck(path: Path) -> Recheck:
                                 "nothing could be rechecked.")
         return outcome
     cutoff = datetime.fromisoformat(run.start["cutoff"]) if run.start else datetime.now()
-    context = ToolContext(cutoff=cutoff, sec=None, records=dict(run.records))  # calculate never fetches
-    for record in run.records.values():
+    for record in (r for versions in run.versions.values() for r in versions):
         if record.get("kind") != "calc":
             continue
         outcome.calcs += 1
-        result = calculate.run(calculate.CalculateInput(formula=record["formula"], inputs=record["inputs"]), context)
+        result = _recompute(record, run, cutoff)
         if result.status not in ("ok", "unsupported"):
             outcome.problems.append(f"{record['id']} could not be recomputed: {'; '.join(result.warnings)}")
         elif result.data["value"] != record["value"]:
@@ -70,6 +77,21 @@ def recheck(path: Path) -> Recheck:
                     outcome.problems.append(f"{key}[{i}] now reads {claim.text!r}, but the saved report has "
                                             f"{old['text']!r}.")
     return outcome
+
+
+def _recompute(calc: dict, run: SavedRun, cutoff: datetime):
+    """The calculation recomputed from the versions frozen under its input IDs, latest first. The first combination
+    that gives the saved value wins; if none does, the latest versions' result is the one reported."""
+    ids = list(calc["inputs"].values())
+    latest = None
+    for chosen in product(*(run.versions.get(i, [])[::-1] or [None] for i in ids)):  # None: calculate says unknown
+        records = {**run.records, **{i: r for i, r in zip(ids, chosen, strict=True) if r}}
+        result = calculate.run(calculate.CalculateInput(formula=calc["formula"], inputs=calc["inputs"]),
+                               ToolContext(cutoff=cutoff, sec=None, records=records))  # calculate never fetches
+        latest = latest or result
+        if result.status in ("ok", "unsupported") and result.data["value"] == calc["value"]:
+            return result
+    return latest
 
 
 def inject_wrong_period(draft: Draft, records: dict[str, dict]) -> tuple[Draft, str] | None:
