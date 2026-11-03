@@ -1,0 +1,108 @@
+"""Saved agent runs, read back from their trace files (PROJECT_GUIDE Phase 7: the files in data/traces/ are the
+store, no database): a summary per run for History, a run's progress lines, and its checked report."""
+import json
+import os
+import re
+from pathlib import Path
+
+from .draft import SECTIONS
+from .evidence import load
+from .progress import describe as progress_line
+from .report import RUN_STATUS, describe
+
+RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")  # the IDs Trace.new gives; any other file is not a run
+
+
+def runs(folder: Path) -> list[dict]:
+    """Every saved run, newest first (run IDs start with the time)."""
+    paths = sorted(folder.glob("*.jsonl"), reverse=True) if folder.is_dir() else []
+    return [found for path in paths if RUN_ID.fullmatch(path.stem) and (found := summary(path))]
+
+
+def summary(path: Path) -> dict | None:
+    """What History shows. `status` is None while the trace has no run_end: still running, or cut off by a crash."""
+    first, last = _ends(path)
+    if first is None:
+        return None
+    end = last if last and last.get("kind") == "run_end" else {}
+    return {"run_id": path.stem, "question": first.get("question"), "condition": first.get("condition"),
+            "cutoff": first.get("cutoff"), "model": first.get("model"), "started_at": first.get("at"),
+            "status": end.get("status"), "ended_at": end.get("at"), "totals": end.get("totals")}
+
+
+def progress(path: Path) -> list[dict]:
+    """One line per step worth showing, the same lines the CLI prints."""
+    lines = []
+    for event in read_events(path):
+        try:
+            text = progress_line(event)
+        except (KeyError, TypeError):  # traces from before a field was added
+            text = event.get("kind")
+        if text:
+            lines.append({"seq": event.get("seq"), "at": event.get("at"), "text": text})
+    return lines
+
+
+def read_events(path: Path) -> list[dict]:
+    """Every event written so far. A run still writing can leave half a line at the end; it is skipped."""
+    events = []
+    for line in path.read_bytes().splitlines():
+        if (event := _parse(line)) is not None:
+            events.append(event)
+    return events
+
+
+def report(path: Path) -> dict | None:
+    """A finished run's checked report, shaped for the page; None while the trace has no run_end."""
+    run = load(path)
+    if run.end is None:
+        return None
+    end, checked = run.end, run.end.get("report") or {}  # Discover's run_end has only Markdown
+    number = {record_id: n for n, record_id in enumerate(checked.get("sources", []), start=1)}
+    sections = []
+    for key, heading in (SECTIONS if checked else ()):
+        claims = [{"text": c["text"], "status": "qualified" if c["flags"] else "cited",
+                   "citations": [number[i] for i in c["citations"] if i in number],
+                   "flags": [flag["problem"] for flag in c["flags"]]} for c in checked["sections"].get(key, [])]
+        status = "abstained" if not claims else "qualified" if any(c["flags"] for c in claims) else "cited"
+        sections.append({"key": key, "heading": heading, "status": status, "claims": claims})
+    return {"status": end["status"], "status_label": RUN_STATUS.get(end["status"], end["status"]),
+            "error": end.get("error"), "sections": sections, "limitations": checked.get("limitations", []),
+            "flags": [f"{flag['where']}: {flag['problem']}" for flag in checked.get("flags", [])],
+            "objections": [_objection(o) for o in end.get("objections") or []],
+            "sources": [_source(n, i, run.records.get(i)) for i, n in number.items()],
+            "markdown": end.get("markdown") or ""}
+
+
+def _objection(o: dict) -> dict:
+    return {"claim": o["claim"], "version": o["version"], "issue": o["issue"].replace("_", " "),
+            "material": o["material"], "problem": o["problem"], "outcome": o["outcome"],
+            "explanation": o.get("explanation")}
+
+
+def _source(n: int, record_id: str, record: dict | None) -> dict:
+    if record is None:  # traces saved before evidence was frozen hold no records
+        return {"n": n, "id": record_id, "text": f"`{record_id}`", "url": None}
+    text, url = describe(record).removeprefix(f"`{record_id}` "), record.get("filing_url") or record.get("url")
+    return {"n": n, "id": record_id, "text": text.replace(url, "").strip() if url else text, "url": url}
+
+
+def _ends(path: Path) -> tuple[dict | None, dict | None]:
+    """The first and last events, read from both ends: a long run's trace holds megabytes of evidence."""
+    with path.open("rb") as file:
+        first = file.readline()
+        size, window = file.seek(0, os.SEEK_END), 1 << 16
+        while True:  # widen the window until it holds the whole last line (a run_end can be hundreds of KB)
+            start = max(0, size - window)
+            file.seek(start)
+            lines = file.read().rstrip().rsplit(b"\n", 1)
+            if len(lines) == 2 or start == 0:
+                return _parse(first), _parse(lines[-1])
+            window *= 4
+
+
+def _parse(line: bytes) -> dict | None:
+    try:
+        return json.loads(line)
+    except ValueError:  # empty, or half-written by a run still going
+        return None

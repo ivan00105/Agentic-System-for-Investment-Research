@@ -38,8 +38,9 @@ SUBMIT_REVISION = Finish("submit_revision", "Hand in the revised report, every s
 def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
         max_steps: int = config.AGENT_MAX_STEPS, self_review_passes: int = config.AGENT_SELF_REVIEW_PASSES,
         critic_rounds: int = config.AGENT_CRITIC_ROUNDS, trace_dir: Path | None = None,
-        echo: Callable[[dict], None] | None = None) -> AgentRun:
-    trace, ledger = Trace.new(trace_dir, echo), ClaimLedger()
+        echo: Callable[[dict], None] | None = None, trace: Trace | None = None) -> AgentRun:
+    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app)."""
+    trace, ledger = trace or Trace.new(trace_dir, echo), ClaimLedger()
     desk = Desk(question, client, settings, trace, ledger, max_steps)
     critic = Critic(question, client, settings, context, trace, ledger, desk, max_steps, critic_rounds)
     return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
