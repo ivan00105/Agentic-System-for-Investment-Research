@@ -8,7 +8,7 @@ Rules for everyone who changes this repo: people, Claude Code, Codex and any oth
 
 ## Rules
 
-1. **Your own branch, one commit per subtask, then a PR.** Keep working on your personal branch (e.g. `ivan`); no new branch per phase or task. Two people never share a branch. Each commit finishes one checkbox or slice, passes the tests and names it in the message. When you're ready, open a PR to `main`; the repo owner reviews and merges it. Never commit to `main` directly.
+1. **Your own branch, one commit per subtask, then a PR.** Keep working on your personal branch (e.g. `ivan`); no new branch per phase or task. Two people never share a branch. Each commit finishes one checkbox or slice, passes the tests and names it in the message. A fix found before you push goes into the commit it fixes (`git commit --amend` or a fixup), not a new commit. When you're ready, open a PR to `main`; the repo owner reviews and merges it. Never commit to `main` directly.
 2. **Layout and dependency direction.** New code goes in the target layout (PROJECT_GUIDE §8): `finance` ← `data` ← `tools` ← `agents` ← `api`. `finance/` does no I/O. Tools never call an LLM. Agents never make HTTP calls; they use tools. The old pipeline (`application.py`, `research.py`, …) is baseline A: build beside it, don't rewrite it, and delete parts only when they block you.
 3. **Adopt before you build.** Before writing a tool or adding a dependency, check the adopt-or-build table in REFERENCE §10. Licences don't matter (academic project), but if you copy logic or an idea from a paper or repo, put its link in a code comment and in its REFERENCE row so the report can cite it. Pin exact versions (`==`) of anything new in `pyproject.toml`.
 4. **No hidden caps.** No output-token caps, token quotas or cost budgets unless the user opts in. Retry 429/5xx with the SDK's retry logic (agents set a more patient count in `config.py`). Never hard-code tickers, sectors or result counts. Never silently truncate input or output.
@@ -17,7 +17,8 @@ Rules for everyone who changes this repo: people, Claude Code, Codex and any oth
 7. **Missing configuration degrades, never crashes.** A data provider without its key is skipped and shown as "not configured". A fallback to another provider is always labelled with its `source`.
 8. **Tests with every change; the network is always mocked** (see `tests/sec_fixture.py`). Keep files small: split a file rather than grow it past about 400 lines.
 9. **Secrets:** never read, print or commit `.env`. A new setting goes in `.env.example` with its tier (0 = no key, 1 = free key, 2 = paid).
-10. **No new docs.** No status files, summaries or plans. Tick the checkbox in PROJECT_GUIDE §9, and record decisions in PROJECT_GUIDE or REFERENCE.
+10. **Write for a reader in a hurry.** A commit message is a clear subject line plus at most 2–3 plain lines on what changed and why; no run IDs, dates or debugging stories. A code comment is one short line, only where the reason isn't obvious from the code.
+11. **No new docs.** No status files, summaries or plans. Tick the checkbox in PROJECT_GUIDE §9, and record decisions in PROJECT_GUIDE or REFERENCE.
 
 ## Commands (PowerShell, from the repo root)
 
