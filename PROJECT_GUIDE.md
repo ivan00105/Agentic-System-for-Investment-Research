@@ -10,7 +10,7 @@ Revised 2 November 2026 after reviewing the code, the course guideline and every
 
 - **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
 - **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
-- **Where we are:** the data plumbing, storage and UI work, and the Phase 1 tools are built (`tools/`, 8 tools). **The agent itself hasn't been built.** Today's flow is a fixed pipeline plus two LLM calls that only add comments, and the course says that is not enough.
+- **Where we are:** the data plumbing, storage and UI work, the Phase 1 tools (`tools/`, 8 tools) and the Phase 2 single agent (`agents/`, CLI only, condition B) are built. **The analyst team, critic and UI hookup aren't.** The web app still runs the old fixed pipeline plus two LLM calls that only add comments (baseline A).
 - **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
 - **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A and as a fallback when no API key is set.
 - **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
@@ -349,11 +349,12 @@ Licences don't matter here (it's an academic project): calling a library and cop
   - Checked live on 3 Nov 2026 for 13 companies (AAPL, MSFT, NVDA, AMZN, GOOGL, KO, JNJ, WMT, XOM, JPM, C, TSM, BABA): every revenue figure `verify_against_filing` checked matched the original filing; bank operating income and TSM (IFRS) come back unsupported. Known cases: XOM's ticker now points to a new holding company with no 10-K yet (history is under predecessor CIK 34088, and `find_company` says so); BABA's USD figures are convenience translations of CNY and are flagged; one-year betas from Yahoo look low (KO −0.28, XOM −0.72; the maths matches numpy), so cross-check them with Tiingo before the evaluation.
 
 ### Phase 2: Single agent loop
-- [ ] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
+- [x] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
   - The trace is one append-only JSONL file per run in `data/traces/` (every model call, tool call, result and token count). It moves into SQLite when the UI needs it (Phase 7).
   - Condition B includes REFERENCE §7's one self-review pass: when the checker flags the draft, the flags go back to the model once (`AGENT_SELF_REVIEW_PASSES`); leftover flags stay visible in the report. The report already uses the Phase 3 shape (summary, key numbers, bull vs bear, risks, what would change the view, limitations) so A–D compare like for like.
-- [ ] CLI: `python -m research_assistant.cli "question"`.
+- [x] CLI: `python -m research_assistant.cli "question"`.
 - **Done when:** the Check and Compare examples give sensible, fully cited reports. This set-up is evaluation condition **B**.
+  - Checked live on 3 Nov 2026 with `deepseek/deepseek-v4.1-flash` on OpenRouter: Check (NVIDIA) and Compare (Apple vs Microsoft) both finished with every section supported and no checker flags left after the self-review pass (first drafts: 3 and 22 flags, mostly figures copied from filing text). About 3 minutes, 12–13 model calls, 60–75 tool calls, 0.6–0.75 M tokens and $0.03–0.08 per run (prompt tokens dominate: each step resends the whole context, so prompt caching is the first cost lever). Reports cite fact, calc, filing-text and verify_against_filing records, attribute management claims, flag misaligned fiscal years and say no outlook model exists. Fixed during the check: upstream 429s (agents now retry 6 times and let OpenRouter use another host of the same model), a NaN Yahoo close that crashed market_cap, tool exceptions that ended a run, and checker false positives (citations written as `calc:ID`, names such as H20 or SIC 3674).
 
 ### Phase 3: Analyst team
 - [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
