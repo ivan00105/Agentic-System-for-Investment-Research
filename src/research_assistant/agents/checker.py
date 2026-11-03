@@ -35,7 +35,9 @@ class CheckedClaim:
 
     @property
     def status(self) -> str:
-        return "qualified" if self.flags else "supported"
+        # "cited" means every citation resolved and nothing was flagged. Whether the cited
+        # evidence really supports the statement is judged in evaluation, not here.
+        return "qualified" if self.flags else "cited"
 
 
 @dataclass
@@ -49,7 +51,7 @@ class CheckedReport:
         claims = self.sections[key]
         if not claims:
             return "abstained"
-        return "qualified" if any(c.flags for c in claims) else "supported"
+        return "qualified" if any(c.flags for c in claims) else "cited"
 
 
 def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:

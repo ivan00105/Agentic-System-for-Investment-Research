@@ -65,7 +65,7 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert result.plan.startswith("1. find_company") and "- Model: fake-model (served by Baidu)" in result.markdown
     assert "- Apple's operating margin was 32.0% in the fiscal year ended 2025-09-27. [1]" in result.markdown
     assert "- Revenue was $416.2 billion. [2]" in result.markdown
-    assert "## Bull case (supported)" in result.markdown and "## Bear case (abstained)" in result.markdown
+    assert "## Bull case (cited)" in result.markdown and "## Bear case (abstained)" in result.markdown
     assert "1. `calc-" in result.markdown and "2. `fact-" in result.markdown
     # Plan call has no tools; every request uses the model settings and no output-token cap.
     assert "tools" not in client.requests[0] and client.requests[1]["tools"]
