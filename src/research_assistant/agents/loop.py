@@ -138,8 +138,10 @@ def _run_tool(call, context, messages, trace, step, seen, allowed):
             result = registry.call(name, arguments, context)
             seen[key] = (step, result)
     messages.append({"role": "tool", "tool_call_id": call.id, "content": result.model_dump_json()})
+    # `records` holds every record this call added in full (e.g. all daily prices behind a series ID), so a
+    # saved run can be rechecked offline (evidence.py).
     trace.write("tool_call", step=step, name=name, arguments=arguments, repeat_of=repeat_of,
-                result=result.model_dump(mode="json"))
+                result=result.model_dump(mode="json"), records=trace.new_records(context.records))
 
 
 def _finish(call, finish, messages, trace, step):

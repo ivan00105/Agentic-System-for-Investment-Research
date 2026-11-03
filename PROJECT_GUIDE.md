@@ -362,7 +362,8 @@ Licences don't matter here (it's an academic project): calling a library and cop
 - [x] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (before, it only hid the other tools' schemas).
 - [x] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
   - `agents/claims.py`: a claim's ID comes from its first wording (`claim-…`) and is kept when the model repeats it in the claim's `id`; the version goes up only when the text, resolved citations, kind or materiality change. Each `check` event lists new, revised, unchanged and dropped claims, and `run_end` keeps every version.
-- [ ] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
+- [x] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
+  - Each `tool_call` event carries the records that call added, in full and once per run; `run_end` keeps the final draft. `agents/evidence.py` (CLI `--recheck TRACE`) recomputes every calculation from its frozen inputs and refills the report's placeholders, with no network or model, and lists any mismatch. Traces saved before this change hold no records and say so.
 - **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).
 
 ### Phase 4: Critic + revision

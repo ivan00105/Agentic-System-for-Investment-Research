@@ -27,6 +27,8 @@ To ask the research agent one question in the terminal (it prints the report and
 .\.venv\Scripts\python.exe -m research_assistant.cli "Compare Apple and Microsoft: growth, margins, valuation."
 ```
 
+The trace keeps every tool result in full, so a saved run's numbers can be rechecked offline: `--recheck data\traces\<run>.jsonl`.
+
 If PowerShell blocks `start.ps1`, run the steps by hand:
 
 ```powershell

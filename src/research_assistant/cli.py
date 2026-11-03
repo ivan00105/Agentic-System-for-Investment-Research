@@ -1,14 +1,16 @@
-"""Serve the web app, or answer one research question in the terminal with the single agent (condition B)."""
+"""Serve the web app, answer one research question in the terminal with the single agent (condition B), or
+recheck a saved run's numbers offline from its trace."""
 import argparse
 import sys
 from datetime import date, datetime, time, timezone
+from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from . import config
-from .agents import single_agent
+from .agents import evidence, single_agent
 from .data.sec import SecClient
 from .model_access import load_model_settings
 from .tools.result import ToolContext
@@ -26,17 +28,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("question", nargs="?", help="A research question. Without one, the web app is served.")
     parser.add_argument("--cutoff", type=date.fromisoformat, metavar="YYYY-MM-DD",
                         help="Research as of the end of this day (UTC). Default: now.")
+    parser.add_argument("--recheck", type=Path, metavar="TRACE",
+                        help="Recheck a saved run's numbers from its trace file, offline (no network, no model).")
     args = parser.parse_args(argv)
+    if args.recheck:
+        return recheck(args.recheck)
     if args.question is None:
         uvicorn.run("research_assistant.api:create_app", factory=True, host="127.0.0.1", port=8000, workers=1)
         return 0
     return ask(args.question, args.cutoff)
 
 
-def ask(question: str, cutoff_day: date | None) -> int:
+def utf8_console():
     for stream in (sys.stdout, sys.stderr):  # Windows consoles default to a legacy code page
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+def ask(question: str, cutoff_day: date | None) -> int:
+    utf8_console()
     load_dotenv(config.PROJECT_ROOT / ".env", override=False, interpolate=False, encoding="utf-8-sig")
     settings = load_model_settings()
     if not settings.configured:
@@ -51,6 +61,14 @@ def ask(question: str, cutoff_day: date | None) -> int:
     print(result.markdown)
     print(f"Trace saved to {result.trace_path}")
     return 1 if result.status == "failed" else 0
+
+
+def recheck(path: Path) -> int:
+    utf8_console()
+    result = evidence.recheck(path)
+    print(f"Rechecked {result.calcs} calculations and {result.statements} report statements offline from {path}.")
+    print("\n".join(f"- {problem}" for problem in result.problems) or "Every number matches the saved run.")
+    return 1 if result.problems else 0
 
 
 def progress(event: dict):

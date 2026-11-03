@@ -23,6 +23,7 @@ class Trace:
         self.totals = {"model_calls": 0, "tool_calls": 0, **dict.fromkeys(USAGE_FIELDS, 0), "cost": None}
         # Hosts that served the model calls (OpenRouter may fall back between them), so a fallback is never silent.
         self.hosts: list[str] = []
+        self.frozen: dict[str, dict] = {}  # records already saved in this trace, by ID
 
     @classmethod
     def new(cls, folder: Path | None = None, echo: Callable[[dict], None] | None = None) -> "Trace":
@@ -44,6 +45,13 @@ class Trace:
         if self.echo:
             self.echo(event)
         return event
+
+    def new_records(self, records: dict[str, dict]) -> dict[str, dict]:
+        """The records not yet saved in this trace (or changed since), marked as saved. Each tool call writes
+        these in full, so the trace freezes the run's evidence once (evidence.py reads it back)."""
+        new = {key: record for key, record in records.items() if self.frozen.get(key) != record}
+        self.frozen.update(new)
+        return new
 
     def _count(self, usage: dict):
         self.totals["model_calls"] += 1

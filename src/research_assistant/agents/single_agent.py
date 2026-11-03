@@ -48,13 +48,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     except (OpenAIError, TimeoutError) as exc:
         error = str(safe_model_error(exc))
         trace.write("error", step=0, error=error, type=type(exc).__name__)
-        return _end(trace, question, settings, context, ledger, "failed", None, None, [], error)
+        return _end(trace, question, settings, context, ledger, "failed", None, None, None, [], error)
 
     messages = [{"role": "system", "content": prompts.load("single_agent", cutoff=cutoff)},
                 {"role": "user", "content": f"{question}\n\nYour plan:\n{plan or '(no plan)'}"}]
     result = run_loop(client, settings.model, kwargs, messages, context, SUBMIT, trace, max_steps=max_steps)
-    steps, status, error = result.steps, result.status, result.error
-    report = _check(result.output, context, trace, ledger)
+    steps, status, error, draft = result.steps, result.status, result.error, result.output
+    report = _check(draft, context, trace, ledger)
     notes = []
     for review in range(1, self_review_passes + 1):
         if not (report and report.flags and status == "finished" and steps < max_steps):
@@ -67,8 +67,9 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
             notes.append(f"The self-review pass ended without a new report ({again.error or again.status}); "
                          "the first draft is shown with its checker flags.")
             break
-        report, status = _check(again.output, context, trace, ledger), again.status
-    return _end(trace, question, settings, context, ledger, status, plan, report, notes, error)
+        draft, status = again.output, again.status
+        report = _check(draft, context, trace, ledger)
+    return _end(trace, question, settings, context, ledger, status, plan, draft, report, notes, error)
 
 
 def _plan(question, client, model, kwargs, cutoff, trace) -> str:
@@ -102,7 +103,7 @@ def _review_request(report: CheckedReport) -> str:
             "calculate for a figure you typed. Remove any statement the evidence doesn't support.")
 
 
-def _end(trace, question, settings, context, ledger, status, plan, report, notes, error) -> AgentRun:
+def _end(trace, question, settings, context, ledger, status, plan, draft, report, notes, error) -> AgentRun:
     if report is None:  # no draft at all: the best partial result is the evidence gathered so far
         report = check(Draft(), context.records)
         report.sources = list(context.records)
@@ -114,5 +115,5 @@ def _end(trace, question, settings, context, ledger, status, plan, report, notes
                       model=model, plan=plan, run_id=trace.run_id, error=error)
     trace.write("run_end", status=status, error=error, totals=dict(trace.totals),
                 statuses={key: report.section_status(key) for key, _ in SECTIONS}, report=asdict(report),
-                claims=ledger.versions, markdown=markdown)
+                claims=ledger.versions, draft=draft.model_dump(mode="json") if draft else None, markdown=markdown)
     return AgentRun(trace.run_id, status, plan, report, markdown, trace.path, dict(trace.totals), error)
