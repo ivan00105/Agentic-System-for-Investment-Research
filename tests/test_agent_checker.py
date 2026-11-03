@@ -72,6 +72,7 @@ def test_names_with_digits_are_not_typed_numbers():
     assert typed_numbers("Revenue rose 12% to $391 billion, a 2.5x jump.") == ["12%", "$391 billion", "2.5x"]
     # Live check 3 Nov 2026: product names were flagged as typed figures.
     assert typed_numbers("Charges on H20 and H200 parts, B200 ramps, COVID-19 effects.") == []
+    assert typed_numbers("Among SIC 3674 filers, per the 10-Q and 8-Ks.") == []
 
 
 def test_citations_are_accepted_in_the_forms_models_write():

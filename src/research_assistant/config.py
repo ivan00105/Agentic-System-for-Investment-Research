@@ -116,7 +116,8 @@ def trace_dir() -> Path:
 # Item numbers, years, dates, quarters, index names. Any other digit outside a {fact:ID}/{calc:ID}
 # placeholder is flagged (never removed) as a number no tool result backs.
 CHECKER_ALLOWED_NUMBER_PATTERNS = (
-    r"\b(?:10-K|10-Q|8-K|20-F|40-F|6-K|S-1|DEF 14A)(?:/A)?\b",  # SEC form types
+    r"\b(?:10-K|10-Q|8-K|20-F|40-F|6-K|S-1|DEF 14A)(?:/A)?s?\b",  # SEC form types, also plural (8-Ks)
+    r"\bSIC (?:code )?\d{4}\b",  # industry codes
     r"\bItems? \d{1,2}[A-C]?(?:\.\d{2})?\b",  # Item 1A, Item 7, Item 2.02
     r"\b(?:19|20)\d{2}-\d{2}-\d{2}\b",  # ISO dates (period ends)
     r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
