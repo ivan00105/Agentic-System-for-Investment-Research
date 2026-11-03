@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { agentApi, agentRunning, stamp } from './api'
-import type { AgentProgress, AgentReport, AgentRunSummary, Condition } from './api'
+import type { AgentProgress, AgentReport, AgentRunSummary, AgentSection, Condition } from './api'
 
 const CONDITIONS: Record<Condition, string> = {D: 'Analyst team with critic', C: 'Analyst team', B: 'Single agent'}
 const STATUS: Record<string, string> = {
@@ -14,6 +14,16 @@ const tone = (status: string) => ['cited', 'finished'].includes(status) ? 'green
 const clock = (at: string) => new Date(at).toISOString().slice(11, 19) + ' UTC'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.
 const secUrl = (url: string | null) => url && /^https:\/\/(www|data)\.sec\.gov\//.test(url) ? url : null
+const OUTCOME: Record<string, string> = {
+  corrected: 'Fixed: the team changed the claim.', defended: 'Kept: the team showed evidence that answers it.',
+  withdrawn: 'Removed: the claim was taken out of the report.', unresolved: 'Not fixed: read this claim with care.',
+}
+// "key_numbers[0]" → "Key numbers, point 1"
+function place(where: string | null | undefined, sections: AgentSection[]) {
+  const match = where?.match(/^(\w+)\[(\d+)\]$/)
+  const section = match && sections.find(s => s.key === match[1])
+  return match && section ? `${section.heading}, point ${Number(match[2]) + 1}` : null
+}
 
 function Badge({children, tone = ''}: {children: ReactNode; tone?: string}) {
   return <span className={`badge ${tone}`}>{children}</span>
@@ -103,10 +113,15 @@ function AgentReportView({report}: {report: AgentReport}) {
         {claim.status === 'qualified' && <> <Badge tone="amber">qualified</Badge><ul className="agent-flags">{claim.flags.map((flag, j) => <li key={j}>{flag}</li>)}</ul></>}
       </li>)}</ul>}
     </section>)}
-    {report.objections.length > 0 && <section className="report-section"><h3>Critic review</h3><ul className="agent-claims">{report.objections.map((o, i) => <li key={i}>
-      <Badge tone={o.outcome === 'unresolved' ? 'amber' : 'green'}>{o.outcome}</Badge> <strong>{o.issue}{o.material ? ', material' : ''}</strong> ({o.claim} v{o.version}): {o.problem}
-      {o.explanation && <p className="muted">{o.explanation}</p>}
-    </li>)}</ul></section>}
+    {report.objections.length > 0 && <section className="report-section"><h3>Critic review</h3>
+      <p className="muted">A separate critic agent checked the report. Material objections go back to the team to fix; minor ones are only listed here.</p>
+      <ul className="agent-claims">{report.objections.map((o, i) => <li key={i}>
+        <Badge tone={o.outcome === 'unresolved' ? 'amber' : 'green'}>{o.outcome}</Badge> <Badge>{o.material ? 'material' : 'minor'}</Badge> <strong>{o.issue}</strong>{place(o.where, report.sections) && ` on ${place(o.where, report.sections)}`}
+        {o.meaning && <p className="muted">"{o.issue}" means {o.meaning}.</p>}
+        <p>{o.problem}</p>
+        <p><strong>{OUTCOME[o.outcome] ?? o.outcome}</strong>{o.explanation && ` ${o.explanation}`}</p>
+        {!!o.notes?.length && <ul className="agent-flags">{o.notes.map((note, j) => <li key={j}>{note}</li>)}</ul>}
+      </li>)}</ul></section>}
     {report.limitations.length > 0 && <section className="report-section limitations"><h3>Limitations</h3><ul>{report.limitations.map((text, i) => <li key={i}>{text}</li>)}</ul></section>}
     {report.sources.length > 0 && <section className="report-section"><h3>Sources</h3><ol className="agent-sources">{report.sources.map(source => <li key={source.id} id={`source-${source.n}`}>
       {source.text} <span className="mono">{source.id}</span>{secUrl(source.url) && <> <a href={secUrl(source.url)!} target="_blank" rel="noopener noreferrer">Open filing ↗</a></>}

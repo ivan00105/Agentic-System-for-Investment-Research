@@ -95,6 +95,9 @@ def test_names_with_digits_are_not_typed_numbers():
     # Live check 3 Nov 2026: product names were flagged as typed figures.
     assert typed_numbers("Charges on H20 and H200 parts, B200 ramps, COVID-19 effects.") == []
     assert typed_numbers("Among SIC 3674 filers, per the 10-Q and 8-Ks.") == []
+    # Live check 3 Nov 2026: the critic shortened chunk IDs to their last parts.
+    assert typed_numbers("Its Item 7 paragraphs (chunk-0000320193-26-000026-part_ii_item_7-6, -7-11 and -7-15)") == []
+    assert typed_numbers("A -7% drop, 10-20% growth.") == ["-7%", "10"]
 
 
 def test_citations_are_accepted_in_the_forms_models_write():

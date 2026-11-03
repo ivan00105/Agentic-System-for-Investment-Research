@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .draft import SECTIONS
 from .evidence import load
+from .objections import ISSUES
 from .progress import describe as progress_line
 from .report import RUN_STATUS, describe
 
@@ -75,9 +76,11 @@ def report(path: Path) -> dict | None:
 
 
 def _objection(o: dict) -> dict:
-    return {"claim": o["claim"], "version": o["version"], "issue": o["issue"].replace("_", " "),
-            "material": o["material"], "problem": o["problem"], "outcome": o["outcome"],
-            "explanation": o.get("explanation")}
+    """One critic objection; `meaning` says what its issue type means, `notes` why it ended as it did."""
+    return {"claim": o["claim"], "version": o["version"], "where": o.get("where"),
+            "issue": o["issue"].replace("_", " "), "meaning": ISSUES.get(o["issue"]), "material": o["material"],
+            "problem": o["problem"], "outcome": o["outcome"], "explanation": o.get("explanation"),
+            "notes": o.get("notes") or []}
 
 
 def _source(n: int, record_id: str, record: dict | None) -> dict:

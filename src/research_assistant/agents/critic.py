@@ -95,7 +95,7 @@ class Critic:
                 break
             pending = [o for o in self.raised if o.outcome == "open"]
             if not any(o.material for o in pending):
-                stop = "Minor, so not routed: the review stopped because no material objection was left."
+                stop = "Minor, so not sent back to the team: the review stops once no material objection is left."
                 break
             if n == self.rounds:
                 break

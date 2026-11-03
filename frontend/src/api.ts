@@ -79,7 +79,7 @@ export interface AgentRunSummary { run_id: string; status: string; question?: st
 export interface AgentProgress extends AgentRunSummary { progress: {seq: number | null; at: string | null; text: string}[] }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
-export interface AgentObjection { claim: string; version: number; issue: string; material: boolean; problem: string; outcome: string; explanation: string | null }
+export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
 export interface AgentSource { n: number; id: string; text: string; url: string | null }
 export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; markdown: string }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})

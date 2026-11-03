@@ -12,6 +12,9 @@ from research_assistant.api import create_app
 
 REPORT = {"summary": [{"text": "Apple Inc. files annual reports with the SEC.", "citations": ["company-0000320193"]}]}
 FIND_APPLE = reply(tool_calls=[("find_company", {"query": "AAPL"})])
+MINOR_OBJECTION = {"id": "objection-1", "claim": "claim-1", "version": 1, "where": "key_numbers[0]",
+                   "issue": "unsupported_inference", "material": False, "problem": "Item 7 has no such line.",
+                   "outcome": "unresolved", "notes": ["Minor, so not sent back to the team."]}
 
 
 @pytest.fixture
@@ -124,7 +127,8 @@ def test_missing_model_settings_start_nothing_and_say_what_to_set(web, monkeypat
 def test_saved_traces_reopen_even_when_unfinished_or_markdown_only(web):
     web.traces.mkdir()
     events = {"20261103-130000-aaaaaa": [{"kind": "run_start", "question": "Find tech."},
-                                         {"kind": "run_end", "status": "finished", "markdown": "# Find tech.\n"}],
+                                         {"kind": "run_end", "status": "finished", "markdown": "# Find tech.\n",
+                                          "objections": [MINOR_OBJECTION]}],
               "20261103-120000-bbbbbb": [{"kind": "run_start", "question": "Cut off."}, {"kind": "plan"}]}
     for run_id, lines in events.items():
         (web.traces / f"{run_id}.jsonl").write_text("".join(json.dumps(e) + "\n" for e in lines), encoding="utf-8")
@@ -134,6 +138,10 @@ def test_saved_traces_reopen_even_when_unfinished_or_markdown_only(web):
                                                            ("20261103-120000-bbbbbb", "incomplete")]
     discover = web.get("/api/agent-runs/20261103-130000-aaaaaa/report").json()
     assert discover["sections"] == [] and discover["markdown"] == "# Find tech.\n"
+    [objection] = discover["objections"]  # shown with what its issue type means and why it stayed open
+    assert objection["issue"] == "unsupported inference" and objection["where"] == "key_numbers[0]"
+    assert objection["meaning"].startswith("the cited evidence doesn't support the statement")
+    assert objection["notes"] == ["Minor, so not sent back to the team."]
     assert web.get("/api/agent-runs/20261103-120000-bbbbbb/report").status_code == 409
     assert web.get("/api/agent-runs/20261103-120000-bbbbbb").json()["progress"] == [
         {"seq": None, "at": None, "text": "plan ready"}]
