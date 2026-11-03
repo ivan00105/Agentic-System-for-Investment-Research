@@ -31,3 +31,8 @@ FILINGS = Role("filings", ("find_company", "read_filing_section", "list_filings"
 MARKET = Role("market", ("find_company", "get_prices", "get_financials", "calculate"), "market and valuation",
               "Price history, returns, volatility, drawdown and beta, and valuation (market cap, P/E, P/S, FCF yield).")
 ANALYSTS = (FUNDAMENTALS, FILINGS, MARKET)
+
+# Condition D. The critic reads; every tool it has only looks data up or recomputes it (REFERENCE §2: read-only tools
+# plus verify_against_filing). screen is left out: it ranks companies, which a review of one report never needs.
+CRITIC = Role("critic", ("find_company", "get_financials", "calculate", "verify_against_filing", "read_filing_section",
+                         "list_filings", "get_prices"), "critic")

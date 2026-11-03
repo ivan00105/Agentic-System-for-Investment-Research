@@ -56,6 +56,7 @@ class Desk:
         self.max_steps = max_steps  # per request: the same guard as any other agent's loop
         self.conversations: dict[str, list[dict]] = {}
         self.log: list[str] = []  # one line per request, for the report's "Who did what"
+        self.asked: list[str] = []  # the role asked, per request, so the critic's routing can be checked
 
     def tools(self) -> tuple[Tool, ...]:
         return tuple(Tool(f"ask_{role.name}", f"Ask the {role.title} analyst. {role.brief} Its tools: "
@@ -65,9 +66,14 @@ class Desk:
 
     def ask(self, role: Role, args: AnalystTask, context: ToolContext) -> ToolResult:
         follow_up = role.name in self.conversations
+        self.asked.append(role.name)
         if follow_up:
             messages = self.conversations[role.name]
-            messages.append({"role": "user", "content": f"Follow-up from the coordinator:\n{args.task}"})
+            # The analyst never sees the claim IDs its findings got, so it couldn't revise one as a new version.
+            earlier = "".join(f"\n- {i} v{len(self.ledger.versions[i])}: {self.ledger.versions[i][-1]['text']}"
+                              for i in self.ledger.latest.get(role.name, []))
+            messages.append({"role": "user", "content": f"Follow-up from the coordinator:\n{args.task}" + (
+                f"\n\nYour findings so far, by claim ID (keep the ID in `id` to revise one):{earlier}" if earlier else "")})
         else:
             messages = self.conversations[role.name] = [
                 {"role": "system", "content": prompts.role(role.name, context.cutoff.isoformat())},

@@ -11,6 +11,6 @@ def load(name: str, **values) -> str:
     return Template(text).safe_substitute(values)
 
 
-def role(name: str, cutoff: str) -> str:
+def role(name: str, cutoff: str, **values) -> str:
     """A role's system prompt, with the evidence rules every role shares (rules.md) in place of $rules."""
-    return load(name, cutoff=cutoff, rules=load("rules").strip())
+    return load(name, cutoff=cutoff, rules=load("rules").strip(), **values)

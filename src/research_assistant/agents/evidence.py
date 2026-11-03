@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..tools import calculate
 from ..tools.result import ToolContext
-from .checker import check
+from .checker import PLACEHOLDER, check, lookup
 from .draft import SECTIONS, Draft
 
 
@@ -70,3 +70,30 @@ def recheck(path: Path) -> Recheck:
                     outcome.problems.append(f"{key}[{i}] now reads {claim.text!r}, but the saved report has "
                                             f"{old['text']!r}.")
     return outcome
+
+
+def inject_wrong_period(draft: Draft, records: dict[str, dict]) -> tuple[Draft, str] | None:
+    """A labelled test defect for the isolated review test (REFERENCE §7: wrong period). The first figure, key numbers
+    first, whose metric has an earlier fiscal year in the frozen records is swapped for the latest earlier year the
+    claim doesn't already use, while its words still name the later period. None if no figure qualifies."""
+    for key in ["key_numbers"] + [key for key, _ in SECTIONS if key != "key_numbers"]:
+        for i, claim in enumerate(getattr(draft, key)):
+            used = {r["id"] for m in PLACEHOLDER.finditer(claim.text) if (r := lookup(records, m[2], m[1]))}
+            used |= {c.strip() for c in claim.citations}
+            for match in PLACEHOLDER.finditer(claim.text):
+                fact = lookup(records, match[2], match[1])
+                if not fact or fact.get("kind") != "fact":
+                    continue
+                earlier = [r for r in records.values() if r.get("kind") == "fact" and r["id"] not in used
+                           and all(r.get(k) == fact.get(k) for k in ("cik", "metric", "unit"))
+                           and bool(r.get("start")) == bool(fact.get("start")) and r["end"] < fact["end"]]
+                if not earlier:
+                    continue
+                swap = max(earlier, key=lambda r: r["end"])
+                text = claim.text[:match.start()] + "{fact:%s}" % swap["id"] + claim.text[match.end():]
+                citations = [swap["id"] if c.strip() == fact["id"] else c for c in claim.citations]
+                changed = draft.model_copy(deep=True)
+                getattr(changed, key)[i] = claim.model_copy(update={"text": text, "citations": citations})
+                return changed, (f"{key}[{i}]: {fact['id']} ({fact['metric']}, period ending {fact['end']}) was "
+                                 f"replaced by {swap['id']} (period ending {swap['end']}); the words are unchanged.")
+    return None

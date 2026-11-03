@@ -1,11 +1,12 @@
-"""One research run, shared by evaluation conditions B and C (REFERENCE §7):
-plan → the lead role's tool loop → draft → deterministic checker → self-review pass(es) → report.
+"""One research run, shared by evaluation conditions B, C and D (REFERENCE §7):
+plan → the lead role's tool loop → draft → deterministic checker → self-review pass(es) → [review] → report.
 In B the lead is a single agent with every tool; in C it is the coordinator, whose tools include the three
-analysts (team.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit or
+analysts (team.py); D adds the critic's review and the team's revisions (critic.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit or
 failed, with its trace saved."""
 from dataclasses import asdict, dataclass, field
 from functools import partial
 from pathlib import Path
+from typing import Callable
 
 from openai import OpenAIError
 
@@ -16,7 +17,7 @@ from . import prompts
 from .checker import CheckedReport, check
 from .claims import ClaimLedger, report_claims
 from .draft import SECTIONS, Draft
-from .loop import Finish, run_loop, toolset
+from .loop import Finish, LoopResult, run_loop, toolset
 from .report import render
 from .roles import Role
 from .trace import Trace
@@ -47,21 +48,29 @@ class Work:
     report: CheckedReport | None = None
     error: str | None = None
     notes: list[str] = field(default_factory=list)
+    # Continues the lead's conversation with another finish tool and step guard (the critic's revisions).
+    resume: Callable[[Finish, int], LoopResult] | None = None
+    messages: list[dict] = field(default_factory=list)  # that conversation, to add a request to before resuming
+    objections: list[dict] = field(default_factory=list)  # the critic's objections and their outcomes (D)
 
 
 def research(question: str, client, settings: ModelSettings, context: ToolContext, lead: Role, trace: Trace, *,
              condition: str, extra_tools: tuple[Tool, ...] = (), ledger: ClaimLedger | None = None,
              team: list[str] | None = None, max_steps: int = config.AGENT_MAX_STEPS,
-             self_review_passes: int = config.AGENT_SELF_REVIEW_PASSES) -> AgentRun:
+             self_review_passes: int = config.AGENT_SELF_REVIEW_PASSES,
+             review: Callable[[Work], None] | None = None) -> AgentRun:
     """`extra_tools` are tools the host adds to the lead's registry tools (the analysts); `team` is a list
-    they fill with one line per request, shown in the report."""
+    they fill with one line per request, shown in the report. `review` gets the finished work and may revise it
+    (condition D's critic)."""
     ledger = ledger or ClaimLedger()
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=condition,
                 lead=lead.name, provider=settings.provider, model=settings.model, max_steps=max_steps)
     with trace.acting_as(lead.name):
         work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)
-    return _end(trace, question, settings, context, ledger, work, condition, team)
+        if review and work.draft is not None and work.status != "failed":
+            review(work)
+    return close(trace, question, settings, context, ledger, work, condition, team)
 
 
 def _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps, passes) -> Work:
@@ -75,24 +84,25 @@ def _work(question, client, settings, context, lead, trace, ledger, extra_tools,
         return work
     messages = [{"role": "system", "content": prompts.role(lead.name, cutoff)},
                 {"role": "user", "content": f"{question}\n\nYour plan:\n{work.plan or '(no plan)'}"}]
-    loop = partial(run_loop, client, settings.model, kwargs, messages, context, SUBMIT, trace, tool_names=lead.tools,
-                   extra_tools=extra_tools)
-    result = loop(max_steps=max_steps)
+    work.messages = messages
+    work.resume = partial(run_loop, client, settings.model, kwargs, messages, context, trace=trace,
+                          tool_names=lead.tools, extra_tools=extra_tools)
+    result = work.resume(SUBMIT, max_steps=max_steps)
     steps, work.status, work.error, work.draft = result.steps, result.status, result.error, result.output
-    work.report = _check(work.draft, context, trace, ledger, lead.name)
+    work.report = check_draft(work.draft, context, trace, ledger, lead.name)
     for review in range(1, passes + 1):
         if not (work.report and work.report.flags and work.status == "finished" and steps < max_steps):
             break
         trace.write("self_review", review=review, flags=len(work.report.flags))
         messages.append({"role": "user", "content": _review_request(work.report, ledger)})
-        again = loop(max_steps=max_steps - steps)
+        again = work.resume(SUBMIT, max_steps=max_steps - steps)
         steps += again.steps
         if again.output is None:
             work.notes.append(f"The self-review pass ended without a new report ({again.error or again.status}); "
                               "the first draft is shown with its checker flags.")
             break
         work.draft, work.status = again.output, again.status
-        work.report = _check(work.draft, context, trace, ledger, lead.name)
+        work.report = check_draft(work.draft, context, trace, ledger, lead.name)
     return work
 
 
@@ -108,7 +118,7 @@ def _plan(question, client, model, kwargs, cutoff, trace, lead: Role, extra_tool
     return plan
 
 
-def _check(draft: Draft | None, context, trace, ledger: ClaimLedger, author: str) -> CheckedReport | None:
+def check_draft(draft: Draft | None, context, trace, ledger: ClaimLedger, author: str) -> CheckedReport | None:
     if draft is None:
         return None
     report = check(draft, context.records)
@@ -136,7 +146,8 @@ def _review_request(report: CheckedReport, ledger: ClaimLedger) -> str:
             "calculate for a figure you typed. Remove any statement the evidence doesn't support.")
 
 
-def _end(trace, question, settings, context, ledger, work: Work, condition, team) -> AgentRun:
+def close(trace, question, settings, context, ledger, work: Work, condition, team) -> AgentRun:
+    """Render the report and write run_end: the end of every run, however far it got."""
     report, notes = work.report, list(work.notes)
     if report is None:  # no draft at all: the best partial result is the evidence gathered so far
         report = check(Draft(), context.records)
@@ -147,9 +158,10 @@ def _end(trace, question, settings, context, ledger, work: Work, condition, team
     model = settings.model + (f" (served by {', '.join(trace.hosts)})" if trace.hosts else "")
     markdown = render(report, context.records, question=question, status=work.status,
                       cutoff=context.cutoff.isoformat(), model=model, plan=work.plan, run_id=trace.run_id,
-                      error=work.error, condition=condition, team=team)
+                      error=work.error, condition=condition, team=team, objections=work.objections)
     trace.write("run_end", status=work.status, error=work.error, totals=dict(trace.totals), by_agent=trace.by_agent,
                 statuses={key: report.section_status(key) for key, _ in SECTIONS}, report=asdict(report),
-                claims=ledger.versions, draft=work.draft.model_dump(mode="json") if work.draft else None,
+                claims=ledger.versions, withdrawn=ledger.withdrawn, objections=work.objections,
+                draft=work.draft.model_dump(mode="json") if work.draft else None,
                 markdown=markdown)
     return AgentRun(trace.run_id, work.status, work.plan, report, markdown, trace.path, dict(trace.totals), work.error)

@@ -104,4 +104,4 @@ def test_limitations_are_checked_and_render_lists_sources_and_flags():
     assert "## Bull case (abstained)\n\n- Nothing to report." in text
     assert "1. `fact-aaa111` revenue = $416.2 billion, 2024-09-29 to 2025-09-27" in text
     assert "2. `chunk-0000320193-25-000079-1A-4` 10-K 0000320193-25-000079, 1A paragraph 4" in text
-    assert "## Checker flags\n\n- limitations[1]: '3' is typed" in text
+    assert "## Flags\n\n- limitations[1]: '3' is typed" in text

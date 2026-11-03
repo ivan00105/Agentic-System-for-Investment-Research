@@ -24,6 +24,7 @@ class ClaimLedger:
     def __init__(self):
         self.versions: dict[str, list[dict]] = {}  # claim ID -> its versions
         self.latest: dict[str, list[str]] = {}  # author -> claim IDs in that author's latest draft
+        self.withdrawn: dict[str, dict] = {}  # claim ID -> the version withdrawn and the objection behind it
 
     def stamp(self, author: str, claims: list[tuple[str, Claim, CheckedClaim]], replaces: bool = True) -> dict:
         """Give each (where, claim, checked) of one draft its ID and version, set on the CheckedClaim.
@@ -32,7 +33,7 @@ class ClaimLedger:
         changes = {"new": [], "revised": [], "unchanged": [], "dropped": [], "notes": []}
         taken: list[str] = []
         for where, claim, checked in claims:
-            claim_id = self._id(claim, where, taken, changes["notes"])
+            claim_id = self._id(claim, where, taken, changes["notes"], author)
             taken.append(claim_id)
             content = {"text": claim.text, "citations": checked.citations, "kind": claim.kind,
                        "materiality": claim.materiality}
@@ -57,20 +58,35 @@ class ClaimLedger:
         statement rewords. Keeping a claim's ID never carries its citations; this says what they were."""
         return next((v["citations"] for v in reversed(self.versions.get(claim_id or "", [])) if v["citations"]), [])
 
-    def _id(self, claim: Claim, where: str, taken: list[str], notes: list[str]) -> str:
+    def withdraw(self, claim_id: str, version: int, objection: str):
+        """Record that a claim left the report because of an objection (REFERENCE §3: withdrawn)."""
+        self.withdrawn[claim_id] = {"version": version, "objection": objection}
+
+    def resolve(self, raw: str | None) -> str | None:
+        """The known claim ID a model meant, in the forms models write it, or None."""
+        raw = _normal(raw)
+        # Live check 3 Nov 2026: copied IDs sometimes gain a stray character (claim-1556f111303d3).
+        near = [i for i in self.versions if raw != i and raw.startswith(i) and len(raw) - len(i) <= 2]
+        return raw if raw in self.versions else near[0] if len(near) == 1 else None
+
+    def _id(self, claim: Claim, where: str, taken: list[str], notes: list[str], author: str) -> str:
         if claim.id:
-            raw = claim.id.strip().strip("{}").strip()
-            raw = "claim-" + raw.removeprefix("claim:").removeprefix("claim-").strip()
-            # Live check 3 Nov 2026: copied IDs sometimes gain a stray character (claim-1556f111303d3).
-            near = [i for i in self.versions if raw != i and raw.startswith(i) and len(raw) - len(i) <= 2]
-            known = raw if raw in self.versions else near[0] if len(near) == 1 else None
-            if known and known != raw:
+            known = self.resolve(claim.id)
+            if known and known != _normal(claim.id):
                 notes.append(f"{where}: {claim.id!r} was read as {known}.")
             if known and known not in taken:
                 return known
             notes.append(f"{where}: {claim.id!r} is not a claim ID from an earlier draft, or is used twice, "
                          "so the statement got its own ID.")
+        else:  # the author's own statement handed in again word for word, without the ID it had
+            same = [i for i in self.latest.get(author, []) if i not in taken and self.versions[i][-1]["text"] == claim.text]
+            if same:
+                return same[0]
         n = 0
         while (claim_id := make_id("claim", claim.text, *([n] if n else []))) in taken:
             n += 1  # the same wording twice in one draft: two claims
         return claim_id
+
+
+def _normal(raw: str | None) -> str:
+    return "claim-" + (raw or "").strip().strip("{}").strip().removeprefix("claim:").removeprefix("claim-").strip()
