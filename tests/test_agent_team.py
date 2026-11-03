@@ -2,7 +2,7 @@ import json
 
 import httpx
 import openai
-from fake_llm import FakeClient, reply, tool_results
+from fake_llm import FakeClient, reply, resubmit, tool_results
 from sec_files import make_context
 
 from research_assistant.agents import team
@@ -82,7 +82,7 @@ def test_the_coordinator_asks_analysts_and_merges_their_findings(tmp_path):
         calls(("ask_fundamentals", {"task": FUNDAMENTALS_TASK}), ("ask_filings", {"task": FILINGS_TASK})),
         fundamentals_financials, fundamentals_margin, fundamentals_submit,
         calls(("get_financials", {"cik": "320193"})), calls(("list_filings", {"cik": "320193", "forms": ["8-K"]})),
-        filings_submit, coordinator_merge)
+        filings_submit, coordinator_merge, resubmit)
     assert result.status == "finished" and not result.report.flags
 
     # Each role sees its own tools only, and an analyst starts from the question and its task.
@@ -106,8 +106,8 @@ def test_the_coordinator_asks_analysts_and_merges_their_findings(tmp_path):
                           ("coordinator", "ask_filings", "ok")]
     end = events[-1]
     assert {agent: totals["model_calls"] for agent, totals in end["by_agent"].items()} == {
-        "coordinator": 4, "fundamentals": 3, "filings": 3}
-    assert end["totals"]["model_calls"] == 10 and end["totals"]["tool_calls"] == 7
+        "coordinator": 5, "fundamentals": 3, "filings": 3}
+    assert end["totals"]["model_calls"] == 11 and end["totals"]["tool_calls"] == 7
 
     # Report claims keep the analysts' claim IDs: repeated unchanged stays v1, reworded becomes v2.
     margin_claim = next(e for e in events if e["kind"] == "analyst_end" and e["agent"] == "fundamentals")["claims"]
@@ -161,7 +161,8 @@ def test_a_failed_analyst_is_reported_and_a_follow_up_continues_its_conversation
         return calls(("submit_report", {"limitations": ["The market analyst could not fetch prices."]}))
 
     result, client, events = run(tmp_path, PLAN, calls(("ask_market", {"task": "Apple: three-year volatility."})),
-                                 ERROR, retry, calls(("submit_findings", {"gaps": ["Prices were not fetched."]})), report)
+                                 ERROR, retry, calls(("submit_findings", {"gaps": ["Prices were not fetched."]})), report,
+                                 resubmit)
     assert result.status == "finished" and "## Summary (abstained)" in result.markdown
     follow_up = client.requests[4]["messages"]  # plan, coordinator, market (fails), coordinator, market again
     assert follow_up[1]["content"].endswith("Your task from the coordinator:\nApple: three-year volatility.")

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import httpx
 import openai
-from fake_llm import FakeClient, reply
+from fake_llm import FakeClient, reply, resubmit
 from sec_files import make_context
 
 from research_assistant import cli, config
@@ -23,7 +23,7 @@ def configure(monkeypatch, tmp_path, client):
 
 def test_a_question_prints_the_report_and_where_the_trace_is(tmp_path, monkeypatch, capsys):
     client = FakeClient(reply("1. find_company"), reply(tool_calls=[("find_company", {"query": "AAPL"})]),
-                        reply(tool_calls=[("submit_report", REPORT)]))
+                        reply(tool_calls=[("submit_report", REPORT)]), resubmit)
     configure(monkeypatch, tmp_path, client)
     assert cli.main(["Who is Apple?", "--cutoff", "2026-11-01"]) == 0
     out, err = capsys.readouterr()
@@ -40,7 +40,7 @@ def test_condition_c_runs_the_team_and_says_who_did_each_step(tmp_path, monkeypa
 
     client = FakeClient(reply("1. ask_fundamentals"), reply(tool_calls=[("ask_fundamentals", {"task": "Who is Apple?"})]),
                         reply(tool_calls=[("find_company", {"query": "AAPL"})]), findings,
-                        reply(tool_calls=[("submit_report", REPORT)]))
+                        reply(tool_calls=[("submit_report", REPORT)]), resubmit)
     configure(monkeypatch, tmp_path, client)
     assert cli.main(["Who is Apple?", "--condition", "C"]) == 0
     out, err = capsys.readouterr()

@@ -3,7 +3,7 @@ from collections import Counter
 
 import pandas as pd
 import pytest
-from fake_llm import FakeClient, reply, tool_results
+from fake_llm import FakeClient, reply, resubmit, tool_results
 from sec_files import make_context
 
 from research_assistant import cli
@@ -33,7 +33,7 @@ def saved_run(tmp_path):
         return reply(tool_calls=[("submit_report", {"summary": [{"text": "Volatility was {calc:%s}." % calc}]})])
 
     prices = reply(tool_calls=[("get_prices", {"ticker": "AAPL"})])
-    client = FakeClient(reply("1. get_prices"), prices, prices, volatility, submit)
+    client = FakeClient(reply("1. get_prices"), prices, prices, volatility, submit, resubmit)
     return single_agent.run("How volatile is Apple?", client, SETTINGS, make_context(tmp_path),
                             trace_dir=tmp_path / "traces")
 

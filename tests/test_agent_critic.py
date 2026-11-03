@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 import pytest
-from fake_llm import FakeClient, reply, tool_results
+from fake_llm import FakeClient, reply, resubmit, tool_results
 from sec_files import make_context
 
 from research_assistant import cli
@@ -129,14 +129,14 @@ def critic_clean_after_the_fix(messages):
 
 def test_a_wrong_period_is_caught_routed_to_its_analyst_and_corrected_as_a_new_version(tmp_path):
     result, client, events = run_d(tmp_path, PLAN, calls(("ask_fundamentals", {"task": TASK})), financials,
-                                   wrong_finding, report, critic_objects, route, corrected_finding, revise,
+                                   wrong_finding, report, resubmit, critic_objects, route, corrected_finding, revise,
                                    critic_clean_after_the_fix)
     assert result.status == "finished" and not result.report.flags
     # The critic runs its own loop with read-only tools plus verify_against_filing.
-    assert {t["function"]["name"] for t in client.requests[5]["tools"]} == {*CRITIC.tools, "submit_objections"}
+    assert {t["function"]["name"] for t in client.requests[6]["tools"]} == {*CRITIC.tools, "submit_objections"}
     assert "verify_against_filing" in CRITIC.tools and "screen" not in CRITIC.tools
     # The follow-up continues the analyst's conversation.
-    assert client.requests[7]["messages"][1]["content"].endswith(f"Your task from the coordinator:\n{TASK}")
+    assert client.requests[8]["messages"][1]["content"].endswith(f"Your task from the coordinator:\n{TASK}")
 
     [o] = events[-1]["objections"]
     claim = result.report.sections["key_numbers"][0]
@@ -159,7 +159,7 @@ def test_a_wrong_period_is_caught_routed_to_its_analyst_and_corrected_as_a_new_v
 def test_a_clean_report_gets_no_objections_and_stays_unchanged(tmp_path, monkeypatch, capsys):
     configure(monkeypatch, tmp_path, FakeClient(PLAN, calls(("find_company", {"query": "AAPL"})), calls((
         "submit_report", {"summary": [{"text": "Apple Inc. files annual reports with the SEC.",
-                                       "citations": [COMPANY]}]})), CLEAN))
+                                       "citations": [COMPANY]}]})), resubmit, CLEAN))
     assert cli.main([QUESTION, "--condition", "D"]) == 0
     out, err = capsys.readouterr()
     assert "- Condition: D (analyst team + critic)" in out and "## Review" not in out
@@ -199,8 +199,8 @@ def test_outcomes_follow_the_ledger_and_what_is_open_at_the_guard_is_unresolved(
         tmp_path, PLAN, calls(("find_company", {"query": "AAPL"})), calls(("submit_report", {
             "summary": [{"text": "Apple Inc. files annual reports with the SEC.", "citations": [COMPANY]}],
             "bull_case": [{"text": "Apple is the strongest company in its sector.", "citations": [COMPANY]}]})),
-        critic_round_1, withdraw_and_defend, critic_round_2, critic_rounds=2)
-    assert result.status == "finished" and len(client.requests) == 6
+        resubmit, critic_round_1, withdraw_and_defend, critic_round_2, critic_rounds=2)
+    assert result.status == "finished" and len(client.requests) == 7
     withdrawn, defended, unknown, minor = events[-1]["objections"]
     summary = result.report.sections["summary"][0]
     assert withdrawn["outcome"] == "withdrawn" and withdrawn["closed_in"] == 1
@@ -257,7 +257,8 @@ def saved_run(tmp_path):
                              "kind": "fact", "materiality": "central"}]}))
 
     client = FakeClient(reply("1. get_financials"), calls(("get_financials", {"cik": "0000320193", "metrics":
-                                                                             ["revenue"], "years": 3})), submit)
+                                                                             ["revenue"], "years": 3})), submit,
+                        resubmit)
     return single_agent.run(QUESTION, client, SETTINGS, make_context(tmp_path), trace_dir=tmp_path / "traces")
 
 

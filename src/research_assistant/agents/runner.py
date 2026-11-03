@@ -18,6 +18,7 @@ from .checker import CheckedReport, check
 from .claims import ClaimLedger, report_claims
 from .draft import SECTIONS, Draft
 from .loop import Finish, LoopResult, run_loop, toolset
+from .objections import claims_view, evidence_view, issue_list
 from .report import render
 from .roles import Role
 from .trace import Trace
@@ -90,16 +91,18 @@ def _work(question, client, settings, context, lead, trace, ledger, extra_tools,
     result = work.resume(SUBMIT, max_steps=max_steps)
     steps, work.status, work.error, work.draft = result.steps, result.status, result.error, result.output
     work.report = check_draft(work.draft, context, trace, ledger, lead.name)
+    # REFERENCE §7: the first pass always runs and looks for the critic's issue types, not only checker flags, so
+    # B (and C) get the same kind of review D's critic gives; a further pass runs only while the checker still flags.
     for review in range(1, passes + 1):
-        if not (work.report and work.report.flags and work.status == "finished" and steps < max_steps):
+        if not (work.report and (review == 1 or work.report.flags) and work.status == "finished" and steps < max_steps):
             break
         trace.write("self_review", review=review, flags=len(work.report.flags))
-        messages.append({"role": "user", "content": _review_request(work.report, ledger)})
+        messages.append({"role": "user", "content": _review_request(work.report, ledger, context.records)})
         again = work.resume(SUBMIT, max_steps=max_steps - steps)
         steps += again.steps
         if again.output is None:
             work.notes.append(f"The self-review pass ended without a new report ({again.error or again.status}); "
-                              "the first draft is shown with its checker flags.")
+                              "the draft before it is shown" + (" with its checker flags." if work.report.flags else "."))
             break
         work.draft, work.status = again.output, again.status
         work.report = check_draft(work.draft, context, trace, ledger, lead.name)
@@ -127,7 +130,7 @@ def check_draft(draft: Draft | None, context, trace, ledger: ClaimLedger, author
     return report
 
 
-def _review_request(report: CheckedReport, ledger: ClaimLedger) -> str:
+def _review_request(report: CheckedReport, ledger: ClaimLedger, records: dict[str, dict]) -> str:
     claims = {f"{key}[{i}]": claim for key, items in report.sections.items() for i, claim in enumerate(items)}
     lines = []
     for flag in report.flags:
@@ -139,11 +142,15 @@ def _review_request(report: CheckedReport, ledger: ClaimLedger) -> str:
             line += (f" Its earlier version cited {', '.join(earlier)}; the claim ID in `id` doesn't cite them, so "
                      "put the ones that back this statement in its citations.")
         lines.append(line)
-    flags = "\n".join(lines)
-    return ("The checker found these problems in your report:\n" + flags + "\n\nFix them and call submit_report "
-            "again with the complete corrected report (every section). Put a revised statement's claim ID in its "
-            "`id`, so the change is recorded as a new version of that claim. You may call tools first, e.g. "
-            "calculate for a figure you typed. Remove any statement the evidence doesn't support.")
+    flags = ("\n\nThe checker also found these problems:\n" + "\n".join(lines)) if lines else ""
+    return ("Review your report before it is final. Check every statement against the evidence it cites for these "
+            f"problems, the ones a critic would look for:\n{issue_list()}{flags}\n\nYour report's claims (ID, version, "
+            f"where, kind, materiality), as they read with the numbers filled in:\n{claims_view(report)}\n\nThe "
+            f"evidence they cite:\n{evidence_view(report.sources, records)}\n\nFix what you find and call "
+            "submit_report again with the complete report (every section), unchanged if nothing needs fixing. Put a "
+            "revised statement's claim ID in its `id`, so the change is recorded as a new version of that claim. You "
+            "may call tools first, e.g. calculate for a figure you typed or get_financials for the right fiscal year. "
+            "Remove any statement the evidence doesn't support.")
 
 
 def close(trace, question, settings, context, ledger, work: Work, condition, team) -> AgentRun:
