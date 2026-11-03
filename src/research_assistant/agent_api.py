@@ -125,6 +125,16 @@ def cancel(run_id: str, request: Request):
     return runs(request).view(run_id)
 
 
+@router.get("/{run_id}/records/{record_id}")
+def record(run_id: str, record_id: str, request: Request):
+    """One cited record for the evidence panel, read from the run's frozen evidence (no data call)."""
+    runs(request).view(run_id)
+    found = saved.record(runs(request).path(run_id), record_id) if runs(request).path(run_id).is_file() else None
+    if found is None:
+        raise DomainError("This run holds no record with that ID.", "not_found", 404)
+    return found
+
+
 @router.get("/{run_id}/report")
 def report(run_id: str, request: Request):
     view = runs(request).view(run_id)

@@ -5,11 +5,14 @@ import os
 import re
 from pathlib import Path
 
+from .checker import PLACEHOLDER, lookup
 from .draft import SECTIONS
 from .evidence import load
+from .figures import figures
 from .objections import ISSUES
 from .progress import describe as progress_line
 from .report import RUN_STATUS, describe
+from .sources import GROUPS, chip, detail
 
 RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")  # the IDs Trace.new gives; any other file is not a run
 
@@ -32,7 +35,8 @@ def summary(path: Path) -> dict | None:
 
 
 def progress(path: Path) -> list[dict]:
-    """One line per step worth showing, the same lines the CLI prints."""
+    """One line per step worth showing, the same lines the CLI prints, with the role that took it (the CLI's
+    "[role] " prefix) and the event kind, so the page can group the lines by role."""
     lines = []
     for event in read_events(path):
         try:
@@ -40,7 +44,9 @@ def progress(path: Path) -> list[dict]:
         except (KeyError, TypeError):  # traces from before a field was added
             text = event.get("kind")
         if text:
-            lines.append({"seq": event.get("seq"), "at": event.get("at"), "text": text})
+            role = event.get("agent")
+            lines.append({"seq": event.get("seq"), "at": event.get("at"), "kind": event.get("kind"), "role": role,
+                          "text": text.removeprefix(f"[{role}] ") if role else text})
     return lines
 
 
@@ -71,8 +77,24 @@ def report(path: Path) -> dict | None:
             "error": end.get("error"), "sections": sections, "limitations": checked.get("limitations", []),
             "flags": [f"{flag['where']}: {flag['problem']}" for flag in checked.get("flags", [])],
             "objections": [_objection(o) for o in end.get("objections") or []],
-            "sources": [_source(n, i, run.records.get(i)) for i, n in number.items()],
+            "sources": [_source(n, i, run.records) for i, n in number.items()],
+            "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
             "markdown": end.get("markdown") or ""}
+
+
+def record(path: Path, record_id: str) -> dict | None:
+    """One frozen record as the evidence panel shows it, or None if the run holds no record with that ID."""
+    records = load(path).records
+    return detail(records[record_id], records) if record_id in records else None
+
+
+def _shown(end: dict, records: dict[str, dict]) -> list[str]:
+    """The records the key numbers were filled from, in order: the placeholders in the final draft. A claim also
+    cites the inputs behind its figure, so its citations would list more than it shows."""
+    if not end.get("draft"):  # traces saved before the draft was kept
+        return [i for c in end["report"]["sections"]["key_numbers"] for i in c["citations"]]
+    texts = [c if isinstance(c, str) else c.get("text", "") for c in end["draft"].get("key_numbers") or []]
+    return [r["id"] for text in texts for m in PLACEHOLDER.finditer(text) if (r := lookup(records, m[2], m[1]))]
 
 
 def _objection(o: dict) -> dict:
@@ -83,11 +105,14 @@ def _objection(o: dict) -> dict:
             "notes": o.get("notes") or []}
 
 
-def _source(n: int, record_id: str, record: dict | None) -> dict:
-    if record is None:  # traces saved before evidence was frozen hold no records
-        return {"n": n, "id": record_id, "text": f"`{record_id}`", "url": None}
+def _source(n: int, record_id: str, records: dict[str, dict]) -> dict:
+    """A numbered source with its chip label and the group it is listed under (facts, filing text, ...)."""
+    if (record := records.get(record_id)) is None:  # traces saved before evidence was frozen hold no records
+        return {"n": n, "id": record_id, "text": f"`{record_id}`", "url": None, "kind": None, "group": "Other",
+                "label": record_id}
     text, url = describe(record).removeprefix(f"`{record_id}` "), record.get("filing_url") or record.get("url")
-    return {"n": n, "id": record_id, "text": text.replace(url, "").strip() if url else text, "url": url}
+    return {"n": n, "id": record_id, "text": text.replace(url, "").strip() if url else text, "url": url,
+            "kind": record.get("kind"), "group": GROUPS.get(record.get("kind"), "Other"), "label": chip(record, records)}
 
 
 def _ends(path: Path) -> tuple[dict | None, dict | None]:

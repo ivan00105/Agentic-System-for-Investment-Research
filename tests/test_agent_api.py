@@ -54,8 +54,9 @@ def test_a_question_runs_in_the_background_and_its_report_reopens_from_history(w
     run = wait(web, run_id)
     assert run["status"] == "finished" and run["question"] == "Who is Apple?"
     assert run["condition"] == "B (single agent)" and run["totals"]["model_calls"] == 4
-    lines = [line["text"].removeprefix("[single_agent] ") for line in run["progress"]]
+    lines = [line["text"] for line in run["progress"]]
     assert lines[:3] == ["plan ready", "step 1: model asks for find_company", "step 1: find_company -> ok"]
+    assert {line["role"] for line in run["progress"]} == {"single_agent"} and run["progress"][0]["kind"] == "plan"
     assert "checker: 0 flags" in lines and (web.traces / f"{run_id}.jsonl").is_file()
 
     [saved] = web.get("/api/agent-runs").json()["items"]
@@ -67,6 +68,12 @@ def test_a_question_runs_in_the_background_and_its_report_reopens_from_history(w
     assert key_numbers["status"] == "abstained" and key_numbers["claims"] == []
     [source] = report["sources"]
     assert source["n"] == 1 and source["id"] == "company-0000320193" and source["text"].startswith("Apple Inc.")
+    assert (source["kind"], source["group"], source["label"]) == ("company", "Companies", "Apple Inc.")
+    assert report["figures"] == {"table": [], "charts": []}  # no figures cited, so nothing to chart
+
+    shown = web.get(f"/api/agent-runs/{run_id}/records/company-0000320193").json()  # the evidence panel
+    assert shown["title"] == "Apple Inc." and {"label": "Industry", "value": "Electronic Computers"} in shown["rows"]
+    assert web.get(f"/api/agent-runs/{run_id}/records/fact-unknown").status_code == 404
     assert report["status_label"] == "finished" and report["markdown"].startswith("# Who is Apple?")
 
 
@@ -99,7 +106,7 @@ def test_cancel_ends_the_run_as_a_partial_report_marked_stopped(web):
     assert cancelled.status_code == 200 and cancelled.json()["status"] == "stopping"
     release.set()
     run = wait(web, run_id)
-    assert run["status"] == "stopped" and run["progress"][-1]["text"] == "[single_agent] cancelled"
+    assert run["status"] == "stopped" and run["progress"][-1]["text"] == "cancelled"
     report = web.get(f"/api/agent-runs/{run_id}/report").json()
     assert report["status_label"] == "stopped: the run was cancelled, so this report is partial"
     assert report["error"] is None and {s["status"] for s in report["sections"]} == {"abstained"}
@@ -144,6 +151,6 @@ def test_saved_traces_reopen_even_when_unfinished_or_markdown_only(web):
     assert objection["notes"] == ["Minor, so not sent back to the team."]
     assert web.get("/api/agent-runs/20261103-120000-bbbbbb/report").status_code == 409
     assert web.get("/api/agent-runs/20261103-120000-bbbbbb").json()["progress"] == [
-        {"seq": None, "at": None, "text": "plan ready"}]
+        {"seq": None, "at": None, "kind": "plan", "role": None, "text": "plan ready"}]
     assert web.get("/api/agent-runs/notes").status_code == 404
     assert web.get("/api/agent-runs/..%2Fresearch").status_code == 404
