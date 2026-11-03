@@ -78,3 +78,17 @@ def test_number_formats_scale_and_sign():
     assert ixbrl._number(nodes["b"]) == Decimal(-7)
     assert ixbrl._number(nodes["c"]) == Decimal(0)
     assert ixbrl._number(nodes["d"]) is None
+
+
+def test_a_value_in_another_currency_is_not_a_match(apple):
+    context, ids, _ = apple
+    context.remember({**context.records[ids["2025-09-27", "revenue"]], "id": "fact-cny", "unit": "CNY"})
+    result = verify(context, "fact-cny")
+    assert result.data["verdict"] == "not_in_filing" and any("USD" in w for w in result.warnings)
+
+
+def test_an_unreadable_number_is_unverified_not_a_mismatch(apple, monkeypatch):
+    context, ids, _ = apple
+    monkeypatch.setattr(ixbrl, "_number", lambda node: None)
+    result = verify(context, ids["2025-09-27", "revenue"])
+    assert result.data["verdict"] == "unverified" and "could not be read" in result.warnings[0]

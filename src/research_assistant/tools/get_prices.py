@@ -4,7 +4,8 @@ from datetime import date, timedelta
 from pydantic import BaseModel, Field
 
 from .. import config
-from ..data import prices
+from ..data import companies, prices
+from ..data.errors import DataError
 from .result import Tool, ToolContext, ToolResult, make_id
 
 
@@ -31,12 +32,19 @@ def run(args: GetPricesInput, context: ToolContext) -> ToolResult:
     preferred = (context.price_providers or prices.provider_order())[:1]
     label = source if [source] == preferred else f"{source} (fallback)"
     ticker = prices.normalize_ticker(args.ticker)
+    # Which company this is, so calculate never mixes one company's price with another's share count.
+    # ETFs such as SPY are not SEC operating companies and stay None.
+    try:
+        cik = next((c.cik for c in companies.listed_companies(context.sec).values() if ticker in c.tickers), None)
+    except DataError as exc:
+        cik = None
+        warnings.append(f"Could not look up which company {ticker} is ({exc}); calculate can't check it.")
     record = {"id": make_id("prices", source, ticker, rows[0]["date"], rows[-1]["date"], len(rows)), "kind": "prices",
-              "ticker": ticker, "source": source, "start": rows[0]["date"], "end": rows[-1]["date"], "rows": rows}
+              "ticker": ticker, "cik": cik, "source": source, "start": rows[0]["date"], "end": rows[-1]["date"], "rows": rows}
     context.remember(record)
     last = rows[-1]
     splits = [{"date": r["date"], "ratio": r["split"]} for r in rows if r.get("split") not in (None, 0, 1)]
-    data = {"id": record["id"], "ticker": ticker, "source": source, "start": record["start"], "end": record["end"],
+    data = {"id": record["id"], "ticker": ticker, "cik": cik, "source": source, "start": record["start"], "end": record["end"],
             "trading_days": len(rows), "last": {"date": last["date"], "close": last["close"], "adj_close": last["adj_close"]},
             "first": {"date": rows[0]["date"], "close": rows[0]["close"], "adj_close": rows[0]["adj_close"]},
             "splits": splits, "dividends": sum(1 for r in rows if r.get("dividend")),

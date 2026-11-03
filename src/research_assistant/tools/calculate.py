@@ -87,6 +87,38 @@ def _closes(series: dict, field: str = "adj_close") -> dict[str, float]:
             if isinstance(row.get(field), (int, float)) and math.isfinite(row[field])}
 
 
+def _company(formula: str, r: dict[str, dict]) -> tuple[str | None, list[str]]:
+    """The one company every input describes. A beta's benchmark is the only input allowed to differ."""
+    ciks = {r[role].get("cik") for role in ROLES[formula] if not (formula == "beta" and role == "benchmark")}
+    known = sorted(ciks - {None})
+    if len(known) > 1:
+        raise Rejected(f"The inputs belong to different companies (CIK {', '.join(known)}); calculate each company "
+                       "separately and compare the results.")
+    notes = ["Not every input could be tied to a company (e.g. an unmatched ticker); check they describe the same one."
+             if known and None in ciks else None]
+    return (known[0] if known else None), [n for n in notes if n]
+
+
+def _split_factor(series: dict, shares_day: date, price_day: date) -> tuple[Decimal, list[str]]:
+    """Splits between the share count and the price, so both are on one share basis (2-for-1: shares x 2)."""
+    if price_day < shares_day:
+        return Decimal(1), [f"The share count ({shares_day}) is later than the price ({price_day}); splits between "
+                            "them could not be checked."]
+    notes = []
+    first = min(date.fromisoformat(row["date"]) for row in series["rows"])
+    if first > shares_day:
+        notes.append(f"The price series starts on {first}, after the share count; splits in between could not be checked.")
+    splits = [(row["date"], Decimal(str(row["split"]))) for row in series["rows"]
+              if row.get("split") not in (None, 0, 1) and shares_day < date.fromisoformat(row["date"]) <= price_day]
+    factor = Decimal(1)
+    for _, ratio in splits:
+        factor *= ratio
+    if splits:
+        notes.append(f"Share count multiplied by {factor} for the split(s) on {', '.join(d for d, _ in splits)}, after "
+                     "the share-count date, to match the as-traded price.")
+    return factor, notes
+
+
 def _compute(formula: str, r: dict[str, dict]):
     """Returns (outcome, start, end, notes)."""
     notes: list[str] = []
@@ -113,7 +145,9 @@ def _compute(formula: str, r: dict[str, dict]):
         notes.append(f"As-traded close on {last} x shares outstanding on {shares_end}.")
         if abs((date.fromisoformat(last) - shares_end).days) > 120:
             notes.append("The price and share count are more than 120 days apart.")
-        outcome = fundamentals.market_cap(Decimal(str(raw[last])), _number(r["shares"]))
+        factor, split_notes = _split_factor(r["prices"], shares_end, date.fromisoformat(last))
+        notes += split_notes
+        outcome = fundamentals.market_cap(Decimal(str(raw[last])), _number(r["shares"]) * factor)
         return outcome, None, date.fromisoformat(last), notes
     if formula in ("ratio", "fcf", "pe", "ps", "pb", "fcf_yield"):
         a, b = (r[role] for role in ROLES[formula])
@@ -167,12 +201,14 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
         return ToolResult(status="invalid", source="calculate", warnings=problems)
     records = {role: context.records[args.inputs[role]] for role in roles}
     try:
+        cik, company_notes = _company(args.formula, records)
         outcome, start, end, notes = _compute(args.formula, records)
     except Rejected as exc:
         return ToolResult(status="invalid", source="calculate", warnings=[str(exc)])
+    notes += company_notes
     unit = UNITS[args.formula]
     record = {"id": make_id("calc", args.formula, *(f"{role}={args.inputs[role]}" for role in roles)), "kind": "calc",
-              "formula": args.formula, "inputs": {role: args.inputs[role] for role in roles},
+              "cik": cik, "formula": args.formula, "inputs": {role: args.inputs[role] for role in roles},
               "value": _rounded(outcome.value, unit), "unit": unit,
               "start": start.isoformat() if isinstance(start, date) else start,
               "end": end.isoformat() if isinstance(end, date) else end,

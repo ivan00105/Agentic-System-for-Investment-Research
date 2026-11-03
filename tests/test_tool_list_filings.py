@@ -29,7 +29,7 @@ def test_newest_first_and_recent_block_only_when_enough(tmp_path):
     filed = [f["filed"] for f in result.data["filings"]]
     assert filed == sorted(filed, reverse=True) and len(filed) == 3
     assert OLDER_PAGE not in files.paths
-    assert any("before=" in w for w in result.warnings)
+    assert result.data["next_page"] and any("page=" in w for w in result.warnings)
 
 
 def test_old_filings_come_from_the_older_pages(tmp_path):
@@ -49,3 +49,23 @@ def test_acceptance_time_enforces_the_cutoff_to_the_second(tmp_path):
     before = datetime(2026, 7, 30, 20, 30, 27, tzinfo=timezone.utc)
     result, _ = listed(tmp_path, cutoff=before, forms=["8-K"], limit=1)
     assert result.data["filings"][0]["filed"] < "2026-07-30"
+
+
+def test_paging_never_skips_filings_from_the_same_day(tmp_path):
+    # Codex review: with before=<date>, the other filings of the boundary day were skipped.
+    import json
+
+    import httpx
+    from sec_files import FIXTURES
+
+    payload = json.loads((FIXTURES / "submissions_AAPL.json").read_text())
+    recent = payload["filings"]["recent"]
+    newest = max(range(len(recent["filingDate"])), key=lambda i: recent["filingDate"][i])
+    twin = next(i for i in range(len(recent["filingDate"])) if i != newest)
+    recent["filingDate"][twin] = recent["filingDate"][newest]
+    recent["acceptanceDateTime"][twin] = recent["acceptanceDateTime"][newest]
+    files = SecFiles({"/submissions/CIK0000320193.json": httpx.Response(200, json=payload)})
+    first, _ = listed(tmp_path, files=files, limit=1)
+    second, _ = listed(tmp_path, files=files, limit=1, page=first.data["next_page"])
+    shown = {first.data["filings"][0]["accession"], second.data["filings"][0]["accession"]}
+    assert shown == {recent["accessionNumber"][newest], recent["accessionNumber"][twin]}

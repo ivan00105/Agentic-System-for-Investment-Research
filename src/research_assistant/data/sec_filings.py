@@ -88,15 +88,18 @@ def pages(sec: SecClient, cik: int | str, since: date | None = None) -> Iterator
 
 
 def search(sec: SecClient, cik: int | str, cutoff: datetime, *, forms: set[str] | None = None, since: date | None = None,
-           before: date | None = None, limit: int | None = None) -> list[Filing]:
-    """Filings public at the cutoff, newest first; stops reading pages once `limit` are found or `since` is passed."""
+           after: tuple[date, str] | None = None, limit: int | None = None) -> list[Filing]:
+    """Filings public at the cutoff, newest first; stops reading pages once `limit` are found or `since` is passed.
+
+    `after` is the (filing date, accession) of the last filing already shown: paging continues right after it,
+    so other filings from that same day are never skipped."""
     found: list[Filing] = []
     for page in pages(sec, cik, since):
         for filing in sorted(page, key=lambda f: (f.filed, f.accession), reverse=True):
             if since and filing.filed < since:
                 return found
             if (filing.public_by(cutoff) and (not forms or filing.form in forms)
-                    and (not before or filing.filed < before)):
+                    and (not after or (filing.filed, filing.accession) < after)):
                 found.append(filing)
                 if limit is not None and len(found) >= limit:
                     return found

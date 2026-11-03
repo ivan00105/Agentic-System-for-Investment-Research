@@ -127,3 +127,60 @@ def test_not_meaningful_result_is_recorded_with_its_reason(apple):
     cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
     pe = calc(context, "pe", market_cap=cap.ids[0], net_income="fact-loss")
     assert pe.status == "unsupported" and pe.data["value"] is None and "zero or negative" in pe.data["reason"]
+
+
+def add_bank(context):
+    result = get_financials(GetFinancialsInput(cik="19617", years=2, metrics=["revenue", "net_income"]), context)
+    return {(v["end"], metric): v["id"] for metric, m in result.data["metrics"].items() for v in m["values"]}
+
+
+def test_growth_across_two_companies_is_rejected(apple):
+    # Codex review: Apple FY2025 revenue "grew" 134% over JPMorgan FY2024 revenue and came back ok.
+    context, ids = apple
+    bank = add_bank(context)
+    result = calc(context, "growth", current=ids["2025-09-27", "revenue"], previous=bank["2024-12-31", "revenue"])
+    assert result.status == "invalid" and "different companies" in result.warnings[0]
+
+
+def test_results_carry_their_company_so_chains_stay_checked(apple):
+    context, ids = apple
+    bank = add_bank(context)
+    margin = calc(context, "ratio", numerator=ids["2025-09-27", "net_income"], denominator=ids["2025-09-27", "revenue"])
+    assert margin.data["cik"] == "0000320193"
+    bank_margin = calc(context, "ratio", numerator=bank["2025-12-31", "net_income"], denominator=bank["2025-12-31", "revenue"])
+    mixed = calc(context, "change_pp", current=bank_margin.ids[0], previous=margin.ids[0])
+    assert mixed.status == "invalid" and "different companies" in mixed.warnings[0]
+
+
+def test_market_cap_rejects_another_companys_prices(apple):
+    context, ids = apple
+    context.remember({"id": "prices-jpm", "kind": "prices", "source": "yfinance", "ticker": "JPM", "cik": "0000019617",
+                      "rows": [{"date": "2026-10-30", "close": 300.0, "adj_close": 300.0}]})
+    result = calc(context, "market_cap", prices="prices-jpm", shares=ids["2026-07-17", "shares_outstanding"])
+    assert result.status == "invalid" and "different companies" in result.warnings[0]
+
+
+def test_beta_against_a_benchmark_is_not_a_company_mix(apple):
+    context, _ = apple
+    rows = [{"date": f"2026-01-0{d}", "close": c, "adj_close": c} for d, c in enumerate([100.0, 102.0, 99.0, 101.0], 1)]
+    context.remember({"id": "prices-aapl", "kind": "prices", "source": "yfinance", "cik": "0000320193", "rows": rows})
+    context.remember({"id": "prices-spy", "kind": "prices", "source": "yfinance", "cik": None, "rows": rows})
+    assert calc(context, "beta", prices="prices-aapl", benchmark="prices-spy").status == "ok"
+
+
+def test_market_cap_scales_shares_for_a_split_after_the_count(apple):
+    # Codex review: 10 shares at $100, then a 2-for-1 split, is 20 shares at $50, still $1,000 - not $500.
+    context, ids = apple
+    series = prices(context, "prices-split", [{"date": "2026-07-10", "close": 200.0, "adj_close": 100.0, "split": 1.0},
+                                              {"date": "2026-08-03", "close": 101.0, "adj_close": 101.0, "split": 2.0},
+                                              {"date": "2026-10-30", "close": 105.0, "adj_close": 105.0, "split": 1.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    assert cap.data["value"] == str(105 * 14594180000 * 2)
+    assert any("split" in note and "2026-08-03" in note for note in cap.data["notes"])
+
+
+def test_market_cap_says_when_splits_could_not_be_checked(apple):
+    context, ids = apple
+    series = prices(context, "prices-short", [{"date": "2026-10-30", "close": 105.0, "adj_close": 105.0, "split": 1.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    assert cap.status == "ok" and any("could not be checked" in note for note in cap.data["notes"])

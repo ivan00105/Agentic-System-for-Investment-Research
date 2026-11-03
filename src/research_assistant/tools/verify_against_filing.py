@@ -28,11 +28,14 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
     if not found:
         return ToolResult(status="unsupported", source=source, warnings=[
             "The filing has no inline XBRL (SEC required it from 2019), so it can't be checked this way."])
-    same = [f for f in found if f["concept"] == fact["tag"] and f["end"] == fact["end"]
-            and (f["start"] or None) == fact["start"]]
-    matches = [f for f in same if f["value"] is not None and Decimal(f["value"]) == Decimal(fact["value"])]
-    verdict = "match" if matches else "mismatch" if same else "not_in_filing"
-    shown = (matches or same)[:5]
+    tagged = [f for f in found if f["concept"] == fact["tag"] and f["end"] == fact["end"]
+              and (f["start"] or None) == fact["start"]]
+    same = [f for f in tagged if f["unit"] == fact["unit"]]  # USD only ever checks against USD
+    readable = [f for f in same if f["value"] is not None]
+    matches = [f for f in readable if Decimal(f["value"]) == Decimal(fact["value"])]
+    # A number we can't read is "unverified", never a mismatch.
+    verdict = "match" if matches else "mismatch" if readable else "unverified" if same else "not_in_filing"
+    shown = (matches or readable or same or tagged)[:5]
     record = {"id": make_id("check", args.fact_id, filing.accession), "kind": "check", "fact_id": args.fact_id,
               "verdict": verdict, "expected": fact["value"], "concept": fact["tag"], "period_end": fact["end"],
               "filing_url": filing.url, "found": shown}
@@ -41,6 +44,13 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
     if verdict == "mismatch":
         warnings.append(f"The filing tags {fact['tag']} for this period as {', '.join(f['raw'] for f in shown)}, "
                         f"not {fact['value']}.")
+    elif verdict == "unverified":
+        warnings.append(f"The filing tags {fact['tag']} for this period, but its number "
+                        f"({', '.join(repr(f['raw']) + ' format ' + (f['format'] or 'none') for f in shown)}) could not "
+                        "be read, so it was not checked.")
+    elif tagged:
+        units = sorted({f["unit"] or "an unreadable unit" for f in tagged})
+        warnings.append(f"{fact['tag']} for this period is tagged only in {', '.join(units)}, not {fact['unit']}.")
     elif verdict == "not_in_filing":
         warnings.append(f"{fact['tag']} for this period is not tagged in {filing.accession}; companyfacts may come "
                         "from a different filing or a dimensioned (segment) fact.")

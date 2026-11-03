@@ -42,9 +42,25 @@ def _number(node) -> Decimal | None:
     return -value if node.attrs.get("sign") == "-" else value
 
 
+def _unit(node) -> str | None:
+    """A unit in companyfacts' spelling: "USD", "CNY", "shares" or "USD/shares"; None if it can't be read."""
+    if node is None:
+        return None
+
+    def measures(part):
+        return [n.text().split(":")[-1] for n in part.nodes() if _local(n.tag) == "measure"]
+    divide = next((n for n in node.nodes() if _local(n.tag) == "divide"), None)
+    if divide is None:
+        found = measures(node)
+        return found[0] if len(found) == 1 else None
+    parts = {_local(n.tag): measures(n) for n in divide.nodes() if _local(n.tag) in ("unitnumerator", "unitdenominator")}
+    top, bottom = parts.get("unitnumerator", []), parts.get("unitdenominator", [])
+    return f"{top[0]}/{bottom[0]}" if len(top) == 1 and len(bottom) == 1 else None
+
+
 def facts(sec: SecClient, filing: Filing, cache: DiskCache) -> list[dict]:
     """Every whole-company numeric fact in the filing's primary document; cached, since filings never change."""
-    key = f"ixbrl|{filing.url}"
+    key = f"ixbrl|v2|{filing.url}"  # v2: facts carry the unit's measure
     cached = cache.get(key, None)
     if cached is not None:
         return json.loads(cached[0])
@@ -66,7 +82,8 @@ def facts(sec: SecClient, filing: Filing, cache: DiskCache) -> list[dict]:
         _, start, end = doc.fragment(node)
         row = node.ancestor("tr")
         found.append({"concept": node.attrs["name"], "value": None if value is None else format(value, "f"),
-                      "raw": node.text(), "format": node.attrs.get("format", ""), "unit": node.attrs.get("unitref"),
+                      "raw": node.text(), "format": node.attrs.get("format", ""),
+                      "unit": _unit(by_id.get(node.attrs.get("unitref"))),
                       "start": fields.get("startdate"), "end": fields.get("enddate") or fields.get("instant"),
                       "hidden": node.ancestor("ix:hidden") is not None, "row": row.text() if row else None,
                       "locator": f"#{node.attrs.get('id', '')} bytes [{start},{end})"})

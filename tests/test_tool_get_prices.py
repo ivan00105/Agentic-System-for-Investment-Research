@@ -53,3 +53,10 @@ def test_end_after_the_cutoff_is_moved_back(tmp_path):
 def test_start_after_end_is_invalid(tmp_path):
     result, _ = get(tmp_path, ticker="AAPL", start=date(2026, 3, 4), end=date(2026, 3, 2))
     assert result.status == "invalid"
+
+
+def test_series_records_which_company_the_ticker_is(tmp_path):
+    result, context = get(tmp_path, ticker="aapl", start=date(2026, 3, 1))
+    assert context.records[result.ids[0]]["cik"] == "0000320193"
+    spy, context = get(tmp_path, ticker="SPY", start=date(2026, 3, 1))
+    assert spy.status == "ok" and context.records[spy.ids[0]]["cik"] is None
