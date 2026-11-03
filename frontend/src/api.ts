@@ -71,3 +71,23 @@ export const metricValue = (metric: Metric) => metric.value === null ? 'Unavaila
 export const stamp = (value: string) => new Intl.DateTimeFormat('en-GB', {dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC'}).format(new Date(value)) + ' UTC'
 
 export const investigationLabel = (request: RunRequest) => request.connection_check === 'sec' ? 'SEC connection check' : request.connection_check === 'model' ? 'Model connection check' : modeLabel[request.mode]
+
+// Agent runs (conditions B, C, D), saved as trace files and served by /api/agent-runs.
+export type Condition = 'B' | 'C' | 'D'
+export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
+export interface AgentRunSummary { run_id: string; status: string; question?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
+export interface AgentProgress extends AgentRunSummary { progress: {seq: number | null; at: string | null; text: string}[] }
+export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
+export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
+export interface AgentObjection { claim: string; version: number; issue: string; material: boolean; problem: string; outcome: string; explanation: string | null }
+export interface AgentSource { n: number; id: string; text: string; url: string | null }
+export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; markdown: string }
+const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+export const agentApi = {
+  start: (question: string, condition: Condition) => request<AgentRunSummary>('/agent-runs', post({question, condition})),
+  list: () => request<{items: AgentRunSummary[]}>('/agent-runs'),
+  get: (id: string) => request<AgentProgress>(`/agent-runs/${encodeURIComponent(id)}`),
+  cancel: (id: string) => request<AgentRunSummary>(`/agent-runs/${encodeURIComponent(id)}/cancel`, post({})),
+  report: (id: string) => request<AgentReport>(`/agent-runs/${encodeURIComponent(id)}/report`),
+}
+export const agentRunning = (status: string) => status === 'running' || status === 'stopping'

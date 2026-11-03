@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { AgentHistory, AgentQuestion, AgentRunView } from './AgentRun'
 import { active, api, ApiError, metricValue, modeLabel, investigationLabel, percentage, progressLabel, stamp } from './api'
 import type { Candidate, CompanyReport, Config, ConnectionInfo, Evidence, HistoryItem, Mode, Run, RunRequest, View } from './api'
 
 function route() {
   const params = new URLSearchParams(location.search)
   const view = params.get('view')
-  return {view: (view === 'discovery' || view === 'history' || view === 'connections' ? view : 'research') as View, id: view === 'connections' ? null : params.get('run') ?? (location.search ? null : 'example-msft'), ticker: params.get('company')}
+  return {view: (view === 'discovery' || view === 'history' || view === 'connections' ? view : 'research') as View, id: view === 'connections' ? null : params.get('run') ?? (location.search ? null : 'example-msft'), ticker: params.get('company'), agent: view === 'research' ? params.get('agent') : null}
 }
 function Badge({children, tone = ''}: {children: React.ReactNode; tone?: string}) {
   return <span className={`badge ${tone}`}>{children}</span>
@@ -319,12 +320,16 @@ export default function App() {
   const [attempt, setAttempt] = useState(0)
   const [evidenceId, setEvidenceId] = useState<string | null>(null)
   const evidenceTrigger = useRef<HTMLElement | null>(null)
-  const {view, id, ticker} = locationState
+  const {view, id, ticker, agent} = locationState
   function navigate(nextView: View, nextId: string | null = null, company: string | null = null) {
     const params = new URLSearchParams({view: nextView})
     if (nextId) params.set('run', nextId)
     if (company) params.set('company', company)
     history.pushState({}, '', `?${params}`)
+    setLocationState(route()); setEvidenceId(null)
+  }
+  function openAgent(runId: string) {
+    history.pushState({}, '', `?view=research&agent=${encodeURIComponent(runId)}`)
     setLocationState(route()); setEvidenceId(null)
   }
   useEffect(() => {const onPop = () => {setLocationState(route()); setEvidenceId(null)}; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop)}, [])
@@ -352,7 +357,9 @@ export default function App() {
     <div className="workspace"><header className="topbar"><span>WORKSPACE <span className="separator">/</span> {view.toUpperCase()}</span><span className="local-status">SOURCES · FIGURES · REVIEW</span></header><main id="main">
       <div className="page-heading"><div><div className="eyebrow">EVIDENCE-GROUNDED RESEARCH</div><h1>{view === 'research' ? 'Read beyond the claim.' : view === 'discovery' ? ticker ? 'Inside the candidate.' : 'A smaller, clearer shortlist.' : view === 'connections' ? 'Connections' : 'Return to the evidence.'}</h1><p>{view === 'research' ? 'Investigate a company, inspect its sources, and follow what changed.' : view === 'discovery' ? 'Screen the declared universe. Keep exclusions and missing evidence visible.' : view === 'connections' ? 'See what is configured and what has actually been tried.' : 'Original inputs. Saved evidence. A review trail you can reopen.'}</p></div><span className="edition">FIELDNOTES / 01</span></div>
       {view !== 'connections' && configError && <ErrorBox message={configError} retry={() => setAttempt(a => a + 1)} />}
-      {view === 'connections' ? <Connections onOpen={(runId, kind) => navigate(kind, runId)} /> : view === 'history' ? <History onOpen={(runId, kind) => navigate(kind, runId)} /> : <>
+      {view === 'connections' ? <Connections onOpen={(runId, kind) => navigate(kind, runId)} /> : view === 'history' ? <><AgentHistory onOpen={openAgent} /><History onOpen={(runId, kind) => navigate(kind, runId)} /></> : <>
+        {view === 'research' && <AgentQuestion onStarted={openAgent} />}
+        {agent ? <AgentRunView id={agent} /> : <>
         {config && <RequestForm key={view} view={view} config={config} current={run} onOpen={(runId, kind) => navigate(kind, runId)} />}
         {error && <ErrorBox message={error} retry={() => setAttempt(a => a + 1)} />}
         {loading && <div className="notice" role="status">Loading the saved investigation…</div>}
@@ -367,6 +374,7 @@ export default function App() {
           {run.report && (showDiscovery ? <Discovery run={run} onCompany={selected => navigate('discovery', run.id, selected)} /> : company ? <>{ticker && <button className="text-button back-button" onClick={() => navigate('discovery', run.id)}>← Back to screening results</button>}<div className="report-layout"><div className="report-body"><ResearchReport company={company} ongoing={active(run)} onEvidence={showEvidence} /></div><EvidencePanel runId={run.id} evidenceId={evidenceId} onClose={() => {setEvidenceId(null); evidenceTrigger.current?.focus()}} /></div></> : <div className="notice">No company results are available yet. Check the research status and activity log.</div>)}
           {run.report && (run.report.model_run || !!run.report.model_calls?.length) && <details className="technical-details model-usage"><summary>Model usage</summary>{run.report.model_run && <p>Provider: {run.report.model_run.provider} · Model: {run.report.model_run.model ?? 'Not recorded'} · Schema: {run.report.model_run.schema_version} · Output-token limit: {run.report.model_run.max_output_tokens ?? 'Provider/model default (no app cap)'}</p>}{run.report.model_calls?.map((call, index) => <div key={index}><h3>{call.role} · {call.status === 'running' ? 'Running' : call.status}</h3><dl className="source-meta"><dt>Provider / requested model</dt><dd>{call.provider} / {call.requested_model}</dd><dt>Returned model</dt><dd>{call.returned_model ?? 'Unknown'}</dd><dt>Response ID</dt><dd>{call.response_id ?? 'Unknown'}</dd><dt>Input / output / total tokens</dt><dd>{call.input_tokens ?? 'Unknown'} / {call.output_tokens ?? 'Unknown'} / {call.total_tokens ?? 'Unknown'}</dd>{call.reasoning_tokens != null && <><dt>Reasoning tokens (included in output)</dt><dd>{call.reasoning_tokens}</dd></>}{call.provider_status && <><dt>Provider response status</dt><dd>{call.provider_status}</dd></>}{call.incomplete_reason && <><dt>Response stop reason</dt><dd>{call.incomplete_reason === 'max_output_tokens' ? 'Output-token limit reached' : call.incomplete_reason === 'content_filter' ? 'Content filtered by provider' : 'Other provider reason'}</dd></>}<dt>Reported cost (USD)</dt><dd>{call.cost_usd == null ? 'Unknown' : call.cost_usd}</dd>{call.error_code && <><dt>Error code</dt><dd>{call.error_code}</dd></>}{call.error_message && <><dt>Failure reason</dt><dd>{call.error_message}</dd></>}</dl></div>)}<p>Usage and cost reflect what the provider returned. Unknown cost does not mean zero.</p></details>}
           <details className="activity"><summary>Activity log <span>{run.actions.length} recorded actions</span></summary><ol>{run.actions.map(a => <li key={a.sequence}><time>{stamp(a.at)}</time><strong>{a.role}</strong><span>{a.message}</span></li>)}</ol><p>Latest detail: {run.stage}</p><p className="mono">Run ID: {run.id}</p></details>
+        </>}
         </>}
       </>}
       <footer className="page-footer"><span>FIELDNOTE</span><p>Research support, with provenance and limitations kept visible.</p></footer>
