@@ -1,11 +1,13 @@
 import json
+import re
 
 import httpx
 import openai
-from fake_llm import FakeClient, reply, tool_results
+from fake_llm import FakeClient, reply, resubmit, tool_results
 from sec_files import make_context
 
 from research_assistant.agents import single_agent
+from research_assistant.agents.objections import ISSUES
 from research_assistant.model_access import ModelSettings
 
 SETTINGS = ModelSettings("openrouter", "OpenRouter", "fake-model", "key", "https://openrouter.ai/api/v1")
@@ -33,7 +35,7 @@ def calculate_margin(messages):
     return reply(tool_calls=[("calculate", {"formula": "ratio", "inputs": inputs})])
 
 
-def submit(stray: bool):
+def submit(stray: bool, bull_id: str | None = None):
     def step(messages):
         margin = next(r for r in reversed(tool_results(messages)) if r["source"] == "calculate")["ids"][0]
         revenue = latest(messages, "revenue")
@@ -41,7 +43,7 @@ def submit(stray: bool):
         draft = {"summary": [{"text": "Apple's operating margin was {calc:%s} in the fiscal year ended 2025-09-27."
                               % margin, "kind": "calculation"}],
                  "key_numbers": [{"text": "Revenue was {fact:%s}." % revenue, "kind": "fact"}],
-                 "bull_case": [{"text": upside, "citations": [margin], "kind": "interpretation"}],
+                 "bull_case": [{"text": upside, "citations": [margin], "kind": "interpretation", "id": bull_id}],
                  "limitations": ["No statistical outlook model is available yet."]}
         return reply(tool_calls=[("submit_report", draft)])
     return step
@@ -57,11 +59,17 @@ def run(tmp_path, *script, **options):
 
 def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     def fix(messages):
-        assert "bull_case[0]: '30%' is typed" in messages[-1]["content"]
-        return submit(stray=False)(messages)
+        flagged = re.search(r"bull_case\[0\] \((claim-\w+)\): '30%' is typed", messages[-1]["content"])
+        return submit(stray=False, bull_id=flagged[1])(messages)
 
     result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=True), fix)
     assert result.status == "finished" and result.error is None and not result.report.flags
+    # The fixed claim is version 2 of the same claim; the untouched summary stays version 1.
+    first_bull = events[[e["kind"] for e in events].index("check")]["claims"]["new"][2]
+    bull, summary = result.report.sections["bull_case"][0], result.report.sections["summary"][0]
+    assert first_bull == f"{bull.id} v1" and bull.version == 2 and summary.version == 1
+    assert events[-1]["claims"][bull.id][0]["text"] == "Margins above 30% leave room."
+    assert [e["claims"]["revised"] for e in events if e["kind"] == "check"] == [[], [f"{bull.id} v2"]]
     assert result.plan.startswith("1. find_company") and "- Model: fake-model (served by Baidu)" in result.markdown
     assert "- Apple's operating margin was 32.0% in the fiscal year ended 2025-09-27. [1]" in result.markdown
     assert "- Revenue was $416.2 billion. [2]" in result.markdown
@@ -82,10 +90,28 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert result.totals == events[-1]["totals"] and events[-1]["markdown"] == result.markdown
 
 
-def test_a_clean_draft_skips_the_self_review(tmp_path):
-    result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=False))
-    assert result.status == "finished" and len(client.requests) == 5
-    assert "self_review" not in [e["kind"] for e in events]
+def test_a_clean_draft_still_gets_one_self_review_for_the_critics_issue_types(tmp_path):
+    # REFERENCE §7: B's self-review looks for the same issue types as D's critic, not only checker flags.
+    result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=False),
+                                 resubmit)
+    assert result.status == "finished" and len(client.requests) == 6 and not result.report.flags
+    request = client.requests[5]["messages"][-1]["content"]
+    assert request.startswith("Review your report before it is final.") and "checker also found" not in request
+    assert all(f"- `{issue}`: " in request for issue in ISSUES)
+    summary = result.report.sections["summary"][0]
+    assert (f"- {summary.id} v1 [summary[0], calculation, supporting]: Apple's operating margin was 32.0% in the "
+            "fiscal year ended 2025-09-27.") in request
+    assert "revenue = $416.2 billion, 2024-09-29 to 2025-09-27" in request  # the fact behind the margin calc
+    assert [e["kind"] for e in events].count("self_review") == 1
+    assert [e["claims"]["unchanged"] for e in events if e["kind"] == "check"][1] == [
+        c.id for key in ("summary", "key_numbers", "bull_case") for c in result.report.sections[key]]
+    assert all(len(versions) == 1 for versions in events[-1]["claims"].values())
+
+
+def test_a_second_pass_runs_only_while_the_checker_still_flags(tmp_path):
+    result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=False),
+                                 resubmit, self_review_passes=2)
+    assert len(client.requests) == 6 and [e["kind"] for e in events].count("self_review") == 1
 
 
 def test_a_failed_self_review_keeps_the_first_draft_with_its_flags(tmp_path):

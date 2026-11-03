@@ -21,6 +21,13 @@ def reply(content: str | None = None, tool_calls=(), usage=(10, 5), extra: dict 
         "usage": {"prompt_tokens": usage[0], "completion_tokens": usage[1], "total_tokens": sum(usage)}})
 
 
+def resubmit(messages: list[dict]) -> ChatCompletion:
+    """Hand in the last report or findings again unchanged, e.g. when the self-review finds nothing to fix."""
+    call = next(c for m in reversed(messages) if m["role"] == "assistant" for c in m.get("tool_calls") or []
+                if c["function"]["name"].startswith("submit_"))
+    return reply(tool_calls=[(call["function"]["name"], call["function"]["arguments"])])
+
+
 def tool_results(messages: list[dict]) -> list[dict]:
     """Every tool result sent to the model so far, oldest first (finish acknowledgements skipped)."""
     return [json.loads(m["content"]) for m in messages if m["role"] == "tool" and m["content"].startswith("{")]

@@ -1,0 +1,100 @@
+id: dev-trap-aapl-msft-fy2024-revenue-growth
+split: dev
+case_type: fiscal_period_trap
+mode: compare
+source: Hand-built, mismatched fiscal years in the style of FinRetrieval (arXiv 2603.04403)
+question: Compare Apple's and Microsoft's revenue growth in fiscal 2024.
+cutoff: 2024-12-31
+companies:
+  - ticker: AAPL
+    cik: 320193
+    name: Apple Inc.
+  - ticker: MSFT
+    cik: 789019
+    name: Microsoft Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The fiscal years end on different dates (Microsoft 30 June 2024, Apple 28 September 2024), so they cover different periods.
+    - Apple's fiscal 2023 had 53 weeks and fiscal 2024 had 52, which lowers Apple's reported growth.
+  must_not:
+    - Presents the two growth rates as covering the same period.
+gold:
+  - name: aapl_net_sales_fy2024
+    ticker: AAPL
+    value: 391035
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-09-28
+    source:
+      form: 10-K
+      accession: 0000320193-24-000123
+      filed: 2024-11-01
+      url: https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm
+      location: Consolidated Statements of Operations, row "Total net sales", September 28, 2024 column
+  - name: aapl_net_sales_fy2023
+    ticker: AAPL
+    value: 383285
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-09-30
+    source:
+      form: 10-K
+      accession: 0000320193-24-000123
+      filed: 2024-11-01
+      url: https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm
+      location: Consolidated Statements of Operations, row "Total net sales", September 30, 2023 column
+  - name: aapl_revenue_growth_fy2024
+    ticker: AAPL
+    value: 2.0
+    unit: percent
+    fiscal_period: FY2024 vs FY2023
+    period_end: 2024-09-28
+    derived:
+      formula: aapl_net_sales_fy2024 / aapl_net_sales_fy2023 - 1
+      inputs: [aapl_net_sales_fy2024, aapl_net_sales_fy2023]
+    tolerance: 0.05
+  - name: msft_revenue_fy2024
+    ticker: MSFT
+    value: 245122
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-06-30
+    source:
+      form: 10-K
+      accession: 0000950170-24-087843
+      filed: 2024-07-30
+      url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
+      location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2024 column
+  - name: msft_revenue_fy2023
+    ticker: MSFT
+    value: 211915
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-06-30
+    source:
+      form: 10-K
+      accession: 0000950170-24-087843
+      filed: 2024-07-30
+      url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
+      location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2023 column
+  - name: msft_revenue_growth_fy2024
+    ticker: MSFT
+    value: 15.7
+    unit: percent
+    fiscal_period: FY2024 vs FY2023
+    period_end: 2024-06-30
+    derived:
+      formula: msft_revenue_fy2024 / msft_revenue_fy2023 - 1
+      inputs: [msft_revenue_fy2024, msft_revenue_fy2023]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Apple 391,035 / 383,285 - 1 = 2.02%; Microsoft 245,122 / 211,915 - 1 = 15.67%. Apple's FY2024
+  10-K says fiscal 2024 and 2022 spanned 52 weeks and fiscal 2023 spanned 53 (the extra week fell
+  in Q1 2023). Microsoft's fiscal year ends 30 June. A trailing-twelve-month comparison to a
+  common date is a valid extra, not a replacement for the labelled fiscal figures.

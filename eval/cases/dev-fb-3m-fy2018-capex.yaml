@@ -1,0 +1,40 @@
+id: dev-fb-3m-fy2018-capex
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_03029 (adapted)
+question: What was 3M's capital expenditure in fiscal 2018?
+cutoff: 2019-03-31
+companies:
+  - ticker: MMM
+    cik: 66740
+    name: 3M Company
+expected:
+  behaviour: answer
+  must_not:
+    - Nets capex against "Proceeds from sale of PP&E and other assets" (262) without saying so.
+gold:
+  - name: capex_fy2018
+    ticker: MMM
+    value: 1577
+    unit: USD millions
+    fiscal_period: FY2018
+    period_end: 2018-12-31
+    source:
+      form: 10-K
+      accession: 0001558370-19-000470
+      filed: 2019-02-07
+      url: https://www.sec.gov/Archives/edgar/data/66740/000155837019000470/mmm-20181231x10k.htm
+      location: >-
+        Consolidated Statement of Cash Flows, Cash Flows from Investing Activities,
+        row "Purchases of property, plant and equipment (PP&E)", 2018 column, shown as (1,577)
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  FinanceBench's answer ($1,577 million) matches the filing. The filing shows the outflow in
+  parentheses; the gold is its size. The same row appears in the MD&A cash-flow tables.
+  Cutoff rule for FinanceBench cases: end of the month after the source 10-K was filed, so the
+  original filing is available and later restatements are not.

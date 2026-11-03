@@ -1,0 +1,59 @@
+id: dev-fb-ko-fy2021-cogs-margin
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_09724 (adapted)
+question: What was Coca-Cola's cost of goods sold as a percentage of revenue in 2021?
+cutoff: 2022-03-31
+companies:
+  - ticker: KO
+    cik: 21344
+    name: The Coca-Cola Company
+expected:
+  behaviour: answer
+  must_not:
+    - Uses the equity method investees' aggregate figures (revenues 79,934, cost of goods sold 47,847).
+gold:
+  - name: cost_of_goods_sold_2021
+    ticker: KO
+    value: 15357
+    unit: USD millions
+    fiscal_period: FY2021
+    period_end: 2021-12-31
+    source:
+      form: 10-K
+      accession: 0000021344-22-000009
+      filed: 2022-02-22
+      url: https://www.sec.gov/Archives/edgar/data/21344/000002134422000009/ko-20211231.htm
+      location: Consolidated Statements of Income, row "Cost of goods sold", 2021 column
+  - name: net_operating_revenues_2021
+    ticker: KO
+    value: 38655
+    unit: USD millions
+    fiscal_period: FY2021
+    period_end: 2021-12-31
+    source:
+      form: 10-K
+      accession: 0000021344-22-000009
+      filed: 2022-02-22
+      url: https://www.sec.gov/Archives/edgar/data/21344/000002134422000009/ko-20211231.htm
+      location: Consolidated Statements of Income, row "Net Operating Revenues", 2021 column
+  - name: cogs_pct_of_revenue_2021
+    ticker: KO
+    value: 39.7
+    unit: percent
+    fiscal_period: FY2021
+    period_end: 2021-12-31
+    derived:
+      formula: cost_of_goods_sold_2021 / net_operating_revenues_2021
+      inputs: [cost_of_goods_sold_2021, net_operating_revenues_2021]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  15,357 / 38,655 = 39.73%, matching FinanceBench's 39.7%. The equity-method note in the same
+  10-K has its own "Net operating revenues" and "Cost of goods sold" rows for investees; those
+  are not Coca-Cola's figures.

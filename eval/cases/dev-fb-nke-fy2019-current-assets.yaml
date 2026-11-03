@@ -1,0 +1,37 @@
+id: dev-fb-nke-fy2019-current-assets
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_03531 (adapted)
+question: What were Nike's total current assets at the end of fiscal 2019?
+cutoff: 2019-08-31
+companies:
+  - ticker: NKE
+    cik: 320187
+    name: NIKE, Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Reports 15,333, the "balances without adoption of Topic 606" figure from the revenue note.
+gold:
+  - name: total_current_assets_fy2019
+    ticker: NKE
+    value: 16525
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-05-31
+    source:
+      form: 10-K
+      accession: 0000320187-19-000051
+      filed: 2019-07-23
+      url: https://www.sec.gov/Archives/edgar/data/320187/000032018719000051/nke-531201910k.htm
+      location: Consolidated Balance Sheets, row "Total current assets", May 31, 2019 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Nike's fiscal year ends 31 May, so fiscal 2019 is June 2018 to May 2019. The Topic 606
+  adoption table in the same 10-K shows total current assets as reported (16,525), the effect of
+  adoption (1,192) and the balance without adoption (15,333); only 16,525 is the reported figure.

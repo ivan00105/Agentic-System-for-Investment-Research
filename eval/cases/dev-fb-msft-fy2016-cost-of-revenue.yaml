@@ -1,0 +1,39 @@
+id: dev-fb-msft-fy2016-cost-of-revenue
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04700 (adapted)
+question: What was Microsoft's total cost of revenue for fiscal year 2016?
+cutoff: 2016-08-31
+companies:
+  - ticker: MSFT
+    cik: 789019
+    name: Microsoft Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 30 June 2016.
+gold:
+  - name: total_cost_of_revenue_fy2016
+    ticker: MSFT
+    value: 32780
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-06-30
+    source:
+      form: 10-K
+      accession: 0001193125-16-662209
+      filed: 2016-07-28
+      url: https://www.sec.gov/Archives/edgar/data/789019/000119312516662209/d187868d10k.htm
+      location: >-
+        Item 8, Income Statements, row "Total cost of revenue" (product 17,880 + service and
+        other 14,900), Year Ended June 30, 2016 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  FinanceBench calls this COGS; Microsoft's line is "Total cost of revenue". The FY2018 10-K
+  restated FY2016 revenue for ASC 606 but still shows FY2016 total cost of revenue as 32,780
+  (see dev-restatement-msft-fy2016-revenue).

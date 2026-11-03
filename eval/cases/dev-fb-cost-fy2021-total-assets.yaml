@@ -1,0 +1,35 @@
+id: dev-fb-cost-fy2021-total-assets
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04209 (adapted)
+question: How much were Costco's total assets at the end of fiscal 2021?
+cutoff: 2021-11-30
+companies:
+  - ticker: COST
+    cik: 909832
+    name: Costco Wholesale Corporation
+expected:
+  behaviour: answer
+gold:
+  - name: total_assets_fy2021
+    ticker: COST
+    value: 59268
+    unit: USD millions
+    fiscal_period: FY2021
+    period_end: 2021-08-29
+    source:
+      form: 10-K
+      accession: 0000909832-21-000014
+      filed: 2021-10-06
+      url: https://www.sec.gov/Archives/edgar/data/909832/000090983221000014/cost-20210829.htm
+      location: Consolidated Balance Sheets, row "TOTAL ASSETS", August 29, 2021 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Costco's fiscal 2021 was the 52-week year ended 29 August 2021 (fiscal 2020 ended 30 August
+  2020). Total assets is a point-in-time balance, so the period is the balance-sheet date. The
+  segment note repeats 59,268.

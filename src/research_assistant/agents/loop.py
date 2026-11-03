@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 from .. import config
 from ..model_access import safe_model_error
 from ..tools import registry
-from ..tools.result import ToolContext, ToolResult
+from ..tools.result import Tool, ToolContext, ToolResult
 from .trace import Trace
 
 
@@ -39,11 +39,20 @@ class LoopResult:
     error: str | None = None
 
 
+def toolset(tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = ()) -> dict[str, Tool]:
+    """A role's tools: registry tools by name (None: all of them) plus tools the host adds, e.g. analysts."""
+    return {name: registry.TOOLS[name] for name in (registry.TOOLS if tool_names is None else tool_names)} | {
+        tool.name: tool for tool in extra_tools}
+
+
 def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], context: ToolContext, finish: Finish,
-             trace: Trace, *, tool_names: list[str] | None = None, max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
+             trace: Trace, *, tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = (),
+             max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
     """Ask, run the requested tools, repeat. `messages` grows in place, so a caller can continue the
-    same conversation later (e.g. to send checker flags back)."""
-    tools = registry.schemas(tool_names) + [finish.schema()]
+    same conversation later (e.g. to send checker flags back). The role's tools are `tool_names` (None: every
+    registry tool) plus `extra_tools`; the loop runs no other tool, whatever the model asks for."""
+    allowed = toolset(tool_names, extra_tools)
+    tools = [tool.schema() for tool in allowed.values()] + [finish.schema()]
     seen: dict[str, tuple[int, ToolResult]] = {}
     steps = 0
     try:
@@ -59,7 +68,7 @@ def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], con
                 if call.function.name == finish.name:
                     output = _finish(call, finish, messages, trace, steps) or output
                 else:
-                    _run_tool(call, context, messages, trace, steps, seen)
+                    _run_tool(call, context, messages, trace, steps, seen, allowed)
             if output is not None:
                 return LoopResult("finished", output, steps)
     except (OpenAIError, TimeoutError) as exc:
@@ -113,7 +122,7 @@ def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
     return message
 
 
-def _run_tool(call, context, messages, trace, step, seen):
+def _run_tool(call, context, messages, trace, step, seen, allowed):
     name, raw = call.function.name, call.function.arguments or "{}"
     repeat_of = None
     try:
@@ -125,16 +134,21 @@ def _run_tool(call, context, messages, trace, step, seen):
         result = ToolResult(status="invalid", source="agent loop", warnings=[f"Arguments are not a JSON object: {raw}"])
     else:
         key = name + json.dumps(arguments, sort_keys=True)
-        if key in seen:  # REFERENCE §2: a repeated action with no new inputs is skipped
+        if name not in allowed:  # REFERENCE §2: a role runs only its own tools; hiding the others isn't enough
+            result = ToolResult(status="invalid", source="agent loop", warnings=[
+                f"{name!r} is not one of this role's tools ({', '.join(allowed) or 'none'}), so it was not run."])
+        elif key in seen:  # REFERENCE §2: a repeated action with no new inputs is skipped
             repeat_of, earlier = seen[key]
             result = earlier.model_copy(update={"warnings": [
                 *earlier.warnings, f"Repeated call: same arguments as step {repeat_of}, so it was not run again."]})
         else:
-            result = registry.call(name, arguments, context)
+            result = registry.call(name, arguments, context, allowed)
             seen[key] = (step, result)
     messages.append({"role": "tool", "tool_call_id": call.id, "content": result.model_dump_json()})
+    # `records` holds every record this call added in full (e.g. all daily prices behind a series ID), so a
+    # saved run can be rechecked offline (evidence.py).
     trace.write("tool_call", step=step, name=name, arguments=arguments, repeat_of=repeat_of,
-                result=result.model_dump(mode="json"))
+                result=result.model_dump(mode="json"), records=trace.new_records(context.records))
 
 
 def _finish(call, finish, messages, trace, step):

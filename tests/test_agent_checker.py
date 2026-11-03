@@ -1,5 +1,5 @@
 from research_assistant.agents.checker import check, format_value, typed_numbers
-from research_assistant.agents.draft import Draft
+from research_assistant.agents.draft import Claim, Draft
 from research_assistant.agents.report import render
 
 REVENUE = {"id": "fact-aaa111", "kind": "fact", "metric": "revenue", "unit": "USD", "value": "416161000000",
@@ -65,6 +65,28 @@ def test_problems_are_flagged_never_rejected():
     assert any("zero or negative denominator" in p for _, p in problems)
 
 
+def test_a_direction_word_shows_the_size_and_a_contradicting_one_is_flagged():
+    def change(id_, formula, unit, value):
+        return {"id": id_, "kind": "calc", "formula": formula, "unit": unit, "value": value}
+
+    records = {r["id"]: r for r in (change("calc-down", "change_pp", "pp", "-3.9"), change("calc-up", "change_pp", "pp",
+               "2.1"), change("calc-g", "growth", "ratio", "-0.046"), MARGIN)}
+
+    def reads(text):
+        report = check(Draft(summary=[claim(text)]), records)
+        return report.sections["summary"][0].text, [f.problem for f in report.flags]
+
+    # Live check 3 Nov 2026: "gross margin fell -3.9 pp".
+    assert reads("Gross margin fell {calc:calc-down}.") == ("Gross margin fell 3.9 pp.", [])
+    assert reads("Revenue saw a decline of {calc:calc-g}.") == ("Revenue saw a decline of 4.6%.", [])
+    assert reads("Operating margin rose by {calc:calc-up}.") == ("Operating margin rose by 2.1 pp.", [])
+    assert reads("Margin changed by {calc:calc-down}.") == ("Margin changed by -3.9 pp.", [])
+    assert reads("Margin fell to {calc:calc-bbb222}.") == ("Margin fell to 32.0%.", [])  # a level, not a change
+    text, problems = reads("Gross margin rose {calc:calc-down}.")
+    assert text == "Gross margin rose -3.9 pp." and problems == [
+        "'rose -3.9 pp' contradicts itself: calc-down is -3.9 pp. Fix the direction word, or write 'changed by'."]
+
+
 def test_names_with_digits_are_not_typed_numbers():
     text = ("The fiscal 2025 10-K (Item 1A, Item 7) for FY2025, filed October 31, 2025 for the year ended "
             "2025-09-27, cites Q3 and the S&P 500 (chunk-0000320193-25-000079-1A-4).")
@@ -82,6 +104,13 @@ def test_citations_are_accepted_in_the_forms_models_write():
     assert not report.flags and report.sections["risks"][0].citations == ["calc-bbb222", "fact-aaa111", CHUNK["id"]]
 
 
+def test_the_schema_asks_for_citations_but_a_claim_without_them_is_flagged_not_rejected():
+    # Live check 3 Nov 2026: the coordinator left the optional citations key out of every interpretation.
+    assert Claim.model_json_schema()["required"] == ["text", "citations"]
+    report = check(Draft.model_validate({"risks": [{"text": "Supply is concentrated."}]}), RECORDS)
+    assert report.sections["risks"][0].text == "Supply is concentrated." and report.sections["risks"][0].flags
+
+
 def test_limitations_are_checked_and_render_lists_sources_and_flags():
     draft = Draft(summary=[claim("Revenue was {fact:aaa111}.")], risks=[claim("Supply risk.", [CHUNK["id"]])],
                   limitations=["Outlook model not built yet.", "About 3 segments were not checked."])
@@ -97,4 +126,4 @@ def test_limitations_are_checked_and_render_lists_sources_and_flags():
     assert "## Bull case (abstained)\n\n- Nothing to report." in text
     assert "1. `fact-aaa111` revenue = $416.2 billion, 2024-09-29 to 2025-09-27" in text
     assert "2. `chunk-0000320193-25-000079-1A-4` 10-K 0000320193-25-000079, 1A paragraph 4" in text
-    assert "## Checker flags\n\n- limitations[1]: '3' is typed" in text
+    assert "## Flags\n\n- limitations[1]: '3' is typed" in text

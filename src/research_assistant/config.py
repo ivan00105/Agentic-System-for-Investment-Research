@@ -91,13 +91,19 @@ TRADING_DAYS_PER_YEAR = 252
 
 # --- Agents -------------------------------------------------------------------------------
 
-# Model calls per agent run: a guard against infinite loops, not a quality cap (§5). A Check or
-# Compare question needs roughly 8-20 calls. Reaching the guard asks the model once for its best
-# report from what it has, marked "stopped at limit"; it never errors.
+# Model calls per agent loop: a guard against infinite loops, not a quality cap (§5). It applies to the
+# single agent, the coordinator, and each request the coordinator sends an analyst (PROJECT_GUIDE §5:
+# about 30 per analyst). A Check or Compare question needs roughly 8-20 calls. Reaching the guard asks
+# the model once for its best report or findings from what it has, marked "stopped at limit"; it never errors.
 AGENT_MAX_STEPS = 30
 # Condition B's self-review (REFERENCE §7): when the checker flags the draft, the flags go back to
 # the model this many times so it can fix them. They share the step guard above.
 AGENT_SELF_REVIEW_PASSES = 1
+# Condition D's critic (REFERENCE §3): reviews of the report per run. After a review with a material objection the
+# coordinator revises the report and the critic reviews it again; it stops sooner once no material objection has a
+# feasible next action. A guard, not a target: more debate rounds can make results worse (Kaesberg et al. 2025).
+# What the last review raises, and anything still open then, is shown as unresolved, never dropped.
+AGENT_CRITIC_ROUNDS = 3
 # Retries of an agent's model call on 429, 5xx and connection errors, with the SDK's own backoff
 # (0.5 s doubling to 8 s, or the provider's Retry-After). The SDK default of 2 (about 4 s) did not
 # outlast OpenRouter's upstream 429s in the 3 Nov 2026 live check; 6 waits about 25 s. Agents also

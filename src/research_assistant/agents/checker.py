@@ -10,7 +10,7 @@ from .draft import SECTIONS, Claim, Draft
 # Tolerates spaces and a dash instead of the colon: {fact:fact-1a2b}, {fact: 1a2b}, {calc-1a2b}.
 PLACEHOLDER = re.compile(r"\{\s*(fact|calc)\s*[:-]\s*([A-Za-z0-9_.-]+?)\s*\}")
 ALLOWED_NUMBERS = re.compile("|".join(config.CHECKER_ALLOWED_NUMBER_PATTERNS))
-KINDS = "fact|calc|chunk|filing|company|prices|check|screen"
+KINDS = "fact|calc|chunk|filing|company|prices|check|screen|claim"
 # A citation as models write it: fact-1a2b, fact:1a2b, {calc:1a2b} or {chunk: 0000-...}.
 CITATION = re.compile(rf"\{{?\s*({KINDS})\s*:\s*([A-Za-z0-9_.-]+?)\s*\}}?")
 # A record ID written in the text is a misplaced citation, not a typed figure.
@@ -18,6 +18,12 @@ RECORD_ID = re.compile(rf"\b(?:{KINDS})-[A-Za-z0-9_.-]+")
 # Digits glued to a word are names (H20, COVID-19, B200), not figures.
 TYPED_NUMBER = re.compile(r"(?<![\w.-])[$€£]?[-+]?\d[\d,.]*(?:\s?(?:%|pp\b|x\b|bn\b|billion|million|thousand|trillion))?")
 SCALES = ((Decimal(10) ** 12, "trillion"), (Decimal(10) ** 9, "billion"), (Decimal(10) ** 6, "million"))
+# A direction word right before a change figure: "fell {calc:ID}", "grew by {calc:ID}", "a decline of {calc:ID}".
+DOWN = "fell|falls?|falling|declined|declines?|decreased|decreases?|dropped|drops?|shrank|shrunk|contracted|slipped|" \
+       "slid|eroded|compressed|narrowed|lost|down"
+UP = "rose|rises?|risen|grew|grows?|growing|increased|increases?|gained|gains?|climbed|expanded|improved|widened|up"
+DIRECTION = re.compile(rf"\b(?:({DOWN})|({UP}))\s+(?:by\s+|of\s+)?$", re.IGNORECASE)
+CHANGES = {"growth", "change_pp", "cagr", "total_return", "max_drawdown"}
 
 
 @dataclass
@@ -32,6 +38,9 @@ class CheckedClaim:
     kind: str
     citations: list[str]  # IDs that resolved, in order of first use
     flags: list[Flag] = field(default_factory=list)
+    materiality: str = "supporting"
+    id: str | None = None  # claim ID and version, set by claims.ClaimLedger (REFERENCE §3)
+    version: int | None = None
 
     @property
     def status(self) -> str:
@@ -55,8 +64,7 @@ class CheckedReport:
 
 
 def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:
-    sections = {key: [_claim(claim, f"{key}[{i}]", records) for i, claim in enumerate(getattr(draft, key))]
-                for key, _ in SECTIONS}
+    sections = {key: check_claims(getattr(draft, key), key, records) for key, _ in SECTIONS}
     flags = [flag for claims in sections.values() for claim in claims for flag in claim.flags]
     sources = list(dict.fromkeys(i for claims in sections.values() for claim in claims for i in claim.citations))
     limitations = []
@@ -68,6 +76,11 @@ def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:
     return CheckedReport(sections, limitations, flags, sources)
 
 
+def check_claims(claims: list[Claim], name: str, records: dict[str, dict]) -> list[CheckedClaim]:
+    """Check one list of claims, e.g. a report section or an analyst's findings, labelled name[0], name[1]..."""
+    return [_claim(claim, f"{name}[{i}]", records) for i, claim in enumerate(claims)]
+
+
 def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
     text, used, flags = fill(claim.text, where, records)
     cited = []
@@ -76,12 +89,12 @@ def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
         found = lookup(records, match[2], match[1]) if match else lookup(records, raw.strip())
         if found is None:
             flags.append(Flag(where, f"Citation {raw!r} is not an ID any tool returned in this run."))
-        else:
-            cited.append(found["id"])
+        else:  # an analyst's finding (condition C) brings the records it cites
+            cited += [found["id"], *(found.get("citations") or [])] if found.get("kind") == "claim" else [found["id"]]
     citations = list(dict.fromkeys(used + cited))
     if not citations:
         flags.append(Flag(where, "No citation: cite the records this statement rests on."))
-    return CheckedClaim(text, claim.kind, citations, flags)
+    return CheckedClaim(text, claim.kind, citations, flags, claim.materiality)
 
 
 def lookup(records: dict[str, dict], raw: str, kind: str | None = None) -> dict | None:
@@ -107,7 +120,15 @@ def fill(text: str, where: str, records: dict[str, dict]) -> tuple[str, list[str
         if record.get("value") is None:
             flags.append(Flag(where, f"{record['id']} has no value: {record.get('reason') or 'unavailable'}"))
             return "unavailable"
-        return format_value(record)
+        shown = format_value(record)
+        word = DIRECTION.search(text, 0, match.start()) if record.get("formula") in CHANGES else None
+        value = Decimal(str(record["value"]))
+        if word and value:
+            if bool(word[1]) == (value < 0):  # the word gives the direction, so show only the size: "fell 3.9 pp"
+                return format_value({**record, "value": str(abs(value))}).removeprefix("+")
+            flags.append(Flag(where, f"'{word[0].strip()} {shown}' contradicts itself: {record['id']} is {shown}. "
+                                     "Fix the direction word, or write 'changed by'."))
+        return shown
 
     filled = PLACEHOLDER.sub(replace, text)
     for number in typed_numbers(text):

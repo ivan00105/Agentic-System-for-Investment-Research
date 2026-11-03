@@ -12,14 +12,17 @@ TOOLS: dict[str, Tool] = {tool.name: tool for tool in (
 
 
 def schemas(names: list[str] | None = None) -> list[dict]:
-    return [TOOLS[name].schema() for name in (names or TOOLS)]
+    """None means every tool; an empty list means none (a role without registry tools)."""
+    return [TOOLS[name].schema() for name in (TOOLS if names is None else names)]
 
 
-def call(name: str, arguments: dict, context: ToolContext) -> ToolResult:
-    """Run one tool. Bad arguments and provider failures come back as a status, never an exception."""
-    tool = TOOLS.get(name)
+def call(name: str, arguments: dict, context: ToolContext, tools: dict[str, Tool] | None = None) -> ToolResult:
+    """Run one tool from `tools` (default: the registry; agents add their own, e.g. an analyst to ask).
+    Bad arguments and provider failures come back as a status, never an exception."""
+    tools = TOOLS if tools is None else tools
+    tool = tools.get(name)
     if tool is None:
-        return ToolResult(status="invalid", source="registry", warnings=[f"Unknown tool {name!r}. Tools: {', '.join(TOOLS)}."])
+        return ToolResult(status="invalid", source="registry", warnings=[f"Unknown tool {name!r}. Tools: {', '.join(tools)}."])
     try:
         arguments = tool.input_model.model_validate(arguments)
     except ValidationError as exc:

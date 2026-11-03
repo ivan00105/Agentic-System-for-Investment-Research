@@ -48,6 +48,7 @@ pytest==9.1.1
 python-dateutil==4.0.0
 python-dotenv==1.2.1
 pytz==2026.6
+PyYAML==6.0.3
 rank-bm25==0.2.2
 RapidFuzz==3.14.6
 requests==2.34.2
