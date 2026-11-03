@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import agent_api
+from . import agent_api, companies_api
 from .application import Application
 from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
 from .data import providers
@@ -115,6 +115,7 @@ def create_app(data_dir: Path | None = None):
         return {"kinds": providers.status(app.state.provider_checks)}
 
     app.include_router(agent_api.router)
+    app.include_router(companies_api.router)
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

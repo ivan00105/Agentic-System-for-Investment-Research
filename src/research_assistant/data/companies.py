@@ -86,6 +86,22 @@ def search(sec: SecClient, query: str) -> tuple[list[Match], int]:
     return matches[:config.FIND_COMPANY_MAX_MATCHES], len(matches)
 
 
+def suggest(sec: SecClient, query: str) -> tuple[list[Company], int]:
+    """Listed companies for a search box as the user types: the exact ticker, then tickers starting with the text,
+    then the closest names. Current tickers only, so a typo never fetches SEC's all-filers list."""
+    text = query.strip()
+    if not text:
+        return [], 0
+    listed = listed_companies(sec)
+    order = {cik: i for i, cik in enumerate(listed)}  # SEC's file lists the largest companies first
+    ticker = normalize_ticker(text)
+    by_ticker = sorted((c for c in listed.values() if any(t.startswith(ticker) for t in c.tickers)),
+                       key=lambda c: (ticker not in c.tickers, order[c.cik]))
+    seen = {c.cik for c in by_ticker}
+    found = by_ticker + [m.company for m in _fuzzy(text, listed) if m.company.cik not in seen]
+    return found[:config.COMPANY_SUGGEST_MAX], len(found)
+
+
 def _fuzzy(text: str, companies: dict[str, Company]) -> list[Match]:
     names = {cik: company.name for cik, company in companies.items()}
     found = process.extract(text, names, scorer=fuzz.WRatio, processor=utils.default_process,

@@ -51,6 +51,9 @@ FIND_COMPANY_MAX_MATCHES = 10
 # rapidfuzz WRatio score (0-100) a name must reach to count as a match. Below ~80 the matches
 # are mostly unrelated companies that share one word.
 FIND_COMPANY_MIN_SCORE = 80
+# Companies the web page's search box lists as the user types. More are counted ("8 of 40 matches"), never
+# dropped silently, and typing more narrows them.
+COMPANY_SUGGEST_MAX = 8
 
 # Fiscal years returned when the agent doesn't ask: enough for growth and trends. Older years are
 # counted in a warning and the agent can ask for them.
