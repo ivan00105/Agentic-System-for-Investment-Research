@@ -216,7 +216,7 @@ test('opting into unavailable model analysis still completes and saves financial
 })
 
 test('fresh retrieval configuration failure is explicit; empty and invalid run states recover', async ({page}) => {
-  await page.goto('/?view=research')
+  await page.goto('/?view=baseline')
   await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
   await page.screenshot({path: path.join(evidenceDir, 'empty-state.png')})
   await page.getByLabel('Research action').selectOption('fresh')
@@ -229,7 +229,7 @@ test('fresh retrieval configuration failure is explicit; empty and invalid run s
   await page.goto('/?view=research&run=missing-run')
   await expect(page.getByRole('alert')).toContainText('Run not found')
   await page.screenshot({path: path.join(evidenceDir, 'error-state.png')})
-  await page.getByRole('button', {name: 'Research', exact: true}).click()
+  await page.getByRole('button', {name: 'Baseline A', exact: true}).click()
   await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
 })
 
@@ -263,7 +263,7 @@ test('an accepted submission with a lost response retries with the same idempote
 test('legacy pending submissions retain their original payload and key', async ({page, request}) => {
   const source = await (await request.get('/api/runs/example-msft')).json()
   const legacy = {request: {kind: 'research', mode: 'frozen', ticker: 'MSFT', cutoff: source.request.cutoff, source_run_id: source.id, screen: null}, key: 'legacy-pending-recovery'}
-  await page.goto('/?view=research')
+  await page.goto('/?view=baseline')
   await page.evaluate(intent => sessionStorage.setItem('fieldnote-pending', JSON.stringify(intent)), legacy)
   await page.reload()
   const submitted = page.waitForRequest(request => request.method() === 'POST' && request.url().endsWith('/api/runs'))
@@ -694,4 +694,20 @@ test('model check sends nothing and remains usable when recovery storage is unav
   await expect(page.getByRole('button', {name: 'Retry same submission'})).toHaveCount(0)
   expect(posts).toBe(0)
   expect(await page.evaluate(() => sessionStorage.getItem('fieldnote-pending-check'))).toBeNull()
+})
+
+test('the agent page opens on an empty question box whose helpers only fill the text', async ({page}) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', {name: 'Ask about any US-listed company.'})).toBeVisible()
+  await expect(page.getByText('SYNTHETIC TEACHING DATA', {exact: true})).toHaveCount(0)
+  await expect(page.getByRole('heading', {name: 'Recent runs'})).toBeVisible()
+  await expect(page.getByLabel('Your question')).toHaveValue('')
+  await page.getByRole('button', {name: 'Compare NVIDIA and AMD on growth and valuation.'}).click()
+  await expect(page.getByLabel('Your question')).toHaveValue('Compare NVIDIA and AMD on growth and valuation.')
+  await page.locator('.starter', {hasText: 'Find companies'}).click()
+  await expect(page.getByRole('group', {name: 'Where to look'})).toBeVisible()
+  await expect(page.getByRole('button', {name: 'Find companies →'})).toBeEnabled()
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+  await page.getByRole('button', {name: 'Baseline A', exact: true}).click()
+  await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
 })

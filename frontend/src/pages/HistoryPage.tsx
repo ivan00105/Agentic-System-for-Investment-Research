@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AgentHistory } from '../AgentRun'
+import { RunList } from '../components/agent/RunList'
 import { api, investigationLabel, stamp } from '../api'
 import type { HistoryItem, View } from '../api'
 import { Badge } from '../components/Badge'
@@ -36,5 +36,5 @@ function BaselineHistory({onOpen}: {onOpen: (id: string, view: View) => void}) {
 }
 
 export function HistoryPage({onOpen, onOpenAgent}: {onOpen: (id: string, view: View) => void; onOpenAgent: (id: string) => void}) {
-  return <><AgentHistory onOpen={onOpenAgent} /><BaselineHistory onOpen={onOpen} /></>
+  return <><RunList onOpen={onOpenAgent} /><BaselineHistory onOpen={onOpen} /></>
 }
