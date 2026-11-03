@@ -1,16 +1,28 @@
-"""Every data provider by kind, with its tier and settings, for the status page (REFERENCE §10).
+"""Every data provider by kind, with its tier and settings, for the Setup & status page (REFERENCE §10).
 
 Tiers: 0 = free, no key; 1 = free with a key; 2 = paid. A provider without its settings is skipped
-and shown as "not configured" with the variable to set; nothing crashes.
+and shown as "not configured" with the variable to set; nothing crashes. The page learns only whether
+a setting is set, never its value.
 """
 import os
 import tempfile
 from dataclasses import dataclass
 from typing import Callable
 
-from ..model_access import load_model_settings
+from ..contracts import DomainError
+from ..model_access import check_model, load_model_settings
 from . import prices, prices_tiingo, prices_yfinance
+from .errors import DataError
 from .sec import SecClient
+
+# Each card's title and what its data is for, in page order.
+KINDS = {
+    "filings": ("SEC filings", "Lists a company's filings and reads sections of its 10-K, 10-Q and 8-K reports."),
+    "fundamentals": ("Fundamentals", "Reported figures such as revenue, operating income and cash flow."),
+    "identity": ("Company lookup", "Matches a company name or ticker to the company SEC knows."),
+    "prices": ("Daily prices", "Closing prices for market cap, valuation ratios and risk."),
+    "llm": ("Model", "The language model that plans the research, calls the tools and writes the report."),
+}
 
 
 @dataclass(frozen=True)
@@ -22,10 +34,22 @@ class Provider:
     env: tuple[str, ...]  # settings it needs in .env
     configured: Callable[[], bool]
     check: Callable[[], str] | None = None  # a live request; returns a message or raises
+    missing: Callable[[], list[str]] | None = None  # what to set when not configured; default: its unset env names
+    problem: Callable[[], str | None] = lambda: None  # why settings that are set still don't work
+
+
+def _unset(names) -> list[str]:
+    return [name for name in names if not os.getenv(name, "").strip()]
 
 
 def _sec_configured() -> bool:
     return SecClient().configured
+
+
+def _sec_problem() -> str | None:
+    if os.getenv("SEC_USER_AGENT", "").strip() and not _sec_configured():
+        return 'SEC_USER_AGENT needs a name and a contact email, e.g. "Fieldnote you@example.com".'
+    return None
 
 
 def _sec_check() -> str:
@@ -37,29 +61,43 @@ def _sec_check() -> str:
     return "SEC answered with the User-Agent from SEC_USER_AGENT."
 
 
-def _model_env() -> tuple[str, ...]:
-    settings = load_model_settings()
-    keys = {"openrouter": "OPENROUTER_API_KEY", "openai": "OPENAI_API_KEY", "compatible": "OPENAI_API_KEY"}
-    return ("RESEARCH_MODEL", keys[settings.provider]) + (("OPENAI_BASE_URL",) if settings.provider == "compatible" else ())
+def _model_provider(name: str, label: str, tier: int, env: tuple[str, ...]) -> Provider:
+    """One model service. Only the one RESEARCH_MODEL_PROVIDER selects (default: openai) can be active."""
+    def selected() -> bool:
+        return load_model_settings().provider == name
+
+    def missing() -> list[str]:
+        choose = [] if selected() else [f"RESEARCH_MODEL_PROVIDER={name}"]
+        return choose + _unset(n for n in env if n != "RESEARCH_MODEL_PROVIDER")
+
+    return Provider(name, "llm", label, tier, env, lambda: selected() and load_model_settings().configured,
+                    check_model, missing, lambda: load_model_settings().error if selected() else None)
 
 
 def all_providers() -> list[Provider]:
-    sec = dict(tier=0, env=("SEC_USER_AGENT",), configured=_sec_configured, check=_sec_check)
+    sec = dict(tier=0, env=("SEC_USER_AGENT",), configured=_sec_configured, check=_sec_check, problem=_sec_problem)
     price_adapters = [prices.ADAPTERS[name] for name in prices.provider_order()]
     price_adapters += [a for a in (prices_tiingo, prices_yfinance) if a not in price_adapters]
-    settings = load_model_settings()
     return [
-        Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
         Provider("sec_archives", "filings", "SEC EDGAR filings", **sec),
+        Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
         Provider("sec_tickers", "identity", "SEC company tickers", **sec),
         *[Provider(a.NAME, "prices", a.LABEL, a.TIER, a.ENV, a.configured, a.check) for a in price_adapters],
-        Provider("model", "llm", settings.label, 2, _model_env(), lambda: load_model_settings().configured),
+        _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),
+        _model_provider("openai", "OpenAI", 2, ("RESEARCH_MODEL", "OPENAI_API_KEY")),
+        _model_provider("compatible", "OpenAI-compatible endpoint (e.g. local Ollama)", 0,
+                        ("OPENAI_BASE_URL", "RESEARCH_MODEL", "OPENAI_API_KEY")),
     ]
 
 
+def _missing(provider: Provider) -> list[str]:
+    return provider.missing() if provider.missing else _unset(provider.env)
+
+
 def status(checks: dict[str, dict]) -> list[dict]:
-    """One entry per kind: its providers in priority order and which one is active."""
-    kinds: dict[str, dict] = {}
+    """One entry per kind: its providers in priority order and which one is active (the first configured)."""
+    kinds = {kind: {"kind": kind, "label": label, "purpose": purpose, "active": None, "providers": []}
+             for kind, (label, purpose) in KINDS.items()}
     for provider in all_providers():
         last = checks.get(provider.name)
         configured = provider.configured()
@@ -69,21 +107,27 @@ def status(checks: dict[str, dict]) -> list[dict]:
             state = "not_configured"
         else:
             state = "ready" if not provider.env else "configured"
-        missing = [name for name in provider.env if not os.getenv(name, "").strip()]
-        kind = kinds.setdefault(provider.kind, {"kind": provider.kind, "active": None, "providers": []})
+        kind = kinds[provider.kind]
         if configured and kind["active"] is None:
             kind["active"] = provider.name
-        kind["providers"].append({"name": provider.name, "label": provider.label, "tier": provider.tier,
-                                  "env": list(provider.env), "missing_env": missing if not configured else [],
-                                  "status": state, "last_check": last, "can_check": provider.check is not None})
-    return list(kinds.values())
+        kind["providers"].append({
+            "name": provider.name, "label": provider.label, "tier": provider.tier, "env": list(provider.env),
+            "configured": configured, "missing_env": [] if configured else _missing(provider), "problem": None if configured else provider.problem(),
+            "status": state, "last_check": last, "can_check": provider.check is not None})
+    return [kind for kind in kinds.values() if kind["providers"]]
 
 
 def run_check(name: str) -> dict:
+    """Run one provider's live check. KeyError: no such check. DataError: not configured, so nothing to test."""
     provider = next((p for p in all_providers() if p.name == name), None)
     if provider is None or provider.check is None:
         raise KeyError(name)
+    if not provider.configured():
+        reason = provider.problem() or f"Set {', '.join(_missing(provider))} in .env."
+        raise DataError(f"{provider.label} is not configured yet. {reason} Restart the server after changing .env.",
+                        "not_configured")
     try:
         return {"ok": True, "message": provider.check()}
     except Exception as exc:  # a check reports any failure; it never crashes the status page
-        return {"ok": False, "message": f"{type(exc).__name__}: {exc}"}
+        ours = isinstance(exc, (DataError, DomainError))  # our own errors already say what went wrong
+        return {"ok": False, "message": str(exc) if ours else f"{type(exc).__name__}: {exc}"}
