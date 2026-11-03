@@ -32,6 +32,7 @@ def test_companyfacts_value_matches_the_filing_table(apple):
     found = result.data["found"][0]
     assert found["value"] == "416161000000" and "Total net sales" in found["row"] and found["locator"].startswith("#")
     assert context.records[result.ids[0]]["kind"] == "check"
+    assert not any("tagged only in" in w for w in result.warnings)
 
 
 def test_prior_year_comparative_also_matches(apple):

@@ -48,7 +48,7 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
         warnings.append(f"The filing tags {fact['tag']} for this period, but its number "
                         f"({', '.join(repr(f['raw']) + ' format ' + (f['format'] or 'none') for f in shown)}) could not "
                         "be read, so it was not checked.")
-    elif tagged:
+    elif tagged and not same:
         units = sorted({f["unit"] or "an unreadable unit" for f in tagged})
         warnings.append(f"{fact['tag']} for this period is tagged only in {', '.join(units)}, not {fact['unit']}.")
     elif verdict == "not_in_filing":
