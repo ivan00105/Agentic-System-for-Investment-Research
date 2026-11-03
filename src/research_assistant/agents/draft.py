@@ -42,14 +42,17 @@ def _section(what: str):
 
 
 class Draft(BaseModel):
-    summary: list[Claim] = _section("The direct answer to the question.")
-    key_numbers: list[Claim] = _section("The figures the answer rests on, each labelled with its period.")
+    summary: list[Claim] = _section("The answer first: one or two short sentences that answer the question, then "
+                                    "the main takeaways, one idea each.")
+    key_numbers: list[Claim] = _section("The figures the answer rests on, one per statement, each labelled with its "
+                                        "metric and period.")
     bull_case: list[Claim] = _section("The strongest evidence-based case for the company.")
     bear_case: list[Claim] = _section("The strongest evidence-based case against it.")
     risks: list[Claim] = _section("Material risks, attributed to their source (e.g. the 10-K's Item 1A).")
     what_would_change_view: list[Claim] = _section("Observable developments that would change the conclusion.")
     limitations: list[str] = Field(default_factory=list, description=(
-        "What could not be checked: missing or unsupported data, tools that failed, questions not answered."))
+        "What could not be checked: missing or unsupported data, tools that failed, questions not answered, and "
+        "caveats about how figures were found or calculated."))
 
 
 class Findings(BaseModel):
