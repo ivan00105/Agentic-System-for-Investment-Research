@@ -35,15 +35,16 @@ def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper().replace(".", "-")
 
 
+def _has_closes(row: dict) -> bool:
+    return all(isinstance(v, (int, float)) and math.isfinite(v) for v in (row.get("close"), row.get("adj_close")))
+
+
 def _with_closes(rows: list[dict], notes: list[str]) -> list[dict]:
     """Drop days without both closes: Yahoo can list the current day with a blank (NaN) close. Unknown is
     left out, never turned into a number, and the note says how many days went."""
-    def known(value) -> bool:
-        return isinstance(value, (int, float)) and math.isfinite(value)
-
     kept, missing = [], []
     for row in rows:
-        (kept if known(row.get("close")) and known(row.get("adj_close")) else missing).append(row)
+        (kept if _has_closes(row) else missing).append(row)
     if missing:
         notes.append(f"{len(missing)} day(s) without a close left out: {', '.join(r['date'] for r in missing)}.")
     return kept
@@ -60,7 +61,11 @@ def fetch(ticker: str, start: date, end: date, cache: DiskCache, names: list[str
         key = f"prices|{name}|{ticker}|{start}|{end}"
         cached = cache.get(key, timedelta(hours=config.PRICE_CACHE_MAX_AGE_HOURS))
         if cached is not None:
-            return _with_closes(json.loads(cached[0]), notes), name, notes
+            rows, retrieved_at = json.loads(cached[0]), cached[1]
+            # A series whose last day had no close yet is reused only briefly, so a later call gets that close.
+            blank_age = timedelta(minutes=config.PRICE_CACHE_BLANK_CLOSE_MAX_AGE_MINUTES)
+            if not rows or _has_closes(rows[-1]) or datetime.now(timezone.utc) - retrieved_at <= blank_age:
+                return _with_closes(rows, notes), name, notes
         try:
             rows = adapter.fetch(ticker, start, end)
         except DataError as exc:

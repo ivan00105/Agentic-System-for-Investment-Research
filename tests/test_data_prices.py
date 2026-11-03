@@ -90,6 +90,17 @@ def test_days_without_a_close_are_left_out_and_counted(tmp_path, monkeypatch):
         assert notes[-1] == "1 day(s) without a close left out: 2026-03-04."
 
 
+def test_a_series_ending_without_a_close_is_refetched_soon(tmp_path, monkeypatch):
+    frames = [yahoo((50.0, 51.0, float("nan"))), yahoo()]
+    monkeypatch.setattr(prices_yfinance, "_history", lambda *a: frames.pop(0))
+    for _ in range(2):  # fetched, then reused while it is new
+        rows, _, _ = prices.fetch("MSFT", date(2026, 3, 1), date(2026, 3, 4), DiskCache(tmp_path))
+        assert rows[-1]["date"] == "2026-03-03" and len(frames) == 1
+    monkeypatch.setattr("research_assistant.config.PRICE_CACHE_BLANK_CLOSE_MAX_AGE_MINUTES", 0)
+    rows, _, notes = prices.fetch("MSFT", date(2026, 3, 1), date(2026, 3, 4), DiskCache(tmp_path))
+    assert rows[-1]["date"] == "2026-03-04" and frames == [] and not any("without a close" in n for n in notes)
+
+
 def test_cached_series_is_reused(tmp_path, calls):
     for _ in range(2):
         prices.fetch("AAPL", date(2026, 3, 1), date(2026, 3, 4), DiskCache(tmp_path))

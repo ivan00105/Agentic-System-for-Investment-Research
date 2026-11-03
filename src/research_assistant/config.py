@@ -81,6 +81,9 @@ SCREEN_FRAME_LAG_DAYS = 100
 PRICE_PROVIDERS = ("tiingo", "yfinance")
 # Adjusted prices change whenever a dividend or split happens, so cached series refresh daily.
 PRICE_CACHE_MAX_AGE_HOURS = 24
+# Yahoo can list the newest day with a blank close for hours after it closes (seen at 21:23 New York time on
+# 2 Nov 2026), so a series ending that way is refetched after this long; 30 minutes covers one research run.
+PRICE_CACHE_BLANK_CLOSE_MAX_AGE_MINUTES = 30
 # History fetched when the agent gives no start date: three years covers volatility, drawdown and beta.
 PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
 # A day's close counts as known from this New York hour on: the close is 16:00 and end-of-day
