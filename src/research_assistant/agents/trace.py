@@ -12,8 +12,8 @@ USAGE_FIELDS = ("prompt_tokens", "completion_tokens", "total_tokens")
 
 
 def _zero() -> dict:
-    # cost stays None unless the provider reports one (OpenRouter does in `usage.cost`).
-    return {"model_calls": 0, "tool_calls": 0, **dict.fromkeys(USAGE_FIELDS, 0), "cost": None}
+    # cached_tokens and cost stay None unless the provider reports them (OpenRouter does in `usage`).
+    return {"model_calls": 0, "tool_calls": 0, **dict.fromkeys(USAGE_FIELDS, 0), "cached_tokens": None, "cost": None}
 
 
 class Trace:
@@ -81,5 +81,9 @@ class Trace:
             for name in USAGE_FIELDS:
                 if isinstance(usage.get(name), int):
                     totals[name] += usage[name]
+            # Prompt tokens the host served from its prompt cache, billed at a fraction of the input price.
+            cached = (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+            if isinstance(cached, int):
+                totals["cached_tokens"] = (totals["cached_tokens"] or 0) + cached
             if isinstance(usage.get("cost"), (int, float)):
                 totals["cost"] = round((totals["cost"] or 0) + usage["cost"], 8)

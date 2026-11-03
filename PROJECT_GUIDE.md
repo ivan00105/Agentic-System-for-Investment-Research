@@ -240,7 +240,7 @@ Rule: add a technique when a **measured** problem calls for it, not because it's
 | Streaming trace to the UI (SSE) | Later | Polling first |
 | Memory across runs ("what changed since last check", watchlist) | Later | Nice extension; reuse saved runs |
 | Model routing (cheap model for analysts, stronger for coordinator/critic) | Later | Worth an evaluation row if cost matters |
-| Prompt caching | Later | Cuts evaluation cost |
+| Prompt caching | **Already on** | The model's hosts cache automatically; measured in Phase 8 |
 | Expose tools as an **MCP server** | Optional | Cheap once `tools/registry.py` exists; lets Claude/other clients use our tools. Good demo bonus. |
 | LLM-as-judge | Evaluation triage only | Never the sole ground truth |
 | Tracing platforms (Langfuse, LangSmith) | No | Our SQLite trace is enough |
@@ -397,6 +397,11 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
   Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
 
 ### Phase 8: Evaluation (start writing cases during Phase 2)
+- [x] Prompt caching measured before the A–D runs (§7's first cost lever). Trace totals now count `cached_tokens` per run and per role.
+  - Nothing to switch on. Every OpenRouter host of `deepseek/deepseek-v4.1-flash` caches automatically ([docs](https://openrouter.ai/docs/features/prompt-caching)), reports `prompt_tokens_details.cached_tokens` and bills cache reads at 2–15% of its input price; `usage.cost` already includes the discount. Across the 13 traces of 3 Nov 2026, 74% of prompt tokens were cached.
+  - Host fallback (`allow_fallbacks`) does break the cache: a call that moves to another host gets nothing cached. But sticky routing keeps a conversation on one host, so only 4 of 308 follow-up calls moved (about 0.8% of cost). Kept, because it outlasts upstream 429s. The other misses (at most about 7% of cost) happen inside a host, where no request option reaches. So no routing change, `session_id` or `order`.
+  - Live check, 3 Nov 2026, NVIDIA Check question. **B:** 14 model calls, 0.76 M prompt tokens, 88% cached, $0.087 (about $0.28 without the cache), 33 min, of which 29 min were two slow `screen` calls (SEC downloads). **C:** 43 calls, 4.95 M prompt tokens, 43% cached, $0.68 (about $0.77 without), 49 min.
+  - C's cost was mostly the filings analyst: on 7 calls its reasoning ran to 121k–131k tokens (6 hit the host's 131,072-token output limit; 4–8 min each), and each reasoning block was sent back with the next call, adding about 131k uncached prompt tokens per step. That was 78% of the run's cost. The same thing happened in two earlier D traces (market and critic roles). It is the next cost lever, not caching.
 - [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample (at least 10) checked by a second person. Sources:
   - ~15 adapted from the FinanceBench open sample.
   - ~8–10 from the Vals Finance Agent public set.

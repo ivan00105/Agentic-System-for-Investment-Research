@@ -47,7 +47,7 @@ def test_runs_tools_until_the_finish_tool_and_traces_every_step(tmp_path):
     assert logged[0]["content"] == "Looking Apple up first." and logged[0]["usage"]["total_tokens"] == 15
     assert logged[1]["name"] == "find_company" and logged[1]["result"]["status"] == "ok"
     assert trace.totals == {"model_calls": 2, "tool_calls": 1, "prompt_tokens": 20, "completion_tokens": 10,
-                            "total_tokens": 30, "cost": None}
+                            "total_tokens": 30, "cached_tokens": None, "cost": None}
     assert messages[-1]["role"] == "tool" and messages[-1]["content"] == "Submitted."
 
 
@@ -146,6 +146,17 @@ def test_the_serving_host_is_traced_so_a_fallback_is_never_silent(tmp_path):
     _, _, trace = start(tmp_path, client)
     assert [e["provider"] for e in events(trace) if e["kind"] == "model_call"] == ["Baidu", "DeepInfra"]
     assert trace.hosts == ["Baidu", "DeepInfra"]
+
+
+def test_cached_prompt_tokens_are_totalled_per_role_when_the_provider_reports_them(tmp_path):
+    trace = Trace(tmp_path / "trace.jsonl", "run-1")
+    with trace.acting_as("filings"):
+        trace.write("model_call", usage={"prompt_tokens": 100, "prompt_tokens_details": {"cached_tokens": 80}})
+        trace.write("model_call", usage={"prompt_tokens": 120, "prompt_tokens_details": {"cached_tokens": 96}})
+    with trace.acting_as("market"):
+        trace.write("model_call", usage={"prompt_tokens": 50, "prompt_tokens_details": None})
+    assert trace.totals["cached_tokens"] == 176 and trace.by_agent["filings"]["cached_tokens"] == 176
+    assert trace.by_agent["market"]["cached_tokens"] is None  # not reported, which is not the same as zero
 
 
 def test_reasoning_details_are_sent_back_but_not_traced(tmp_path):
