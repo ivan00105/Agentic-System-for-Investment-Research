@@ -175,3 +175,19 @@ def test_reasoning_details_are_sent_back_but_not_traced(tmp_path):
     _, messages, trace = start(tmp_path, client)
     assert messages[1]["reasoning_details"] == details
     assert "private chain of thought" not in trace.path.read_text(encoding="utf-8")
+
+
+def test_cancelling_stops_before_the_next_model_call_and_skips_the_steps_other_tools(tmp_path):
+    context = make_context(tmp_path)
+
+    def cancel_while_asking(messages):  # the user cancels while this model call is out
+        context.stop.set()
+        return reply(tool_calls=[("find_company", {"query": "AAPL"})])
+
+    trace = Trace(tmp_path / "trace.jsonl", "run-1")
+    result = run_loop(FakeClient(cancel_while_asking), "fake-model", {}, [{"role": "user", "content": "?"}], context,
+                      FINISH, trace)
+    assert result.status == "stopped" and result.output is None and result.steps == 1
+    logged = events(trace)
+    assert [e["kind"] for e in logged] == ["model_call", "tool_call", "cancelled"]
+    assert logged[1]["result"]["warnings"] == ["Not run: the run was cancelled."]

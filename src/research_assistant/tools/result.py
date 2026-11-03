@@ -1,5 +1,6 @@
 """What every tool returns, and the host-owned context every tool runs in."""
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +38,8 @@ class ToolContext:
     # Price providers to try, best first; None means config order. The evaluation pins this list.
     price_providers: list[str] | None = None
     cache_dir: Path | None = None  # None means config.data_dir()
+    # Set by the host to cancel the run (the web app's cancel button); agent loops check it before each step.
+    stop: threading.Event = field(default_factory=threading.Event)
 
     def cache(self, name: str) -> DiskCache:
         return DiskCache((self.cache_dir or config.data_dir()) / name)

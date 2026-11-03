@@ -1,8 +1,8 @@
 """One research run, shared by evaluation conditions B, C and D (REFERENCE §7):
 plan → the lead role's tool loop → draft → deterministic checker → self-review pass(es) → [review] → report.
 In B the lead is a single agent with every tool; in C it is the coordinator, whose tools include the three
-analysts (team.py); D adds the critic's review and the team's revisions (critic.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit or
-failed, with its trace saved."""
+analysts (team.py); D adds the critic's review and the team's revisions (critic.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit,
+stopped (cancelled) or failed, with its trace saved."""
 from dataclasses import asdict, dataclass, field
 from functools import partial
 from pathlib import Path
@@ -30,7 +30,7 @@ SUBMIT = Finish("submit_report", "Hand in the finished report. Every number is a
 @dataclass
 class AgentRun:
     run_id: str
-    status: str  # finished | stopped_at_limit | failed
+    status: str  # finished | stopped_at_limit | stopped | failed
     plan: str | None
     report: CheckedReport
     markdown: str
@@ -69,8 +69,10 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     with trace.acting_as(lead.name):
         work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)
-        if review and work.draft is not None and work.status != "failed":
+        if review and work.draft is not None and work.status not in ("failed", "stopped"):
             review(work)
+    if context.stop.is_set():  # cancelled: what got done is the partial result, never an error
+        work.status = "stopped"
     return close(trace, question, settings, context, ledger, work, condition, team)
 
 

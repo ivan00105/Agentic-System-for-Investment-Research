@@ -205,7 +205,7 @@ def progress(event: dict):
         line = f"research of candidate {event['rank']} {event['status']} (trace {event['trace']})"
     elif kind == "injected":
         line = f"injected {event['defect']}: {event['change']}"
-    elif kind in ("self_review", "stopped_at_limit", "nudge", "error"):
+    elif kind in ("self_review", "stopped_at_limit", "cancelled", "nudge", "error"):
         line = f"{kind.replace('_', ' ')}" + (f": {event['error']}" if kind == "error" else "")
     else:
         return
