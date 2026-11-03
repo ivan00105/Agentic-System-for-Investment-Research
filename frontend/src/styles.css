@@ -377,6 +377,7 @@ h2{font-size:19px}
 .baseline-switch{display:flex;gap:8px;margin-bottom:16px}
 .baseline-switch [aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
 .run-actions{margin-bottom:8px}
+.agent-run .run-state strong{text-transform:none}
 .timeline{list-style:none;margin:10px 0 0;padding:0}
 .activity .timeline,.activity .timeline ol{max-height:none;overflow:visible}
 .activity .timeline>li{display:block;border-top:1px solid var(--line);padding:10px 0}
