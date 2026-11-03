@@ -39,6 +39,21 @@ class LoopResult:
     error: str | None = None
 
 
+class BadReply(OpenAIError):
+    """A model reply whose body isn't JSON, even after retries."""
+
+
+def create(client, **kwargs):
+    """chat.completions.create, retrying a reply whose body isn't JSON: the SDK retries only errors with a status, and
+    a host's 200 reply cut off mid-body (live Discover check, 3 Nov 2026) raised past every handler."""
+    for _ in range(config.AGENT_BAD_REPLY_RETRIES + 1):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except json.JSONDecodeError as exc:
+            problem = exc
+    raise BadReply(f"The model's reply was not JSON in {config.AGENT_BAD_REPLY_RETRIES + 1} tries: {problem}")
+
+
 def toolset(tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = ()) -> dict[str, Tool]:
     """A role's tools: registry tools by name (None: all of them) plus tools the host adds, e.g. analysts."""
     return {name: registry.TOOLS[name] for name in (registry.TOOLS if tool_names is None else tool_names)} | {
@@ -100,7 +115,7 @@ def _finalize(client, model, request_kwargs, messages, tools, finish, trace, ste
 
 def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
     # No max_tokens: output-token caps cut reasoning models off mid-answer (PROJECT_GUIDE §5).
-    response = client.chat.completions.create(model=model, messages=messages, tools=tools, **request_kwargs, **extra)
+    response = create(client, model=model, messages=messages, tools=tools, **request_kwargs, **extra)
     usage = response.usage.model_dump() if response.usage else None
     provider = (response.model_extra or {}).get("provider")  # the host that served it (OpenRouter)
     if not response.choices:

@@ -109,6 +109,17 @@ AGENT_CRITIC_ROUNDS = 3
 # outlast OpenRouter's upstream 429s in the 3 Nov 2026 live check; 6 waits about 25 s. Agents also
 # let OpenRouter fall back to another host of the same model. Baseline A keeps the SDK default.
 AGENT_MODEL_RETRIES = 6
+# Retries of a model call whose 200 reply body isn't JSON (a host cut the reply off), which the SDK doesn't retry.
+# Seen once in the 3 Nov 2026 live Discover check; after these the call fails like any other model error.
+AGENT_BAD_REPLY_RETRIES = 2
+
+# Discover (REFERENCE §4): companies explained when the question doesn't say how many. Each one is a full
+# research run (B, C or D), so three keeps a Discover run to about the cost and time of three Check runs.
+DISCOVER_DEFAULT_TOP_K = 3
+# Research runs allowed beyond top-k, to replace candidates whose research failed (PROJECT_GUIDE §5: "top-k plus
+# a few replacements", user-adjustable with --replacements). Candidates the deterministic check rejects cost no
+# model call and don't count. On reaching it the shortlist returns fewer picks and says why.
+DISCOVER_MAX_REPLACEMENTS = 3
 
 
 def trace_dir() -> Path:

@@ -17,7 +17,7 @@ from . import prompts
 from .checker import CheckedReport, check
 from .claims import ClaimLedger, report_claims
 from .draft import SECTIONS, Draft
-from .loop import Finish, LoopResult, run_loop, toolset
+from .loop import Finish, LoopResult, create, run_loop, toolset
 from .objections import claims_view, evidence_view, issue_list
 from .report import render
 from .roles import Role
@@ -114,7 +114,7 @@ def _plan(question, client, model, kwargs, cutoff, trace, lead: Role, extra_tool
     tools = "\n".join(f"- {tool.name}: {tool.description}" for tool in toolset(lead.tools, extra_tools).values())
     messages = [{"role": "system", "content": prompts.load(lead.plan_prompt, cutoff=cutoff, tools=tools)},
                 {"role": "user", "content": question}]
-    response = client.chat.completions.create(model=model, messages=messages, **kwargs)
+    response = create(client, model=model, messages=messages, **kwargs)
     plan = ((response.choices[0].message.content if response.choices else None) or "").strip()
     trace.write("plan", plan=plan, model=response.model, provider=(response.model_extra or {}).get("provider"),
                 usage=response.usage.model_dump() if response.usage else None)

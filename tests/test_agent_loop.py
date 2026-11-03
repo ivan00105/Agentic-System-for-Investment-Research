@@ -6,6 +6,7 @@ from fake_llm import FakeClient, reply, tool_results
 from pydantic import BaseModel
 from sec_files import make_context
 
+from research_assistant import config
 from research_assistant.agents.loop import Finish, run_loop
 from research_assistant.agents.trace import Trace
 from research_assistant.tools import registry
@@ -138,6 +139,14 @@ def test_a_model_failure_is_a_failed_result_not_an_exception(tmp_path):
     assert result.status == "failed" and result.output is None and result.steps == 2
     assert "unavailable" in result.error and "example.invalid" not in result.error
     assert events(trace)[-1]["kind"] == "error"
+
+
+def test_a_reply_that_is_not_json_is_retried_then_fails_cleanly(tmp_path):
+    cut_off = json.JSONDecodeError("Expecting value", "\n" * 12, 12)
+    result, _, _ = start(tmp_path, FakeClient(FIND_APPLE, cut_off, submit_found_cik))
+    assert result.status == "finished" and result.steps == 2
+    result, _, trace = start(tmp_path, FakeClient(*[cut_off] * (config.AGENT_BAD_REPLY_RETRIES + 1)))
+    assert result.status == "failed" and events(trace)[-1]["type"] == "BadReply"
 
 
 def test_the_serving_host_is_traced_so_a_fallback_is_never_silent(tmp_path):

@@ -1,6 +1,6 @@
 """Serve the web app, answer one research question in the terminal with the single agent (condition B), the
-analyst team (condition C) or the team with its critic (condition D), review a saved run's draft with the critic,
-or recheck a saved run's numbers offline from its trace."""
+analyst team (condition C) or the team with its critic (condition D), discover companies in a declared universe,
+review a saved run's draft with the critic, or recheck a saved run's numbers offline from its trace."""
 import argparse
 import sys
 from datetime import date, datetime, time, timezone
@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from . import config
-from .agents import critic, evidence, isolated_review, single_agent, team
+from .agents import critic, discover, evidence, isolated_review, single_agent, team
+from .data import universe
 from .data.sec import SecClient
 from .model_access import load_model_settings
 from .tools.result import ToolContext
@@ -20,6 +21,7 @@ from .tools.result import ToolContext
 sec_client = SecClient
 # Evaluation conditions the CLI can run (REFERENCE §7); A is the web app's fixed pipeline.
 CONDITIONS = {"B": single_agent.run, "C": team.run, "D": critic.run}
+LABELS = {"B": single_agent.CONDITION, "C": team.CONDITION, "D": critic.CONDITION}
 
 
 def model_client(settings):
@@ -40,13 +42,37 @@ def main(argv: list[str] | None = None) -> int:
                         help="Run condition D's critic and revisions on a saved run's final draft and frozen evidence.")
     parser.add_argument("--inject", choices=sorted(isolated_review.DEFECTS),
                         help="With --review: first plant a labelled test defect in the saved draft.")
+    parser.add_argument("--universe", metavar="NAME_OR_FILE",
+                        help="Discover: screen this declared universe (bundled: " + ", ".join(universe.bundled())
+                             + "; or a YAML file), then research the top candidates with --condition.")
+    parser.add_argument("--define", action="append", default=[], metavar="TERM=MEANING",
+                        help="With --universe: define a vague term up front, e.g. 'reasonable valuation=P/E below "
+                             "40'. Terms left open are asked about when the terminal is interactive.")
+    parser.add_argument("--replacements", type=int, default=config.DISCOVER_MAX_REPLACEMENTS, metavar="N",
+                        help="With --universe: research runs allowed beyond top-k to replace failed ones "
+                             f"(default {config.DISCOVER_MAX_REPLACEMENTS}).")
     args = parser.parse_args(argv)
     if args.inject and not args.review:
         parser.error("--inject needs --review TRACE")
+    if args.universe and args.cutoff:
+        parser.error("Discover runs on current data only (SEC frames aren't point-in-time), so --cutoff can't be "
+                     "used with --universe")
+    if (args.define or args.replacements != config.DISCOVER_MAX_REPLACEMENTS) and not args.universe:
+        parser.error("--define and --replacements need --universe")
+    if args.replacements < 0:
+        parser.error("--replacements can't be negative")
+    defined = dict(item.split("=", 1) for item in args.define if "=" in item)
+    if len(defined) != len(args.define) or not all(k.strip() and v.strip() for k, v in defined.items()):
+        parser.error("--define takes TERM=MEANING, e.g. 'cheap=P/E below 15'")
     if args.recheck:
         return recheck(args.recheck)
     if args.review:
         return review(args.review, args.inject)
+    if args.universe:
+        if args.question is None:
+            parser.error("--universe needs a question")
+        return find(args.question, args.universe, args.condition,
+                    {k.strip(): v.strip() for k, v in defined.items()}, args.replacements)
     if args.question is None:
         uvicorn.run("research_assistant.api:create_app", factory=True, host="127.0.0.1", port=8000, workers=1)
         return 0
@@ -80,6 +106,37 @@ def ask(question: str, cutoff_day: date | None, condition: str = "B") -> int:
             print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
         result = CONDITIONS[condition](question, client, settings, ToolContext(cutoff=cutoff, sec=sec), echo=progress)
     return show(result)
+
+
+def find(question: str, name: str, condition: str, defined: dict[str, str], replacements: int) -> int:
+    try:
+        declared = universe.load(name)
+    except universe.UniverseError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    if (settings := model_settings()) is None:
+        return 2
+    with sec_client() as sec, model_client(settings) as client:
+        if not sec.configured:
+            print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
+        result = discover.run(question, client, settings, ToolContext(cutoff=datetime.now(timezone.utc), sec=sec),
+                              declared, research=CONDITIONS[condition], condition=LABELS[condition], ask=ask_user,
+                              defined=defined, replacements=replacements, echo=progress)
+    return show(result)
+
+
+def ask_user(term) -> str | None:
+    """A vague term's question on the terminal: an answer sets it, Enter accepts the proposal. None when no one can
+    be asked (no terminal, or its input is empty), so the proposal stands labelled "assumed"."""
+    if not sys.stdin.isatty():  # on Windows the NUL device counts as a terminal; input() then hits EOF below
+        return None
+    print(f"\n{term.question}\n  Proposed: {term.definition}\n  Your definition (Enter accepts): ", end="",
+          file=sys.stderr, flush=True)
+    try:
+        return input()
+    except EOFError:
+        print("(no answer)", file=sys.stderr)
+        return None
 
 
 def review(path: Path, inject: str | None) -> int:
@@ -116,8 +173,9 @@ def progress(event: dict):
     elif kind == "model_call":
         calls = [c["function"]["name"] for c in event["tool_calls"]]
         line = f"step {step}: model asks for {', '.join(calls) or 'no tool'}"
-    elif kind == "tool_call":
-        line = f"step {step}: {event['name']} -> {event['result']['status']}" + (" (repeat)" if event["repeat_of"] else "")
+    elif kind == "tool_call":  # the host's own calls (Discover's screen and checks) have no step
+        line = (f"step {step}: " if step else "") + f"{event['name']} -> {event['result']['status']}" + (
+            " (repeat)" if event["repeat_of"] else "")
     elif kind == "check":
         line = f"checker: {len(event['flags'])} flags"
     elif kind == "analyst_start":
@@ -134,6 +192,17 @@ def progress(event: dict):
         line = f"revising for {len(event['objections'])} objections"
     elif kind == "outcomes":
         line = "outcomes: " + ", ".join(f"{o['objection']} {o['outcome']}" for o in event["outcomes"])
+    elif kind == "screen_spec":
+        line = "screen spec:" + "".join(f"\n  - {text}" for text in event["shown"])
+    elif kind == "clarify":
+        line = f"{event['term']}: " + (f"set to {event['answer']!r}" if event["answer"] else
+                                       "proposal accepted" if event["answer"] == "" else "assumed (no answer)")
+    elif kind == "candidate":
+        line = f"candidate {event['rank']} {event['name']}: check {event['verdict']}"
+    elif kind == "research_start":
+        line = f"researching candidate {event['rank']} {event['name']}"
+    elif kind == "research_end":
+        line = f"research of candidate {event['rank']} {event['status']} (trace {event['trace']})"
     elif kind == "injected":
         line = f"injected {event['defect']}: {event['change']}"
     elif kind in ("self_review", "stopped_at_limit", "nudge", "error"):
