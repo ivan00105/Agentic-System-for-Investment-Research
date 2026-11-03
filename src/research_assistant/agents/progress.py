@@ -30,6 +30,9 @@ def describe(event: dict) -> str | None:
         line = "outcomes: " + ", ".join(f"{o['objection']} {o['outcome']}" for o in event["outcomes"])
     elif kind == "screen_spec":
         line = "screen spec:" + "".join(f"\n  - {text}" for text in event["shown"])
+    elif kind == "questions":
+        line = (f"screen spec drafted, {len(event['terms'])} questions for the user:"
+                + "".join(f"\n  - {text}" for text in event["shown"]))
     elif kind == "clarify":
         line = f"{event['term']}: " + (f"set to {event['answer']!r}" if event["answer"] else
                                        "proposal accepted" if event["answer"] == "" else "assumed (no answer)")

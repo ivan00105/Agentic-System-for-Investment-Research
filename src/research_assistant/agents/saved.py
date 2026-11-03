@@ -79,7 +79,34 @@ def report(path: Path) -> dict | None:
             "objections": [_objection(o) for o in end.get("objections") or []],
             "sources": [_source(n, i, run.records) for i, n in number.items()],
             "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
+            "discover": _discover(run, path.parent) if "candidates" in end else None,
             "markdown": end.get("markdown") or ""}
+
+
+def questions(path: Path) -> dict | None:
+    """What a Discover run waiting for the user asks: its draft spec as shown, and each vague term's question."""
+    found = next((e for e in reversed(read_events(path)) if e.get("kind") == "questions"), None)
+    return found and {"terms": found["terms"], "shown": found["shown"]}
+
+
+def _discover(run, folder: Path) -> dict:
+    """A Discover run's shortlist: the spec as shown, the counts, and each checked candidate with its check's
+    lines and, for a researched one, its own run and that report's answer."""
+    spec = next((e for e in reversed(run.events) if e["kind"] == "screen_spec"), None)
+    checks = {e["rank"]: e for e in run.events if e["kind"] == "candidate"}
+    candidates = [{key: c.get(key) for key in ("rank", "cik", "name", "outcome", "verdict", "run_id")}
+                  | {"lines": (checks.get(c["rank"]) or {}).get("lines", []), "answer": _answer(folder, c.get("run_id"))}
+                  for c in run.end["candidates"]]
+    return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates}
+
+
+def _answer(folder: Path, run_id: str | None) -> str | None:
+    """The first summary statement of a pick's own report: its answer."""
+    path = folder / f"{run_id}.jsonl" if run_id and RUN_ID.fullmatch(run_id) else None
+    if path is None or not path.is_file():
+        return None
+    claims = ((_ends(path)[1] or {}).get("report") or {}).get("sections", {}).get("summary") or []
+    return claims[0]["text"] if claims else None
 
 
 def record(path: Path, record_id: str) -> dict | None:

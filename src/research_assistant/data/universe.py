@@ -3,12 +3,14 @@
 A universe lists today's members, so it is a survivorship-biased snapshot; Discover always says which one it used.
 """
 from dataclasses import dataclass
+from datetime import date
 from importlib.resources import files
 from pathlib import Path
 
 import yaml
 
-from .sec import cik10
+from .companies import listed_companies, normalize_ticker
+from .sec import SecClient, cik10
 
 BUNDLED = files(__package__).joinpath("universes")
 
@@ -61,3 +63,18 @@ def load(name_or_path: str) -> Universe:
     if not members:
         raise UniverseError(f"{source} lists no companies.")
     return universe
+
+
+def from_tickers(sec: SecClient, tickers: list[str]) -> Universe:
+    """The user's own list (the web page's "my own list of tickers"), checked against SEC's current tickers."""
+    listed = {t: c for c in listed_companies(sec).values() for t in c.tickers}
+    wanted = list(dict.fromkeys(normalize_ticker(t) for t in tickers if t.strip()))
+    unknown = [t for t in wanted if t not in listed]
+    if unknown:
+        raise UniverseError(f"Not in SEC's current ticker list: {', '.join(unknown)}.")
+    if not wanted:
+        raise UniverseError("The list has no tickers.")
+    members = tuple(Member(t, listed[t].cik, listed[t].name) for t in wanted)
+    return Universe("your list", "tickers you entered, checked against SEC's company_tickers_exchange.json",
+                    date.today().isoformat(), "Chosen by the user: a hand-picked list, not an index or the market.",
+                    members)

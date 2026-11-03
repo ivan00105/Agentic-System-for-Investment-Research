@@ -54,15 +54,22 @@ class DiscoverRun:
 def run(question: str, client, settings: ModelSettings, context: ToolContext, universe: Universe, *,
         research: Research, condition: str, ask: Callable[[Term], str | None] | None = None,
         defined: dict[str, str] | None = None, replacements: int = config.DISCOVER_MAX_REPLACEMENTS,
-        trace_dir: Path | None = None, echo: Callable[[dict], None] | None = None) -> DiscoverRun:
-    trace = Trace.new(trace_dir, echo)
+        trace_dir: Path | None = None, echo: Callable[[dict], None] | None = None,
+        trace: Trace | None = None) -> DiscoverRun:
+    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app)."""
+    trace = trace or Trace.new(trace_dir, echo)
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=f"Discover ({condition})",
                 lead="screener", provider=settings.provider, model=settings.model, universe=universe.name,
                 replacements=replacements)
     with trace.acting_as("screener"):
-        found = interpret(question, universe, client, settings, context, trace, ask=ask, defined=defined)
-    if found.spec is None:
-        return _close(trace, question, settings, context, universe, found, condition, [], {}, [], found.error)
+        found = interpret(question, universe, client, settings, context, trace, ask=ask, defined=defined,
+                          on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
+                              "questions", terms=[t.model_dump() for t in terms], shown=spec_lines(
+                                  draft, dict.fromkeys((t.term for t in terms), "proposed"), universe,
+                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition)))
+    if found.spec is None or context.stop.is_set():  # cancelled, perhaps while the user was asked: nothing is screened
+        return _close(trace, question, settings, context, universe, found, condition, [], {}, [],
+                      None if context.stop.is_set() else found.error)
     spec = found.spec
     top_k = spec.top_k or config.DISCOVER_DEFAULT_TOP_K
     trace.write("screen_spec", spec=spec.model_dump(mode="json"), top_k=top_k, terms=found.sources,
@@ -81,6 +88,9 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
     for candidate in ranked:
         if sum(c.outcome == "picked" for c in ranked) == top_k:
             break
+        if context.stop.is_set():
+            notes.append("Cancelled: the candidates after this point were not checked or researched.")
+            break
         if researched == budget:
             notes.append(f"Stopped at the research limit: {budget} research runs (top {top_k} plus {replacements} "
                          "replacements). Raise --replacements to research more candidates.")
@@ -98,7 +108,7 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
         try:
             candidate.run = research(brief, client, settings, ToolContext(
                 cutoff=context.cutoff, sec=context.sec, price_providers=context.price_providers,
-                cache_dir=context.cache_dir), trace_dir=trace.path.parent, echo=echo)
+                cache_dir=context.cache_dir, stop=context.stop), trace_dir=trace.path.parent, echo=echo)
         except Exception as exc:  # a bug in one research run must not lose the others; its own trace shows where
             candidate.error = f"The research run crashed ({type(exc).__name__}: {exc}). This is a bug."
         run = candidate.run
@@ -154,7 +164,7 @@ def _close(trace, question, settings, context, universe, found, condition, ranke
         if c.run:  # each research run's per-role totals are in its own trace
             _add(totals, c.run.totals)
             _add(by_agent.setdefault("research", _zero()), c.run.totals)
-    status = "failed" if error else "finished"
+    status = "failed" if error else "stopped" if context.stop.is_set() else "finished"
     model = settings.model + (f" (served by {', '.join(trace.hosts)})" if trace.hosts else "")
     markdown = render(question=question, status=status, cutoff=context.cutoff.isoformat(), model=model,
                       run_id=trace.run_id, error=error, condition=condition, universe=universe, found=found,

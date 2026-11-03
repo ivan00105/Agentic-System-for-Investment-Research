@@ -4,31 +4,14 @@ import time
 
 import pytest
 from fake_llm import FakeClient, reply, resubmit
-from fastapi.testclient import TestClient
-from sec_files import make_context
 
 from research_assistant import cli
-from research_assistant.api import create_app
 
 REPORT = {"summary": [{"text": "Apple Inc. files annual reports with the SEC.", "citations": ["company-0000320193"]}]}
 FIND_APPLE = reply(tool_calls=[("find_company", {"query": "AAPL"})])
 MINOR_OBJECTION = {"id": "objection-1", "claim": "claim-1", "version": 1, "where": "key_numbers[0]",
                    "issue": "unsupported_inference", "material": False, "problem": "Item 7 has no such line.",
                    "outcome": "unresolved", "notes": ["Minor, so not sent back to the team."]}
-
-
-@pytest.fixture
-def web(tmp_path, monkeypatch):
-    """The web app with a scripted model and the SEC fixtures: set `web.model` before starting a run."""
-    monkeypatch.setenv("RESEARCH_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("RESEARCH_MODEL_PROVIDER", "openrouter")
-    monkeypatch.setenv("RESEARCH_MODEL", "fake-model")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(cli, "sec_client", lambda: make_context(tmp_path).sec)
-    monkeypatch.setattr(cli, "model_client", lambda settings: web.model)
-    with TestClient(create_app(tmp_path), base_url="http://localhost:8000") as web:
-        web.traces, web.model = tmp_path / "traces", FakeClient()
-        yield web
 
 
 def start(web, question="Who is Apple?", **body) -> str:

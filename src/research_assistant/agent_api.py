@@ -1,27 +1,57 @@
-"""Agent runs from the web page (PROJECT_GUIDE Phase 7, the thin web path): start a run of condition B, C or D in the
-background, follow its progress, cancel it and read its checked report. Saved runs are the trace files in
-data/traces/ (agents/saved.py), so History also lists runs started from the CLI."""
+"""Agent runs from the web page (PROJECT_GUIDE Phase 7): start a run of condition B, C or D, or a Discover run over a
+declared universe, in the background; follow its progress, answer Discover's questions, cancel it and read its checked
+report. Saved runs are the trace files in data/traces/ (agents/saved.py), so History also lists runs started from
+the CLI."""
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, model_validator
 
-from . import cli
-from .agents import saved
+from . import cli, config
+from .agents import discover, saved
 from .agents.trace import Trace
 from .contracts import DomainError
+from .data import universe as universes
+from .data.errors import DataError
 from .model_access import load_model_settings
 from .tools.result import ToolContext
 
 router = APIRouter(prefix="/api/agent-runs")
 
 
+class Universe(BaseModel):
+    """Discover's universe: a bundled list by name, or the user's own tickers."""
+    name: str | None = None
+    tickers: list[str] | None = None
+
+    @model_validator(mode="after")
+    def _one(self):
+        if (self.name is None) == (self.tickers is None):
+            raise ValueError("give either a bundled universe name or a list of tickers")
+        return self
+
+
 class StartRun(BaseModel):
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    condition: Literal["B", "C", "D"] = "D"  # the analyst team with its critic: the full design
+    # Empty: D, the analyst team with its critic (the full design), or config.WEB_DISCOVER_CONDITION for Discover.
+    condition: Literal["B", "C", "D"] | None = None
+    cutoff: date | None = None  # research as of the end of this day (UTC), as the CLI's --cutoff
+    discover: Universe | None = None
+
+
+class Answers(BaseModel):
+    answers: dict[str, str]  # term -> the user's definition; "" accepts the proposal
+
+
+class Pending:
+    """A Discover run waiting for the user's answers to its vague-term questions."""
+
+    def __init__(self):
+        self.answers: dict[str, str] = {}
+        self.ready = threading.Event()
 
 
 class AgentRuns:
@@ -30,20 +60,28 @@ class AgentRuns:
     def __init__(self, folder: Path):
         self.folder = folder
         self.active: dict[str, threading.Event] = {}
+        self.waiting: dict[str, Pending] = {}
         self.lock = threading.Lock()
 
-    def start(self, question: str, condition: str, settings) -> str:
+    def start(self, question: str, condition: str, settings, cutoff: datetime | None = None,
+              universe: universes.Universe | None = None) -> str:
         trace, stop = Trace.new(self.folder), threading.Event()
         with self.lock:
             self.active[trace.run_id] = stop
-        threading.Thread(target=self._run, args=(question, condition, settings, trace, stop), daemon=True).start()
+        threading.Thread(target=self._run, args=(question, condition, settings, trace, stop, cutoff, universe),
+                         daemon=True).start()
         return trace.run_id
 
-    def _run(self, question: str, condition: str, settings, trace: Trace, stop: threading.Event):
+    def _run(self, question: str, condition: str, settings, trace: Trace, stop: threading.Event,
+             cutoff: datetime | None, universe: universes.Universe | None):
         try:
             with cli.sec_client() as sec, cli.model_client(settings) as client:
-                context = ToolContext(cutoff=datetime.now(timezone.utc), sec=sec, stop=stop)
-                cli.CONDITIONS[condition](question, client, settings, context, trace=trace)
+                context = ToolContext(cutoff=cutoff or datetime.now(timezone.utc), sec=sec, stop=stop)
+                if universe:
+                    discover.run(question, client, settings, context, universe, research=cli.CONDITIONS[condition],
+                                 condition=cli.LABELS[condition], ask=self._asker(trace.run_id, stop), trace=trace)
+                else:
+                    cli.CONDITIONS[condition](question, client, settings, context, trace=trace)
         except Exception as exc:  # a bug must still end the trace, or the page would show the run going forever
             if not trace.seq:
                 trace.write("run_start", question=question, condition=cli.LABELS[condition])
@@ -51,12 +89,38 @@ class AgentRuns:
         finally:
             with self.lock:
                 del self.active[trace.run_id]
+                self.waiting.pop(trace.run_id, None)
+
+    def _asker(self, run_id: str, stop: threading.Event):
+        """Discover's `ask`: the run waits until the page sends answers to all its questions, or it is cancelled."""
+        pending = Pending()
+
+        def ask(term) -> str | None:
+            with self.lock:
+                if not pending.ready.is_set() and not stop.is_set():
+                    self.waiting[run_id] = pending
+            while not pending.ready.wait(0.2):
+                if stop.is_set():  # cancelled: the proposal stands as assumed and the run stops before the screen
+                    with self.lock:
+                        self.waiting.pop(run_id, None)
+                    return None
+            return pending.answers.get(term.term)  # None for a term the page didn't answer: assumed
+        return ask
+
+    def answer(self, run_id: str, answers: dict[str, str]) -> bool:
+        with self.lock:
+            pending = self.waiting.pop(run_id, None)
+        if pending:
+            pending.answers = answers
+            pending.ready.set()
+        return pending is not None
 
     def cancel(self, run_id: str) -> bool:
-        with self.lock:
+        with self.lock:  # under the lock, so a waiting run can't register its questions again after this
             stop = self.active.get(run_id)
-        if stop:
-            stop.set()
+            if stop:
+                stop.set()
+                self.waiting.pop(run_id, None)
         return stop is not None
 
     def stop_all(self):
@@ -79,17 +143,18 @@ class AgentRuns:
         active = self._active()
         return [_status(found, active) for found in saved.runs(self.folder)]
 
-    def _active(self) -> dict[str, threading.Event]:
+    def _active(self) -> dict[str, threading.Event | None]:
         # Read before the trace: a run writes run_end before it leaves `active`, so it never looks incomplete.
         with self.lock:
-            return dict(self.active)
+            return {**self.active, **dict.fromkeys(self.waiting)}  # None marks a run waiting for answers
 
 
-def _status(found: dict, active: dict[str, threading.Event]) -> dict:
+def _status(found: dict, active: dict[str, threading.Event | None]) -> dict:
     if found["status"] is None:
-        stop = active.get(found["run_id"])
+        run_id = found["run_id"]
         # incomplete: no run_end and not running here (a CLI run still going, or a server stopped mid-run)
-        found["status"] = "incomplete" if stop is None else "stopping" if stop.is_set() else "running"
+        found["status"] = ("incomplete" if run_id not in active else "waiting" if active[run_id] is None
+                           else "stopping" if active[run_id].is_set() else "running")
     return found
 
 
@@ -104,7 +169,19 @@ def start(body: StartRun, request: Request):
         raise DomainError(settings.error or "Model access is not configured: set RESEARCH_MODEL_PROVIDER, "
                           "RESEARCH_MODEL and the provider's API key in .env (see .env.example).",
                           "model_not_configured", 409)
-    return runs(request).view(runs(request).start(body.question, body.condition, settings))
+    if body.discover and body.cutoff:  # REFERENCE §4 rule 9
+        raise DomainError("Discover runs on current data only, so it takes no cutoff.", "discover_cutoff", 422)
+    declared = None
+    if body.discover:
+        try:
+            with cli.sec_client() as sec:
+                declared = (universes.load(body.discover.name) if body.discover.name
+                            else universes.from_tickers(sec, body.discover.tickers))
+        except (universes.UniverseError, DataError) as exc:
+            raise DomainError(str(exc), "bad_universe", 422) from exc
+    condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
+    cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
+    return runs(request).view(runs(request).start(body.question, condition, settings, cutoff, declared))
 
 
 @router.get("")
@@ -115,7 +192,16 @@ def history(request: Request):
 @router.get("/{run_id}")
 def progress(run_id: str, request: Request):
     view, path = runs(request).view(run_id), runs(request).path(run_id)
-    return {**view, "progress": saved.progress(path) if path.is_file() else []}
+    questions = saved.questions(path) if view["status"] == "waiting" else None
+    return {**view, "progress": saved.progress(path) if path.is_file() else [], "questions": questions}
+
+
+@router.post("/{run_id}/answers")
+def answer(run_id: str, body: Answers, request: Request):
+    """Discover's answers to its vague-term questions: text sets a term, "" accepts its proposal."""
+    if not runs(request).answer(run_id, body.answers):
+        raise DomainError("This run is not waiting for answers.", "not_waiting", 409)
+    return runs(request).view(run_id)
 
 
 @router.post("/{run_id}/cancel")

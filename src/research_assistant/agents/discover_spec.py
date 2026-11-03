@@ -53,7 +53,7 @@ SUBMIT_SPEC = Finish("submit_screen_spec", "Hand in the screen spec: filters, ra
 
 # How each term's definition was settled, as the shortlist shows it.
 SOURCES = {"user": "set by the user", "accepted": "proposed and accepted by the user",
-           "assumed": "assumed: not confirmed by the user"}
+           "assumed": "assumed: not confirmed by the user", "proposed": "proposed: waiting for the user's answer"}
 
 
 @dataclass
@@ -66,9 +66,11 @@ class Interpretation:
 
 def interpret(question: str, universe: Universe, client, settings: ModelSettings, context: ToolContext,
               trace: Trace, *, ask: Callable[[Term], str | None] | None = None,
-              defined: dict[str, str] | None = None) -> Interpretation:
+              defined: dict[str, str] | None = None,
+              on_questions: Callable[[ScreenSpec, list[Term]], None] | None = None) -> Interpretation:
     """`ask` returns the user's answer to a term's question: text to set it, "" to accept the proposal, None when
-    nobody can be asked. `defined` holds terms the user defined up front (term -> meaning)."""
+    nobody can be asked. `defined` holds terms the user defined up front (term -> meaning). `on_questions` gets
+    the draft spec and the terms about to be asked, so the user sees the whole spec before answering."""
     defined = defined or {}
     kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
     given = "".join(f"\n- {term}: {meaning}" for term, meaning in defined.items())
@@ -80,6 +82,9 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
     if result.output is None:
         return Interpretation(None, status=result.status, error=result.error or "No screen spec was handed in.")
     spec, sources, answers = result.output, {}, {}
+    asked = [term for term in spec.terms if not _match(term.term, defined)]
+    if ask and asked and on_questions:
+        on_questions(spec, asked)
     for term in spec.terms:
         if _match(term.term, defined):
             sources[term.term] = "user"
