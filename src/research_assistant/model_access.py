@@ -46,11 +46,13 @@ class ModelSettings:
             kwargs.update(organization="", project="")
         return kwargs
 
-    def request_kwargs(self) -> dict:
+    def request_kwargs(self, fallbacks: bool = False) -> dict:
+        # fallbacks: let OpenRouter move to another host of the same model when one is rate-limited.
+        # Agents use it (the serving host is traced per call); baseline A keeps a single host.
         kwargs = {"store": False}
         if self.provider == "openrouter":
             kwargs["extra_body"] = {
-                "provider": {"require_parameters": True, "allow_fallbacks": False}
+                "provider": {"require_parameters": True, "allow_fallbacks": fallbacks}
             }
         return kwargs
 

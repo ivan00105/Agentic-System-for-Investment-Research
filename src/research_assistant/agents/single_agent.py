@@ -41,7 +41,7 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     cutoff = context.cutoff.isoformat()
     trace.write("run_start", question=question, cutoff=cutoff, provider=settings.provider, model=settings.model,
                 max_steps=max_steps)
-    kwargs = settings.request_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
+    kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
     try:
         plan = _plan(question, client, settings.model, kwargs, cutoff, trace)
     except (OpenAIError, TimeoutError) as exc:
@@ -77,7 +77,8 @@ def _plan(question, client, model, kwargs, cutoff, trace) -> str:
                 {"role": "user", "content": question}]
     response = client.chat.completions.create(model=model, messages=messages, **kwargs)
     plan = ((response.choices[0].message.content if response.choices else None) or "").strip()
-    trace.write("plan", plan=plan, model=response.model, usage=response.usage.model_dump() if response.usage else None)
+    trace.write("plan", plan=plan, model=response.model, provider=(response.model_extra or {}).get("provider"),
+                usage=response.usage.model_dump() if response.usage else None)
     return plan
 
 
@@ -103,8 +104,9 @@ def _end(trace, question, settings, context, status, plan, report, notes, error)
         notes = [f"The model did not hand in a report ({error or status}). Every section is abstained; the "
                  f"{len(context.records)} records gathered before it stopped are listed as sources."] + notes
     report.limitations += notes
+    model = settings.model + (f" (served by {', '.join(trace.hosts)})" if trace.hosts else "")
     markdown = render(report, context.records, question=question, status=status, cutoff=context.cutoff.isoformat(),
-                      model=settings.model, plan=plan, run_id=trace.run_id, error=error)
+                      model=model, plan=plan, run_id=trace.run_id, error=error)
     trace.write("run_end", status=status, error=error, totals=dict(trace.totals),
                 statuses={key: report.section_status(key) for key, _ in SECTIONS}, report=asdict(report),
                 markdown=markdown)

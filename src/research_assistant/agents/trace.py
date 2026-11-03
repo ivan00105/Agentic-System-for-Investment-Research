@@ -21,6 +21,8 @@ class Trace:
         self.seq = 0
         # cost stays None unless the provider reports one (OpenRouter does in `usage.cost`).
         self.totals = {"model_calls": 0, "tool_calls": 0, **dict.fromkeys(USAGE_FIELDS, 0), "cost": None}
+        # Hosts that served the model calls (OpenRouter may fall back between them), so a fallback is never silent.
+        self.hosts: list[str] = []
 
     @classmethod
     def new(cls, folder: Path | None = None, echo: Callable[[dict], None] | None = None) -> "Trace":
@@ -33,6 +35,8 @@ class Trace:
         event = {"seq": self.seq, "at": datetime.now(timezone.utc).isoformat(), "kind": kind, **fields}
         if "usage" in fields:
             self._count(fields["usage"] or {})
+            if fields.get("provider") and fields["provider"] not in self.hosts:
+                self.hosts.append(fields["provider"])
         if kind == "tool_call":
             self.totals["tool_calls"] += 1
         with self.path.open("a", encoding="utf-8") as file:

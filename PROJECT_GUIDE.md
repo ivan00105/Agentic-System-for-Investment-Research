@@ -171,7 +171,7 @@ What went wrong before: a 2,000-output-token cap cut off reasoning-model answers
 1. **No output-token caps, and no token or cost quotas by default.** Record usage, and let the provider's own limits apply. A cost budget is opt-in only.
 2. **Loop guards are not quality caps.** Agents need a max-step guard against infinite loops. Make it generous (about 30–40 steps). When it's reached, **write the best partial report and mark it "stopped at limit"**. Never error out.
 3. **Every tunable lives in one file** (`config.py`) with a comment saying why. No magic numbers in the code.
-4. **Retry transient errors** (429/5xx) with the SDK defaults. Don't fail on the first network blip.
+4. **Retry transient errors** (429/5xx) with the SDK's retry logic. Don't fail on the first network blip. Agents retry more patiently (`AGENT_MODEL_RETRIES`) and let OpenRouter fall back to another host of the same model, recording the serving host per call; baseline A keeps the SDK default and one host.
 5. **Never hard-code the universe**, the sector list or result counts.
 6. **Flag, don't reject.** A small problem in an LLM answer becomes a flagged item, not a thrown-away answer.
 7. **Never silently truncate** input or output. If something is too big, say so.

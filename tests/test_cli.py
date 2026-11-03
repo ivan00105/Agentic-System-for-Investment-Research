@@ -6,7 +6,8 @@ import openai
 from fake_llm import FakeClient, reply
 from sec_files import make_context
 
-from research_assistant import cli
+from research_assistant import cli, config
+from research_assistant.model_access import ModelSettings
 
 REPORT = {"summary": [{"text": "Apple Inc. files annual reports with the SEC.", "citations": ["company-0000320193"]}]}
 
@@ -43,6 +44,12 @@ def test_a_failed_run_exits_1(tmp_path, monkeypatch, capsys):
 def test_missing_model_settings_explain_what_to_set(capsys):
     assert cli.main(["Who is Apple?"]) == 2
     assert "RESEARCH_MODEL" in capsys.readouterr().err
+
+
+def test_the_agent_model_client_retries_patiently():
+    settings = ModelSettings("openrouter", "OpenRouter", "fake-model", "key", "https://openrouter.ai/api/v1")
+    with cli.model_client(settings) as client:
+        assert client.max_retries == config.AGENT_MODEL_RETRIES > 2
 
 
 def test_no_question_serves_the_web_app(monkeypatch):

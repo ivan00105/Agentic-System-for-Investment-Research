@@ -4,6 +4,7 @@ Every row carries the as-traded `close` (for market cap) and the split- and divi
 (for returns). One series always comes from one provider.
 """
 import json
+import math
 import os
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -34,6 +35,20 @@ def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper().replace(".", "-")
 
 
+def _with_closes(rows: list[dict], notes: list[str]) -> list[dict]:
+    """Drop days without both closes: Yahoo can list the current day with a blank (NaN) close. Unknown is
+    left out, never turned into a number, and the note says how many days went."""
+    def known(value) -> bool:
+        return isinstance(value, (int, float)) and math.isfinite(value)
+
+    kept, missing = [], []
+    for row in rows:
+        (kept if known(row.get("close")) and known(row.get("adj_close")) else missing).append(row)
+    if missing:
+        notes.append(f"{len(missing)} day(s) without a close left out: {', '.join(r['date'] for r in missing)}.")
+    return kept
+
+
 def fetch(ticker: str, start: date, end: date, cache: DiskCache, names: list[str] | None = None) -> tuple[list[dict], str, list[str]]:
     """Rows in date order, the provider that supplied them, and notes on skipped or failed providers."""
     ticker, notes, errors = normalize_ticker(ticker), [], []
@@ -45,7 +60,7 @@ def fetch(ticker: str, start: date, end: date, cache: DiskCache, names: list[str
         key = f"prices|{name}|{ticker}|{start}|{end}"
         cached = cache.get(key, timedelta(hours=config.PRICE_CACHE_MAX_AGE_HOURS))
         if cached is not None:
-            return json.loads(cached[0]), name, notes
+            return _with_closes(json.loads(cached[0]), notes), name, notes
         try:
             rows = adapter.fetch(ticker, start, end)
         except DataError as exc:
@@ -53,7 +68,7 @@ def fetch(ticker: str, start: date, end: date, cache: DiskCache, names: list[str
             notes.append(f"{name} failed: {exc}")
             continue
         cache.put(key, json.dumps(rows).encode(), datetime.now(timezone.utc))
-        return rows, name, notes
+        return _with_closes(rows, notes), name, notes
     if errors and all(e.code == "not_found" for e in errors):
         raise DataError(f"No price history for {ticker}. " + " ".join(notes), "not_found")
     raise DataError(f"No price provider could supply {ticker}. " + " ".join(notes), "not_configured" if not errors else "network")

@@ -81,6 +81,15 @@ def test_unknown_ticker_everywhere_is_not_found(tmp_path, monkeypatch):
     assert error.value.code == "not_found"
 
 
+def test_days_without_a_close_are_left_out_and_counted(tmp_path, monkeypatch):
+    frame, splits = yahoo((50.0, 51.0, float("nan")))
+    monkeypatch.setattr(prices_yfinance, "_history", lambda *a: (frame, splits))
+    for _ in range(2):  # fresh, then from the cache
+        rows, _, notes = prices.fetch("NVDA", date(2026, 3, 1), date(2026, 3, 4), DiskCache(tmp_path))
+        assert [r["date"] for r in rows] == ["2026-03-02", "2026-03-03"]
+        assert notes[-1] == "1 day(s) without a close left out: 2026-03-04."
+
+
 def test_cached_series_is_reused(tmp_path, calls):
     for _ in range(2):
         prices.fetch("AAPL", date(2026, 3, 1), date(2026, 3, 4), DiskCache(tmp_path))

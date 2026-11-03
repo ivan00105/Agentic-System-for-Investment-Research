@@ -100,6 +100,15 @@ def test_valuation_chain_market_cap_then_pe(apple):
     assert Decimal(pe.data["value"]) == round(Decimal(250 * 14594180000) / Decimal(112010000000), 6)
 
 
+def test_market_cap_skips_a_blank_close(apple):
+    # Live check 3 Nov 2026: Yahoo listed the current day with a NaN close and market_cap crashed.
+    context, ids = apple
+    series = prices(context, "prices-nvda", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0},
+                                             {"date": "2026-11-02", "close": float("nan"), "adj_close": None}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    assert cap.status == "ok" and cap.data["value"] == str(250 * 14594180000) and "2026-10-30" in cap.data["notes"][0]
+
+
 def test_price_risk_and_beta_need_one_provider(apple):
     context, _ = apple
     rows = [{"date": f"2026-01-0{d}", "close": c, "adj_close": c} for d, c in enumerate([100.0, 102.0, 99.0, 101.0], 1)]

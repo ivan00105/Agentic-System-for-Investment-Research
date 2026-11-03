@@ -116,6 +116,14 @@ def test_a_model_failure_is_a_failed_result_not_an_exception(tmp_path):
     assert events(trace)[-1]["kind"] == "error"
 
 
+def test_the_serving_host_is_traced_so_a_fallback_is_never_silent(tmp_path):
+    client = FakeClient(reply(tool_calls=[("find_company", {"query": "AAPL"})], provider="Baidu"),
+                        lambda m: reply(tool_calls=[("submit_answer", {"cik": "320193"})], provider="DeepInfra"))
+    _, _, trace = start(tmp_path, client)
+    assert [e["provider"] for e in events(trace) if e["kind"] == "model_call"] == ["Baidu", "DeepInfra"]
+    assert trace.hosts == ["Baidu", "DeepInfra"]
+
+
 def test_reasoning_details_are_sent_back_but_not_traced(tmp_path):
     details = [{"type": "reasoning.text", "text": "private chain of thought"}]
     client = FakeClient(reply(tool_calls=[("find_company", {"query": "AAPL"})], extra={"reasoning_details": details}),

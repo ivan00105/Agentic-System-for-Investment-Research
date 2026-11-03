@@ -8,14 +8,15 @@ from openai.types.chat import ChatCompletion
 _call_ids = itertools.count(1)
 
 
-def reply(content: str | None = None, tool_calls=(), usage=(10, 5), extra: dict | None = None) -> ChatCompletion:
+def reply(content: str | None = None, tool_calls=(), usage=(10, 5), extra: dict | None = None,
+          provider: str | None = None) -> ChatCompletion:
     """One model answer. `tool_calls` holds (name, arguments) pairs; a str argument is sent as-is (bad JSON)."""
     calls = [{"id": f"call_{next(_call_ids)}", "type": "function",
               "function": {"name": name, "arguments": args if isinstance(args, str) else json.dumps(args)}}
              for name, args in tool_calls]
     message = {"role": "assistant", "content": content, "tool_calls": calls or None, **(extra or {})}
     return ChatCompletion.model_validate({
-        "id": "fake", "object": "chat.completion", "created": 0, "model": "fake-model",
+        "id": "fake", "object": "chat.completion", "created": 0, "model": "fake-model", "provider": provider,
         "choices": [{"index": 0, "finish_reason": "tool_calls" if calls else "stop", "message": message}],
         "usage": {"prompt_tokens": usage[0], "completion_tokens": usage[1], "total_tokens": sum(usage)}})
 

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import httpx
@@ -30,6 +31,14 @@ def test_unknown_tool_and_bad_arguments_are_invalid_not_raised(tmp_path):
     assert registry.call("buy_stock", {}, context).status == "invalid"
     bad = registry.call("get_financials", {"cik": "AAPL", "years": 0}, context)
     assert bad.status == "invalid" and any(w.startswith("cik:") for w in bad.warnings) and any(w.startswith("years:") for w in bad.warnings)
+
+
+def test_an_unexpected_tool_bug_is_a_status_not_an_exception(tmp_path, monkeypatch):
+    def broken(args, context):
+        raise ArithmeticError("boom")
+    monkeypatch.setitem(registry.TOOLS, "find_company", replace(registry.TOOLS["find_company"], run=broken))
+    result = registry.call("find_company", {"query": "AAPL"}, make_context(tmp_path))
+    assert result.status == "unavailable" and "find_company failed unexpectedly (ArithmeticError: boom)" in result.warnings[0]
 
 
 def test_provider_failures_become_statuses(tmp_path):

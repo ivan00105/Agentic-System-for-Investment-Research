@@ -2,6 +2,7 @@
 
 The model never passes numbers, only IDs, so every input is a value a tool actually returned.
 """
+import math
 from datetime import date
 from decimal import Decimal
 from typing import Literal
@@ -81,7 +82,9 @@ def _ordered(current: dict, previous: dict, same_metric: bool = True) -> Decimal
 def _closes(series: dict, field: str = "adj_close") -> dict[str, float]:
     if series["kind"] != "prices":
         raise Rejected(f"{series['id']} is not a price series from get_prices.")
-    return {row["date"]: row[field] for row in series["rows"] if row.get(field) is not None}
+    # A blank (None or NaN) close is unknown and left out, never treated as a price.
+    return {row["date"]: row[field] for row in series["rows"]
+            if isinstance(row.get(field), (int, float)) and math.isfinite(row[field])}
 
 
 def _compute(formula: str, r: dict[str, dict]):

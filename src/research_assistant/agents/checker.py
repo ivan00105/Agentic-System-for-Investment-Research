@@ -10,9 +10,13 @@ from .draft import SECTIONS, Claim, Draft
 # Tolerates spaces and a dash instead of the colon: {fact:fact-1a2b}, {fact: 1a2b}, {calc-1a2b}.
 PLACEHOLDER = re.compile(r"\{\s*(fact|calc)\s*[:-]\s*([A-Za-z0-9_.-]+?)\s*\}")
 ALLOWED_NUMBERS = re.compile("|".join(config.CHECKER_ALLOWED_NUMBER_PATTERNS))
+KINDS = "fact|calc|chunk|filing|company|prices|check|screen"
+# A citation as models write it: fact-1a2b, fact:1a2b, {calc:1a2b} or {chunk: 0000-...}.
+CITATION = re.compile(rf"\{{?\s*({KINDS})\s*:\s*([A-Za-z0-9_.-]+?)\s*\}}?")
 # A record ID written in the text is a misplaced citation, not a typed figure.
-RECORD_ID = re.compile(r"\b(?:fact|calc|chunk|filing|company|prices|check|screen)-[A-Za-z0-9_.-]+")
-TYPED_NUMBER = re.compile(r"[$€£]?[-+]?\d[\d,.]*(?:\s?(?:%|pp\b|x\b|bn\b|billion|million|thousand|trillion))?")
+RECORD_ID = re.compile(rf"\b(?:{KINDS})-[A-Za-z0-9_.-]+")
+# Digits glued to a word are names (H20, COVID-19, B200), not figures.
+TYPED_NUMBER = re.compile(r"(?<![\w.-])[$€£]?[-+]?\d[\d,.]*(?:\s?(?:%|pp\b|x\b|bn\b|billion|million|thousand|trillion))?")
 SCALES = ((Decimal(10) ** 12, "trillion"), (Decimal(10) ** 9, "billion"), (Decimal(10) ** 6, "million"))
 
 
@@ -66,7 +70,7 @@ def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
     text, used, flags = fill(claim.text, where, records)
     cited = []
     for raw in claim.citations:
-        match = PLACEHOLDER.fullmatch(raw.strip())
+        match = CITATION.fullmatch(raw.strip())
         found = lookup(records, match[2], match[1]) if match else lookup(records, raw.strip())
         if found is None:
             flags.append(Flag(where, f"Citation {raw!r} is not an ID any tool returned in this run."))

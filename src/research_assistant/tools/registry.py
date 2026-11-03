@@ -30,3 +30,6 @@ def call(name: str, arguments: dict, context: ToolContext) -> ToolResult:
     except DataError as exc:
         return ToolResult(status="not_found" if exc.code == "not_found" else "unavailable", source=tool.source,
                           warnings=[str(exc)])
+    except Exception as exc:  # a bug in one tool must not end the agent's run; the agent sees it and moves on
+        return ToolResult(status="unavailable", source=tool.source, warnings=[
+            f"{name} failed unexpectedly ({type(exc).__name__}: {exc}). This is a tool bug; don't retry the same call."])

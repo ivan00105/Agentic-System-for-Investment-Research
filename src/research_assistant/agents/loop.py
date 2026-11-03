@@ -93,9 +93,10 @@ def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
     # No max_tokens: output-token caps cut reasoning models off mid-answer (PROJECT_GUIDE §5).
     response = client.chat.completions.create(model=model, messages=messages, tools=tools, **request_kwargs, **extra)
     usage = response.usage.model_dump() if response.usage else None
+    provider = (response.model_extra or {}).get("provider")  # the host that served it (OpenRouter)
     if not response.choices:
         trace.write("model_call", step=step, content=None, tool_calls=[], finish_reason=None, model=response.model,
-                    usage=usage, problem="The provider returned no message.")
+                    provider=provider, usage=usage, problem="The provider returned no message.")
         return None
     choice = response.choices[0]
     message = choice.message
@@ -108,7 +109,7 @@ def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
         entry["reasoning_details"] = details  # sent back so reasoning models can continue; not traced
     messages.append(entry)
     trace.write("model_call", step=step, content=message.content, tool_calls=entry.get("tool_calls", []),
-                finish_reason=choice.finish_reason, model=response.model, usage=usage)
+                finish_reason=choice.finish_reason, model=response.model, provider=provider, usage=usage)
     return message
 
 

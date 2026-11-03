@@ -3,6 +3,7 @@
 Yahoo's Close is already split-adjusted, so the as-traded close is rebuilt from the full split history
 (REFERENCE §5). yfinance is imported on first use: it pulls in pandas.
 """
+import warnings
 from datetime import date, timedelta
 
 from .errors import DataError
@@ -15,13 +16,18 @@ def configured() -> bool:
 
 
 def _history(ticker: str, start: date, end: date):
-    import yfinance
+    # yfinance turns its own pandas deprecation notices back on at import; they say nothing about the data
+    # and bury the agent's progress lines, so they stay inside this block.
+    with warnings.catch_warnings():
+        import yfinance  # first: its import puts a "default" filter ahead of any set earlier
 
-    handle = yfinance.Ticker(ticker)
-    # yfinance's end date is exclusive.
-    frame = handle.history(start=start.isoformat(), end=(end + timedelta(days=1)).isoformat(), auto_adjust=False,
-                           actions=True, raise_errors=False)
-    return frame, handle.splits
+        warnings.simplefilter("ignore", DeprecationWarning)
+
+        handle = yfinance.Ticker(ticker)
+        # yfinance's end date is exclusive.
+        frame = handle.history(start=start.isoformat(), end=(end + timedelta(days=1)).isoformat(), auto_adjust=False,
+                               actions=True, raise_errors=False)
+        return frame, handle.splits
 
 
 def to_rows(frame, splits) -> list[dict]:

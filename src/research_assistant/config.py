@@ -98,6 +98,11 @@ AGENT_MAX_STEPS = 30
 # Condition B's self-review (REFERENCE §7): when the checker flags the draft, the flags go back to
 # the model this many times so it can fix them. They share the step guard above.
 AGENT_SELF_REVIEW_PASSES = 1
+# Retries of an agent's model call on 429, 5xx and connection errors, with the SDK's own backoff
+# (0.5 s doubling to 8 s, or the provider's Retry-After). The SDK default of 2 (about 4 s) did not
+# outlast OpenRouter's upstream 429s in the 3 Nov 2026 live check; 6 waits about 25 s. Agents also
+# let OpenRouter fall back to another host of the same model. Baseline A keeps the SDK default.
+AGENT_MODEL_RETRIES = 6
 
 
 def trace_dir() -> Path:

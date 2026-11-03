@@ -32,7 +32,7 @@ def test_legacy_openai_settings_are_explicit_and_private(monkeypatch):
     assert settings.label == "OpenAI"
     assert settings.model == "gpt-example"
     assert settings.client_kwargs == {"api_key": "secret-openai", "base_url": "https://api.openai.com/v1"}
-    assert settings.request_kwargs() == {"store": False}
+    assert settings.request_kwargs() == settings.request_kwargs(fallbacks=True) == {"store": False}
     assert settings.metadata() == {"provider": "openai", "model": "gpt-example", "schema_version": "financial-review-v3"}
     assert "secret-openai" not in repr(settings)
     assert "https://api.openai.com" not in repr(settings)
@@ -56,6 +56,8 @@ def test_openrouter_uses_only_its_key_and_pins_request_policy(monkeypatch):
     assert settings.provider == "openrouter"
     assert settings.client_kwargs == {"api_key": "router-secret", "base_url": "https://openrouter.ai/api/v1", "organization": "", "project": ""}
     assert settings.request_kwargs() == {"store": False, "extra_body": {"provider": {"require_parameters": True, "allow_fallbacks": False}}}
+    # Agents let OpenRouter fall back to another host of the same model; baseline A keeps one host.
+    assert settings.request_kwargs(fallbacks=True)["extra_body"]["provider"]["allow_fallbacks"] is True
     assert settings.metadata()["model"] == "vendor/model:free"
     assert "router-secret" not in repr(settings)
 

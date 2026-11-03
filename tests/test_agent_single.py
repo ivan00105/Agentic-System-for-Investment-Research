@@ -9,7 +9,8 @@ from research_assistant.agents import single_agent
 from research_assistant.model_access import ModelSettings
 
 SETTINGS = ModelSettings("openrouter", "OpenRouter", "fake-model", "key", "https://openrouter.ai/api/v1")
-PLAN = reply("1. find_company AAPL\n2. get_financials revenue and operating income\n3. calculate the margin")
+PLAN = reply("1. find_company AAPL\n2. get_financials revenue and operating income\n3. calculate the margin",
+             provider="Baidu")
 ERROR = openai.APIConnectionError(request=httpx.Request("POST", "https://example.invalid"))
 
 
@@ -61,7 +62,7 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
 
     result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=True), fix)
     assert result.status == "finished" and result.error is None and not result.report.flags
-    assert result.plan.startswith("1. find_company")
+    assert result.plan.startswith("1. find_company") and "- Model: fake-model (served by Baidu)" in result.markdown
     assert "- Apple's operating margin was 32.0% in the fiscal year ended 2025-09-27. [1]" in result.markdown
     assert "- Revenue was $416.2 billion. [2]" in result.markdown
     assert "## Bull case (supported)" in result.markdown and "## Bear case (abstained)" in result.markdown
@@ -70,6 +71,7 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert "tools" not in client.requests[0] and client.requests[1]["tools"]
     for request in client.requests:
         assert request["model"] == "fake-model" and request["store"] is False
+        assert request["extra_body"]["provider"] == {"require_parameters": True, "allow_fallbacks": True}
         assert not {"max_tokens", "max_completion_tokens"} & set(request)
     assert "2026-11-01" in client.requests[1]["messages"][0]["content"]
     assert "Your plan:\n1. find_company AAPL" in client.requests[1]["messages"][1]["content"]

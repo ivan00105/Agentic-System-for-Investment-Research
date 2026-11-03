@@ -18,7 +18,7 @@ sec_client = SecClient
 
 
 def model_client(settings):
-    return OpenAI(**settings.client_kwargs)
+    return OpenAI(**settings.client_kwargs, max_retries=config.AGENT_MODEL_RETRIES)
 
 
 def main(argv: list[str] | None = None) -> int:

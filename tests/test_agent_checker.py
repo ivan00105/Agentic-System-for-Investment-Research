@@ -70,6 +70,15 @@ def test_names_with_digits_are_not_typed_numbers():
             "2025-09-27, cites Q3 and the S&P 500 (chunk-0000320193-25-000079-1A-4).")
     assert typed_numbers(text) == []
     assert typed_numbers("Revenue rose 12% to $391 billion, a 2.5x jump.") == ["12%", "$391 billion", "2.5x"]
+    # Live check 3 Nov 2026: product names were flagged as typed figures.
+    assert typed_numbers("Charges on H20 and H200 parts, B200 ramps, COVID-19 effects.") == []
+
+
+def test_citations_are_accepted_in_the_forms_models_write():
+    # Live check 3 Nov 2026: 34 of 38 first-draft flags were citations written as calc:hash.
+    draft = Draft(risks=[claim("Supply risk.", ["calc:bbb222", "{fact: aaa111}", "fact-aaa111", "chunk:" + CHUNK["id"][6:]])])
+    report = check(draft, RECORDS)
+    assert not report.flags and report.sections["risks"][0].citations == ["calc-bbb222", "fact-aaa111", CHUNK["id"]]
 
 
 def test_limitations_are_checked_and_render_lists_sources_and_flags():
