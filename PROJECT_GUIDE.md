@@ -359,7 +359,7 @@ Licences don't matter here (it's an academic project): calling a library and cop
 
 ### Phase 3: Analyst team
 - [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
-- [ ] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (today it only hides the other tools' schemas).
+- [x] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (before, it only hid the other tools' schemas).
 - [ ] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
 - [ ] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
 - **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).

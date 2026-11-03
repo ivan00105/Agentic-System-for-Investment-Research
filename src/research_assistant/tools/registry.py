@@ -12,7 +12,8 @@ TOOLS: dict[str, Tool] = {tool.name: tool for tool in (
 
 
 def schemas(names: list[str] | None = None) -> list[dict]:
-    return [TOOLS[name].schema() for name in (names or TOOLS)]
+    """None means every tool; an empty list means none (a role without registry tools)."""
+    return [TOOLS[name].schema() for name in (TOOLS if names is None else names)]
 
 
 def call(name: str, arguments: dict, context: ToolContext) -> ToolResult:

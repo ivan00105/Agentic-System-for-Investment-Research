@@ -42,8 +42,10 @@ class LoopResult:
 def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], context: ToolContext, finish: Finish,
              trace: Trace, *, tool_names: list[str] | None = None, max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
     """Ask, run the requested tools, repeat. `messages` grows in place, so a caller can continue the
-    same conversation later (e.g. to send checker flags back)."""
-    tools = registry.schemas(tool_names) + [finish.schema()]
+    same conversation later (e.g. to send checker flags back). `tool_names` is the role's tool list
+    (None: every tool); the loop runs no other tool, whatever the model asks for."""
+    allowed = list(registry.TOOLS if tool_names is None else tool_names)
+    tools = registry.schemas(allowed) + [finish.schema()]
     seen: dict[str, tuple[int, ToolResult]] = {}
     steps = 0
     try:
@@ -59,7 +61,7 @@ def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], con
                 if call.function.name == finish.name:
                     output = _finish(call, finish, messages, trace, steps) or output
                 else:
-                    _run_tool(call, context, messages, trace, steps, seen)
+                    _run_tool(call, context, messages, trace, steps, seen, allowed)
             if output is not None:
                 return LoopResult("finished", output, steps)
     except (OpenAIError, TimeoutError) as exc:
@@ -113,7 +115,7 @@ def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
     return message
 
 
-def _run_tool(call, context, messages, trace, step, seen):
+def _run_tool(call, context, messages, trace, step, seen, allowed):
     name, raw = call.function.name, call.function.arguments or "{}"
     repeat_of = None
     try:
@@ -125,7 +127,10 @@ def _run_tool(call, context, messages, trace, step, seen):
         result = ToolResult(status="invalid", source="agent loop", warnings=[f"Arguments are not a JSON object: {raw}"])
     else:
         key = name + json.dumps(arguments, sort_keys=True)
-        if key in seen:  # REFERENCE §2: a repeated action with no new inputs is skipped
+        if name not in allowed:  # REFERENCE §2: a role runs only its own tools; hiding the others isn't enough
+            result = ToolResult(status="invalid", source="agent loop", warnings=[
+                f"{name!r} is not one of this role's tools ({', '.join(allowed) or 'none'}), so it was not run."])
+        elif key in seen:  # REFERENCE §2: a repeated action with no new inputs is skipped
             repeat_of, earlier = seen[key]
             result = earlier.model_copy(update={"warnings": [
                 *earlier.warnings, f"Repeated call: same arguments as step {repeat_of}, so it was not run again."]})

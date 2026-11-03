@@ -23,11 +23,11 @@ def submit_found_cik(messages):
     return reply(tool_calls=[("submit_answer", {"cik": tool_results(messages)[-1]["data"]["matches"][0]["cik"]})])
 
 
-def start(tmp_path, client, max_steps=5):
+def start(tmp_path, client, max_steps=5, **options):
     trace = Trace(tmp_path / "trace.jsonl", "run-1")
     messages = [{"role": "user", "content": "What is Apple's CIK?"}]
     result = run_loop(client, "fake-model", {"store": False}, messages, make_context(tmp_path), FINISH, trace,
-                      max_steps=max_steps)
+                      max_steps=max_steps, **options)
     return result, messages, trace
 
 
@@ -77,6 +77,30 @@ def test_a_repeated_call_is_not_run_again(tmp_path, monkeypatch):
     assert result.status == "finished" and calls == ["find_company"]
     repeated = [e for e in events(trace) if e["kind"] == "tool_call"][1]
     assert repeated["repeat_of"] == 1 and "same arguments as step 1" in repeated["result"]["warnings"][-1]
+
+
+def test_a_role_runs_only_its_own_tools(tmp_path, monkeypatch):
+    calls = []
+    real = registry.call
+    monkeypatch.setattr(registry, "call", lambda *a: calls.append(a[0]) or real(*a))
+
+    def refused(messages):
+        result = tool_results(messages)[-1]
+        assert result["status"] == "invalid" and result["source"] == "agent loop"
+        assert "'get_financials' is not one of this role's tools (find_company)" in result["warnings"][0]
+        return reply(tool_calls=[("submit_answer", {"cik": "unknown"})])
+
+    client = FakeClient(reply(tool_calls=[("get_financials", {"cik": "320193"})]), refused)
+    result, _, trace = start(tmp_path, client, tool_names=["find_company"])
+    assert result.status == "finished" and calls == []
+    assert {t["function"]["name"] for t in client.requests[0]["tools"]} == {"find_company", "submit_answer"}
+    [logged] = [e for e in events(trace) if e["kind"] == "tool_call"]
+    assert logged["name"] == "get_financials" and logged["result"]["status"] == "invalid"
+
+    # A role with no registry tools sees only its finish tool.
+    client = FakeClient(reply(tool_calls=[("submit_answer", {"cik": "unknown"})]))
+    start(tmp_path / "none", client, tool_names=[])
+    assert [t["function"]["name"] for t in client.requests[0]["tools"]] == ["submit_answer"]
 
 
 def test_bad_json_arguments_come_back_invalid(tmp_path):
