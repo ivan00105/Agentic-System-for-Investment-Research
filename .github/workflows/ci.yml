@@ -18,7 +18,7 @@ jobs:
       - run: python -m pip install --no-deps -e .
       - run: python -m pip install ruff==0.17.1
       - run: python -m ruff check .
-      # Tests that need the local-only SEC packet (verification/packets/) are skipped here.
+      # Filing tests run on trimmed real SEC files in tests/fixtures/; the network is always mocked.
       - run: python -m pytest -q
 
   frontend:

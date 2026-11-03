@@ -10,7 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .application import Application
-from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE
+from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
+from .data import providers
 from .fixtures import FIXTURE_CUTOFF, seed
 from .store import Store
 
@@ -61,6 +62,7 @@ def create_app(data_dir: Path | None = None):
                 app.state.application.close()
 
     app = FastAPI(title="Fieldnote Research", version="0.1.0", lifespan=lifespan)
+    app.state.provider_checks = {}  # last live check per provider, for this server's lifetime
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])
 
     @app.middleware("http")
@@ -94,6 +96,20 @@ def create_app(data_dir: Path | None = None):
     def config():
         connections = app.state.application.connections()
         return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
+
+    @app.get("/api/status")
+    def data_status():
+        """Every data provider by kind: tier, settings, configured or not, and the last check."""
+        return {"kinds": providers.status(app.state.provider_checks)}
+
+    @app.post("/api/status/{name}/check")
+    def check_provider(name: str):
+        try:
+            result = providers.run_check(name)
+        except KeyError:
+            raise DomainError("No provider with a live check has that name.", "not_found", 404) from None
+        app.state.provider_checks[name] = {**result, "checked_at": utcnow().isoformat()}
+        return {"kinds": providers.status(app.state.provider_checks)}
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

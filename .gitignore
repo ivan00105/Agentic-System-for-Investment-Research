@@ -6,7 +6,8 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/tsconfig.tsbuildinfo
 *.egg-info/
-data/
+# Root only: src/research_assistant/data/ is code.
+/data/
 .env
 frontend/node_modules/
 frontend/dist/

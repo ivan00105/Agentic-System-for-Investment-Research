@@ -7,7 +7,8 @@ name = "stock-research"
 version = "0.1.0"
 description = "Local evidence-grounded research workspace"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1", "openai>=2,<3", "python-dotenv>=1.2,<2", "tzdata>=2025.1"]
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1", "openai>=2,<3", "python-dotenv>=1.2,<2", "tzdata>=2025.1",
+                "edgartools==5.62.1", "rapidfuzz==3.14.6", "yfinance==1.7.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
@@ -21,6 +22,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "research_assistant.prompts" = ["*.txt"]
+"research_assistant.agents.prompts" = ["*.md"]
 
 [tool.ruff]
 line-length = 120

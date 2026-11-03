@@ -10,7 +10,7 @@ Revised 2 November 2026 after reviewing the code, the course guideline and every
 
 - **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
 - **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
-- **Where we are:** the data plumbing, storage and UI work (201 tests pass). **The agent itself hasn't been built.** Today's flow is a fixed pipeline plus two LLM calls that only add comments, and the course says that is not enough.
+- **Where we are:** the data plumbing, storage and UI work, the Phase 1 tools (`tools/`, 8 tools) and the Phase 2 single agent (`agents/`, CLI only, condition B) are built. **The analyst team, critic and UI hookup aren't.** The web app still runs the old fixed pipeline plus two LLM calls that only add comments (baseline A).
 - **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
 - **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A and as a fallback when no API key is set.
 - **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
@@ -171,7 +171,7 @@ What went wrong before: a 2,000-output-token cap cut off reasoning-model answers
 1. **No output-token caps, and no token or cost quotas by default.** Record usage, and let the provider's own limits apply. A cost budget is opt-in only.
 2. **Loop guards are not quality caps.** Agents need a max-step guard against infinite loops. Make it generous (about 30–40 steps). When it's reached, **write the best partial report and mark it "stopped at limit"**. Never error out.
 3. **Every tunable lives in one file** (`config.py`) with a comment saying why. No magic numbers in the code.
-4. **Retry transient errors** (429/5xx) with the SDK defaults. Don't fail on the first network blip.
+4. **Retry transient errors** (429/5xx) with the SDK's retry logic. Don't fail on the first network blip. Agents retry more patiently (`AGENT_MODEL_RETRIES`) and let OpenRouter fall back to another host of the same model, recording the serving host per call; baseline A keeps the SDK default and one host.
 5. **Never hard-code the universe**, the sector list or result counts.
 6. **Flag, don't reject.** A small problem in an LLM answer becomes a flagged item, not a thrown-away answer.
 7. **Never silently truncate** input or output. If something is too big, say so.
@@ -288,7 +288,7 @@ tests/             # mirrors src/; network always mocked
 - **CI on every push/PR** (GitHub Actions): `pytest`, `ruff` lint/format and `tsc`. Red CI means no merge.
 - **Pre-commit hook** running ruff, so formatting arguments never happen.
 - **PR template** with a 4-item checklist: tests added, config not bypassed, no new docs, guide checkbox updated.
-- **Branch per task, small PRs**, and protect `main`.
+- **One personal branch per person (no new branch per phase or task), one commit per subtask**, then a PR to `main` that the repo owner reviews, and protect `main`.
 
 "Scaling" here means more tickers and parallel evaluation runs: cache SEC and price responses, respect SEC's 10 req/s, run tool calls concurrently. It does **not** mean microservices, queues or vector DBs.
 
@@ -296,7 +296,7 @@ tests/             # mirrors src/; network always mocked
 Switch whenever a quota runs out. Nothing in the project is tied to one tool. What makes switching safe is that **the repo holds the context, not the chat**:
 1. **One rules file.** `AGENTS.md` has the rules, and `CLAUDE.md` only imports it. Never keep two copies.
 2. **Decisions go into this guide or REFERENCE before you switch.** Chat history and each tool's private memory don't carry over.
-3. **Switch at a clean point.** Commit the current task (a WIP commit on its branch is fine) and tick its checkbox. Avoid switching in the middle of a design discussion.
+3. **Switch at a clean point.** Commit the current subtask (a WIP commit is fine) and tick its checkbox. Avoid switching in the middle of a design discussion.
 4. **Give the new tool one checkbox, not "continue the project".** For example: *"Read AGENTS.md and PROJECT_GUIDE.md. Do the Phase 1 task `get_prices` as described in docs/REFERENCE.md §10. Done when its fixture test passes. Don't create new docs."*
 5. **One tool per branch at a time.** Two agents in the same working tree overwrite each other; use separate branches or git worktrees.
 6. **Review when you switch back.** Have the next tool, or a teammate, review the previous tool's commits before merging, with CI green. Unreviewed AI output is how the doc sprawl and the hidden token cap happened.
@@ -313,7 +313,8 @@ flowchart LR
     P3 --> P4[4 Critic + revise]
     P4 --> P5[5 Discover]
     P1 --> P6[6 Outlook model]
-    P4 --> P7[7 UI]
+    P3 -. thin web path .-> P7[7 UI]
+    P4 --> P7
     P5 --> P7
     P2 --> P8[8 Evaluation]
     P5 --> P8
@@ -338,25 +339,34 @@ flowchart LR
 - **Prices:** yfinance works with no key; Tiingo goes first when its key is set.
 
 Licences don't matter here (it's an academic project): calling a library and copying its logic are both fine, whichever is easier. If you find a better library, add a row to that table, not a new doc.
-- [ ] `config.py`, `data/sec.py` with a disk cache, `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
-- [ ] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
-- [ ] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
-- [ ] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
-- [ ] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
-- [ ] Commit small, trimmed SEC fixtures (a few KB each) so CI covers filing parsing. Today 20 tests read the 48 MB local packet and are skipped in CI.
+- [x] `config.py`, `data/sec.py`: one SEC client with a disk cache (archived filings kept forever, JSON APIs refreshed after a day) and one 10 requests/second limiter shared by the whole process.
+- [x] `find_company`, `get_financials` (multi-year, more concepts), `calculate`.
+- [x] `data/providers.py`: one registry of providers per data kind, with tier, required env variables and `check()`. Add `GET /api/status`, and list every variable in `.env.example` with its tier.
+- [x] Gate for edgartools: section extraction matches a hand-checked sample of ~10 filings (including a bank and a 20-F) before `read_filing_section` relies on it.
+- [x] `read_filing_section`, `list_filings`, `get_prices`, `screen` (ranked), `verify_against_filing`.
+- [x] Each tool returns `{status, data, ids, source, warnings}` and has a fixture test.
+- [x] Commit small, trimmed SEC fixtures so CI covers filing parsing: `tests/fixtures/` (rebuilt by `build_sec_fixtures.py`); the old packet tests now run in CI on a 64 KB trimmed copy.
 - **Done when:** every tool gives correct, cited output for 10+ companies, including a bank and a foreign filer (which must come back "unsupported", not crash).
+  - Checked live on 3 Nov 2026 for 13 companies (AAPL, MSFT, NVDA, AMZN, GOOGL, KO, JNJ, WMT, XOM, JPM, C, TSM, BABA): every revenue figure `verify_against_filing` checked matched the original filing; bank operating income and TSM (IFRS) come back unsupported. Known cases: XOM's ticker now points to a new holding company with no 10-K yet (history is under predecessor CIK 34088, and `find_company` says so); BABA's USD figures are convenience translations of CNY and are flagged; one-year betas from Yahoo look low (KO −0.28, XOM −0.72; the maths matches numpy), so cross-check them with Tiingo before the evaluation.
 
 ### Phase 2: Single agent loop
-- [ ] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
-- [ ] CLI: `python -m research_assistant.cli "question"`.
+- [x] `agents/loop.py`: plan → Chat Completions tool-calling loop → structured draft with `{fact:ID}`/`{calc:ID}` placeholders → deterministic checker. Trace saved.
+  - The trace is one append-only JSONL file per run in `data/traces/` (every model call, tool call, result and token count). It moves into SQLite when the UI needs it (Phase 7).
+  - Condition B includes REFERENCE §7's one self-review pass: when the checker flags the draft, the flags go back to the model once (`AGENT_SELF_REVIEW_PASSES`); leftover flags stay visible in the report. The report already uses the Phase 3 shape (summary, key numbers, bull vs bear, risks, what would change the view, limitations) so A–D compare like for like.
+- [x] CLI: `python -m research_assistant.cli "question"`.
 - **Done when:** the Check and Compare examples give sensible, fully cited reports. This set-up is evaluation condition **B**.
+  - Checked live on 3 Nov 2026 with `deepseek/deepseek-v4.1-flash` on OpenRouter: Check (NVIDIA) and Compare (Apple vs Microsoft) both finished with every section cited and no checker flags left after the self-review pass (first drafts: 3 and 22 flags, mostly figures copied from filing text). About 3 minutes, 12–13 model calls, 60–75 tool calls, 0.6–0.75 M tokens and $0.03–0.08 per run (prompt tokens dominate: each step resends the whole context, so prompt caching is the first cost lever). Reports cite fact, calc, filing-text and verify_against_filing records, attribute management claims, flag misaligned fiscal years and say no outlook model exists. Fixed during the check: upstream 429s (agents now retry 6 times and let OpenRouter use another host of the same model), a NaN Yahoo close that crashed market_cap, tool exceptions that ended a run, and checker false positives (citations written as `calc:ID`, names such as H20 or SIC 3674).
 
 ### Phase 3: Analyst team
 - [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
+- [ ] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (today it only hides the other tools' schemas).
+- [ ] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
+- [ ] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
 - **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).
 
 ### Phase 4: Critic + revision
 - [ ] Critic objections (issue types in REFERENCE §3) → coordinator → analyst follow-up → defended / corrected / withdrawn / unresolved. Claim versions kept.
+- [ ] B's self-review pass checks the same issue types as the critic (wrong period, unsupported inference, missing risk…), not just checker flags, so B vs D is a fair comparison.
 - **Done when:** an injected wrong-period or wrong-unit error is caught and corrected, and a clean case stays unchanged (condition **D**).
 
 ### Phase 5: Discover
@@ -364,9 +374,10 @@ Licences don't matter here (it's an academic project): calling a library and cop
 - **Done when:** the Discover example works on a declared universe of about 50–100 companies.
 
 ### Phase 6: Outlook model (parked)
-Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). The one thing to remember early is that a prospective log (predictions saved now, scored later) is the only clean test, so the sooner it starts the more data it collects.
+Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). A price-based statistical model can be tested on history with proper walk-forward splits. Anything that uses an LLM can't, because the model already knows what happened later; for that, only a prospective log (predictions saved now, scored later) is a clean test, so start it early.
 
 ### Phase 7: UI
+- [ ] **Start right after Phase 3:** a thin web path. Question → agent run → cited report → saved → reopened from History, on the existing page. This is mostly backend work (API, storage, cancel), so give it one owner. The full layout and Discover screen come later.
 - [ ] One question box (no mode, model or cutoff toggles up front; advanced options folded away) + preferences → live trace timeline + cancel button → report with clickable citations and statuses. Opens on an empty box plus recent runs, not a synthetic example. Reuse the evidence panel and History. Split `App.tsx`.
 - [ ] **Setup & status page** (extends today's Connections page): one card per data kind, listing its providers with a status:
   - Ready (no key needed).
@@ -377,7 +388,7 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
   Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
 
 ### Phase 8: Evaluation (start writing cases during Phase 2)
-- [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample double-checked. Sources:
+- [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample (at least 10) checked by a second person. Sources:
   - ~15 adapted from the FinanceBench open sample.
   - ~8–10 from the Vals Finance Agent public set.
   - ~5 fiscal-period traps in the style of FinRetrieval.
