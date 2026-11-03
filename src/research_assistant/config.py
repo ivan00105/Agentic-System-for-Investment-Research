@@ -136,6 +136,12 @@ def trace_dir() -> Path:
     return data_dir() / "traces"
 
 
+def eval_dir() -> Path:
+    # Evaluation batches (eval/run_eval.py): one folder each, with its run index, traces and score tables. Kept apart
+    # from traces/, so evaluation runs don't fill the web app's History.
+    return data_dir() / "eval"
+
+
 # --- Report checker -----------------------------------------------------------------------
 
 # Digits the model may type because they name something rather than state a figure: form types,
