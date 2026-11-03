@@ -45,7 +45,7 @@ The action trace saves short rationales, not chain-of-thought. A repeated action
   - **withdrawn**: the claim is removed, and dependent conclusions are reconsidered.
   - **unresolved**: the issue and its impact are shown.
 - Each outcome must cite evidence or a calculation. A resolution on claim v1 does not validate v2. Track objections by ID, not by count.
-- Each report section carries a status: **supported / qualified / abstained**. Qualify a single section rather than abstaining from the whole report.
+- Each report section carries a status: **cited / qualified / abstained**. Qualify a single section rather than abstaining from the whole report. *Cited* only means every statement cites real tool records and the checker flagged nothing; whether the evidence really supports the statement is judged in evaluation (§7).
 - Stop reviewing when no material objection has a feasible next action. More debate rounds can make results worse (Kaesberg et al. 2025).
 
 ## 4. Discover mode rules
@@ -58,6 +58,7 @@ The action trace saves short rationales, not chain-of-thought. A repeated action
 6. Every final pick must pass a deterministic acceptance test on validated facts.
 7. Never imply the search covered "the whole market" unless the universe really was the whole market.
 8. For a cheap first pass over many companies, the SEC **frames** API returns one concept for all filers in one call. Caveat: frames are calendar-aligned and return each company's **latest-filed** value (restated, not point-in-time), so verify shortlisted names with companyfacts.
+9. **Discover runs on current data only.** Frames aren't point-in-time, so a Discover with a past cutoff would already have used later information, and checking the shortlist afterwards can't undo that. Screen on fundamentals first, then check valuation (which needs prices) on the shortlist. Say for each metric which filers it covers (banks, IFRS filers, ADRs). Never describe the result as "the cheapest in the market".
 
 ## 5. Finance and data cautions
 
@@ -116,13 +117,14 @@ The action trace saves short rationales, not chain-of-thought. A repeated action
 | Condition | What it is | What it isolates |
 |---|---|---|
 | **A** | Deterministic pipeline + report template (the existing code) | What plain software already solves |
-| **B** | Single agent, all tools, one self-review pass (same compute allowance as D) | Value of tools and the loop; compute-matched baseline |
+| **B** | Single agent, all tools, one self-review pass | Value of tools and the loop |
 | **C** | Analyst team, no critic | Value of role specialization |
 | **D** | Analyst team + critic + revision | The full system |
 
 - **Isolated review test:** start from the **same saved draft and evidence**, then compare no revision, self-review and critic-guided revision. Use frozen evidence so that retrieval differences don't confound the result.
 - **Cases:** a development set for tuning plus a separate held-out set that is never used for tuning. Mix of check, compare and discover questions, plus robustness cases: clean (the critic should change nothing), wrong period or unit, restatement, missing data, unknown ticker, impossible filter, API failure, injected instruction in filing text. Label injected defects separately.
-- **Gold labels:** written from SEC data by one person and checked by another, without seeing system output. Gold answers never appear in tool outputs.
+- **Fair comparison:** A only covers what the old pipeline supports (five companies, annual figures), so compare A with the others only on those cases. B, C and D get the same cases, data and scoring. B's self-review and D's critic look for the same issue types (§3), not just checker flags. Compute isn't matched exactly, so report quality next to steps, tokens, cost and time rather than claiming a compute-matched baseline.
+- **Gold labels:** written from SEC data by one person, without seeing system output. A second person checks a sample (at least 10 cases), and the report says how many were checked and how many were changed. Gold answers never appear in tool outputs.
 - **Metrics:**
   - Numeric accuracy (value, period, unit) and citation validity (automatic)
   - Claim support, judged by humans on a sample (an LLM judge may triage only)
