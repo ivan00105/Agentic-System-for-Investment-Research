@@ -398,13 +398,15 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
 - [x] One question box (no mode, model or cutoff toggles up front; advanced options folded away) + preferences → live trace timeline + cancel button → report with clickable citations and statuses. Opens on an empty box plus recent runs, not a synthetic example. Reuse the evidence panel and History. Split `App.tsx`.
   - Starter cards, a company picker over SEC's tickers, topics and examples fill one editable box; Find shows Discover's spec and asks its questions in the page first (a bundled list or your own tickers). The report leads with the answer, then a key-numbers table, SVG charts, both cases side by side, what the review changed and sources by kind, all from frozen records. Baseline A has its own page.
   - Checked live on 3 Nov 2026: a D Check of NVIDIA from the box (run `20261103-172540-c7feca`: 18 min, $0.13, every section cited, a 31-word answer) and a Find over five own tickers (`20261103-180716-f04304`: one term set by the user, NVIDIA rejected at P/E 40.6x, Microsoft picked; 9 min, $0.04).
-- [ ] **Setup & status page** (extends today's Connections page): one card per data kind, listing its providers with a status:
+- [x] **Setup & status page** (extends today's Connections page): one card per data kind, listing its providers with a status:
   - Ready (no key needed).
   - Configured.
   - Not configured, showing which `.env` variable to set.
   - Last check failed.
 
   Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
+  - The page replaces Connections (`?view=setup`; old links still work) with five cards from `data/providers.py`: SEC filings, fundamentals, company lookup, daily prices and the model. OpenRouter, OpenAI and an OpenAI-compatible endpoint are separate model providers, and only the one `RESEARCH_MODEL_PROVIDER` picks can be active. The browser learns only whether a setting is set. A failed check is kept while the server runs, and an unconfigured provider isn't tested. The model test sends one short tool-calling request (a fraction of a cent) instead of the consent-gated baseline A run.
+  - Checked live on 4 Nov 2026 with the project's `.env`: the three SEC providers and OpenRouter configured, yfinance ready, Tiingo, OpenAI and the compatible endpoint not configured. The SEC, Yahoo and OpenRouter tests passed (`deepseek/deepseek-v4.1-flash` called the test tool).
 
 ### Phase 8: Evaluation (start writing cases during Phase 2)
 - [x] Prompt caching measured before the A–D runs (§7's first cost lever). Trace totals now count `cached_tokens` per run and per role.
