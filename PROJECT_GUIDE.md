@@ -313,7 +313,8 @@ flowchart LR
     P3 --> P4[4 Critic + revise]
     P4 --> P5[5 Discover]
     P1 --> P6[6 Outlook model]
-    P4 --> P7[7 UI]
+    P3 -. thin web path .-> P7[7 UI]
+    P4 --> P7
     P5 --> P7
     P2 --> P8[8 Evaluation]
     P5 --> P8
@@ -354,14 +355,18 @@ Licences don't matter here (it's an academic project): calling a library and cop
   - Condition B includes REFERENCE §7's one self-review pass: when the checker flags the draft, the flags go back to the model once (`AGENT_SELF_REVIEW_PASSES`); leftover flags stay visible in the report. The report already uses the Phase 3 shape (summary, key numbers, bull vs bear, risks, what would change the view, limitations) so A–D compare like for like.
 - [x] CLI: `python -m research_assistant.cli "question"`.
 - **Done when:** the Check and Compare examples give sensible, fully cited reports. This set-up is evaluation condition **B**.
-  - Checked live on 3 Nov 2026 with `deepseek/deepseek-v4.1-flash` on OpenRouter: Check (NVIDIA) and Compare (Apple vs Microsoft) both finished with every section supported and no checker flags left after the self-review pass (first drafts: 3 and 22 flags, mostly figures copied from filing text). About 3 minutes, 12–13 model calls, 60–75 tool calls, 0.6–0.75 M tokens and $0.03–0.08 per run (prompt tokens dominate: each step resends the whole context, so prompt caching is the first cost lever). Reports cite fact, calc, filing-text and verify_against_filing records, attribute management claims, flag misaligned fiscal years and say no outlook model exists. Fixed during the check: upstream 429s (agents now retry 6 times and let OpenRouter use another host of the same model), a NaN Yahoo close that crashed market_cap, tool exceptions that ended a run, and checker false positives (citations written as `calc:ID`, names such as H20 or SIC 3674).
+  - Checked live on 3 Nov 2026 with `deepseek/deepseek-v4.1-flash` on OpenRouter: Check (NVIDIA) and Compare (Apple vs Microsoft) both finished with every section cited and no checker flags left after the self-review pass (first drafts: 3 and 22 flags, mostly figures copied from filing text). About 3 minutes, 12–13 model calls, 60–75 tool calls, 0.6–0.75 M tokens and $0.03–0.08 per run (prompt tokens dominate: each step resends the whole context, so prompt caching is the first cost lever). Reports cite fact, calc, filing-text and verify_against_filing records, attribute management claims, flag misaligned fiscal years and say no outlook model exists. Fixed during the check: upstream 429s (agents now retry 6 times and let OpenRouter use another host of the same model), a NaN Yahoo close that crashed market_cap, tool exceptions that ended a run, and checker false positives (citations written as `calc:ID`, names such as H20 or SIC 3674).
 
 ### Phase 3: Analyst team
 - [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
+- [ ] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (today it only hides the other tools' schemas).
+- [ ] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
+- [ ] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
 - **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).
 
 ### Phase 4: Critic + revision
 - [ ] Critic objections (issue types in REFERENCE §3) → coordinator → analyst follow-up → defended / corrected / withdrawn / unresolved. Claim versions kept.
+- [ ] B's self-review pass checks the same issue types as the critic (wrong period, unsupported inference, missing risk…), not just checker flags, so B vs D is a fair comparison.
 - **Done when:** an injected wrong-period or wrong-unit error is caught and corrected, and a clean case stays unchanged (condition **D**).
 
 ### Phase 5: Discover
@@ -369,9 +374,10 @@ Licences don't matter here (it's an academic project): calling a library and cop
 - **Done when:** the Discover example works on a declared universe of about 50–100 companies.
 
 ### Phase 6: Outlook model (parked)
-Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). The one thing to remember early is that a prospective log (predictions saved now, scored later) is the only clean test, so the sooner it starts the more data it collects.
+Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). A price-based statistical model can be tested on history with proper walk-forward splits. Anything that uses an LLM can't, because the model already knows what happened later; for that, only a prospective log (predictions saved now, scored later) is a clean test, so start it early.
 
 ### Phase 7: UI
+- [ ] **Start right after Phase 3:** a thin web path. Question → agent run → cited report → saved → reopened from History, on the existing page. This is mostly backend work (API, storage, cancel), so give it one owner. The full layout and Discover screen come later.
 - [ ] One question box (no mode, model or cutoff toggles up front; advanced options folded away) + preferences → live trace timeline + cancel button → report with clickable citations and statuses. Opens on an empty box plus recent runs, not a synthetic example. Reuse the evidence panel and History. Split `App.tsx`.
 - [ ] **Setup & status page** (extends today's Connections page): one card per data kind, listing its providers with a status:
   - Ready (no key needed).
@@ -382,7 +388,7 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
   Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
 
 ### Phase 8: Evaluation (start writing cases during Phase 2)
-- [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample double-checked. Sources:
+- [ ] About 40 cases (dev + held-out), gold labels from SEC data, a sample (at least 10) checked by a second person. Sources:
   - ~15 adapted from the FinanceBench open sample.
   - ~8–10 from the Vals Finance Agent public set.
   - ~5 fiscal-period traps in the style of FinRetrieval.
