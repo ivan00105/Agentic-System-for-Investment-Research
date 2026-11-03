@@ -16,7 +16,7 @@ def figures(cited: list[str], key_numbers: list[str], records: dict[str, dict]) 
     names = {r["cik"]: r.get("name") for r in records.values() if r.get("kind") == "company"}
     ciks = list(dict.fromkeys(r["cik"] for i in cited if (r := records.get(i)) and r.get("kind") == "fact"))
     return {"table": table(key_numbers, records, names),
-            "charts": [chart(cik, names.get(cik) or cik, records) for cik in ciks]}
+            "charts": [chart(cik, names.get(cik) or cik, records, set(cited)) for cik in ciks]}
 
 
 def table(ids: list[str], records: dict[str, dict], names: dict[str, str]) -> list[dict]:
@@ -42,7 +42,9 @@ def _row(record: dict, records: dict[str, dict], names: dict[str, str]) -> dict:
             "change": None, "change_id": None}
 
 
-def chart(cik: str, company: str, records: dict[str, dict]) -> dict:
+def chart(cik: str, company: str, records: dict[str, dict], cited: set[str]) -> dict:
+    """The price line is the longest series the report cites (else the longest saved), on adjusted closes: an
+    as-traded close drops at every split (NVIDIA's 10-for-1 in 2024 looked like a crash)."""
     revenue = _annual(cik, "revenue", records)
     top_metric = next((m for m in MARGIN_TOPS if set(_annual(cik, m, records)) & set(revenue)), None)
     tops = _annual(cik, top_metric, records) if top_metric else {}
@@ -53,13 +55,14 @@ def chart(cik: str, company: str, records: dict[str, dict]) -> dict:
             margin.append({"end": end, "value": float(outcome.value), "ids": [tops[end]["id"], revenue[end]["id"]],
                            "label": format_value({"value": outcome.value, "unit": "ratio"})})
     series = [r for r in records.values() if r.get("kind") == "prices" and r.get("cik") == cik and r.get("rows")]
-    prices = max(series, key=lambda r: (len(r["rows"]), r["id"]), default=None)
+    prices = max(series, key=lambda r: (r["id"] in cited, len(r["rows"]), r["id"]), default=None)
     return {"cik": cik, "company": company,
             "revenue": [{"end": end, "value": float(r["value"]), "label": format_value(r), "ids": [r["id"]]}
                         for end, r in sorted(revenue.items())],
             "margin": {"label": MARGINS[top_metric] if margin else None, "points": margin},
             "price": prices and {"id": prices["id"], "ticker": prices.get("ticker"), "source": prices.get("source"),
-                                 "points": [[r["date"], r["close"]] for r in prices["rows"] if r.get("close") is not None]}}
+                                 "points": [[r["date"], r["adj_close"]] for r in prices["rows"]
+                                            if r.get("adj_close") is not None]}}
 
 
 def _annual(cik: str, metric: str, records: dict[str, dict]) -> dict[str, dict]:

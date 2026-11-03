@@ -55,7 +55,7 @@ export function PriceChart({ticker, points}: {ticker: string; points: [string, n
   const [low, high] = [Math.min(...closes), Math.max(...closes)]
   const [first, last] = [points[0], points[points.length - 1]]
   const money = (v: number) => `$${v.toFixed(2)}`
-  return <Figure title={`${ticker} closing price (as traded)`} label={`${ticker} closing price from ${first[0]} (${money(first[1])}) to ${last[0]} (${money(last[1])}); low ${money(low)}, high ${money(high)}`}>
+  return <Figure title={`${ticker} share price, adjusted for splits and dividends`} label={`${ticker} adjusted share price from ${first[0]} (${money(first[1])}) to ${last[0]} (${money(last[1])}); low ${money(low)}, high ${money(high)}`}>
     <polyline className="line" points={points.map((p, i) => `${x(i)},${y(p[1])}`).join(' ')} />
     <text className="value start" x={SIDE} y={12}>high {money(high)} · low {money(low)}</text>
     <text className="value end" x={W - SIDE} y={Math.max(y(last[1]) - 8, 12)}>{money(last[1])}</text>
