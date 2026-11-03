@@ -18,6 +18,12 @@ RECORD_ID = re.compile(rf"\b(?:{KINDS})-[A-Za-z0-9_.-]+")
 # Digits glued to a word are names (H20, COVID-19, B200), not figures.
 TYPED_NUMBER = re.compile(r"(?<![\w.-])[$€£]?[-+]?\d[\d,.]*(?:\s?(?:%|pp\b|x\b|bn\b|billion|million|thousand|trillion))?")
 SCALES = ((Decimal(10) ** 12, "trillion"), (Decimal(10) ** 9, "billion"), (Decimal(10) ** 6, "million"))
+# A direction word right before a change figure: "fell {calc:ID}", "grew by {calc:ID}", "a decline of {calc:ID}".
+DOWN = "fell|falls?|falling|declined|declines?|decreased|decreases?|dropped|drops?|shrank|shrunk|contracted|slipped|" \
+       "slid|eroded|compressed|narrowed|lost|down"
+UP = "rose|rises?|risen|grew|grows?|growing|increased|increases?|gained|gains?|climbed|expanded|improved|widened|up"
+DIRECTION = re.compile(rf"\b(?:({DOWN})|({UP}))\s+(?:by\s+|of\s+)?$", re.IGNORECASE)
+CHANGES = {"growth", "change_pp", "cagr", "total_return", "max_drawdown"}
 
 
 @dataclass
@@ -114,7 +120,15 @@ def fill(text: str, where: str, records: dict[str, dict]) -> tuple[str, list[str
         if record.get("value") is None:
             flags.append(Flag(where, f"{record['id']} has no value: {record.get('reason') or 'unavailable'}"))
             return "unavailable"
-        return format_value(record)
+        shown = format_value(record)
+        word = DIRECTION.search(text, 0, match.start()) if record.get("formula") in CHANGES else None
+        value = Decimal(str(record["value"]))
+        if word and value:
+            if bool(word[1]) == (value < 0):  # the word gives the direction, so show only the size: "fell 3.9 pp"
+                return format_value({**record, "value": str(abs(value))}).removeprefix("+")
+            flags.append(Flag(where, f"'{word[0].strip()} {shown}' contradicts itself: {record['id']} is {shown}. "
+                                     "Fix the direction word, or write 'changed by'."))
+        return shown
 
     filled = PLACEHOLDER.sub(replace, text)
     for number in typed_numbers(text):
