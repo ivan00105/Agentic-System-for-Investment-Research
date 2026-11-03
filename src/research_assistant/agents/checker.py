@@ -10,7 +10,7 @@ from .draft import SECTIONS, Claim, Draft
 # Tolerates spaces and a dash instead of the colon: {fact:fact-1a2b}, {fact: 1a2b}, {calc-1a2b}.
 PLACEHOLDER = re.compile(r"\{\s*(fact|calc)\s*[:-]\s*([A-Za-z0-9_.-]+?)\s*\}")
 ALLOWED_NUMBERS = re.compile("|".join(config.CHECKER_ALLOWED_NUMBER_PATTERNS))
-KINDS = "fact|calc|chunk|filing|company|prices|check|screen"
+KINDS = "fact|calc|chunk|filing|company|prices|check|screen|claim"
 # A citation as models write it: fact-1a2b, fact:1a2b, {calc:1a2b} or {chunk: 0000-...}.
 CITATION = re.compile(rf"\{{?\s*({KINDS})\s*:\s*([A-Za-z0-9_.-]+?)\s*\}}?")
 # A record ID written in the text is a misplaced citation, not a typed figure.
@@ -58,8 +58,7 @@ class CheckedReport:
 
 
 def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:
-    sections = {key: [_claim(claim, f"{key}[{i}]", records) for i, claim in enumerate(getattr(draft, key))]
-                for key, _ in SECTIONS}
+    sections = {key: check_claims(getattr(draft, key), key, records) for key, _ in SECTIONS}
     flags = [flag for claims in sections.values() for claim in claims for flag in claim.flags]
     sources = list(dict.fromkeys(i for claims in sections.values() for claim in claims for i in claim.citations))
     limitations = []
@@ -71,6 +70,11 @@ def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:
     return CheckedReport(sections, limitations, flags, sources)
 
 
+def check_claims(claims: list[Claim], name: str, records: dict[str, dict]) -> list[CheckedClaim]:
+    """Check one list of claims, e.g. a report section or an analyst's findings, labelled name[0], name[1]..."""
+    return [_claim(claim, f"{name}[{i}]", records) for i, claim in enumerate(claims)]
+
+
 def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
     text, used, flags = fill(claim.text, where, records)
     cited = []
@@ -79,8 +83,8 @@ def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
         found = lookup(records, match[2], match[1]) if match else lookup(records, raw.strip())
         if found is None:
             flags.append(Flag(where, f"Citation {raw!r} is not an ID any tool returned in this run."))
-        else:
-            cited.append(found["id"])
+        else:  # an analyst's finding (condition C) brings the records it cites
+            cited += [found["id"], *(found.get("citations") or [])] if found.get("kind") == "claim" else [found["id"]]
     citations = list(dict.fromkeys(used + cited))
     if not citations:
         flags.append(Flag(where, "No citation: cite the records this statement rests on."))

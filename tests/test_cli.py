@@ -34,6 +34,23 @@ def test_a_question_prints_the_report_and_where_the_trace_is(tmp_path, monkeypat
     assert "plan ready" in err and "step 1: find_company -> ok" in err and "checker: 0 flags" in err
 
 
+def test_condition_c_runs_the_team_and_says_who_did_each_step(tmp_path, monkeypatch, capsys):
+    def findings(messages):
+        return reply(tool_calls=[("submit_findings", {"findings": [REPORT["summary"][0]]})])
+
+    client = FakeClient(reply("1. ask_fundamentals"), reply(tool_calls=[("ask_fundamentals", {"task": "Who is Apple?"})]),
+                        reply(tool_calls=[("find_company", {"query": "AAPL"})]), findings,
+                        reply(tool_calls=[("submit_report", REPORT)]))
+    configure(monkeypatch, tmp_path, client)
+    assert cli.main(["Who is Apple?", "--condition", "C"]) == 0
+    out, err = capsys.readouterr()
+    assert "- Condition: C (analyst team)" in out and "- Apple Inc. files annual reports with the SEC. [1]" in out
+    for line in ("[coordinator] plan ready", "[fundamentals] task: Who is Apple?",
+                 "[fundamentals] step 1: find_company -> ok", "[fundamentals] done (finished): 1 findings",
+                 "[coordinator] step 1: ask_fundamentals -> ok", "[coordinator] checker: 0 flags"):
+        assert line in err
+
+
 def test_a_failed_run_exits_1(tmp_path, monkeypatch, capsys):
     configure(monkeypatch, tmp_path, FakeClient(openai.APIConnectionError(request=httpx.Request("POST", "https://x"))))
     assert cli.main(["Who is Apple?"]) == 1

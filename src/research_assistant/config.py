@@ -91,9 +91,10 @@ TRADING_DAYS_PER_YEAR = 252
 
 # --- Agents -------------------------------------------------------------------------------
 
-# Model calls per agent run: a guard against infinite loops, not a quality cap (§5). A Check or
-# Compare question needs roughly 8-20 calls. Reaching the guard asks the model once for its best
-# report from what it has, marked "stopped at limit"; it never errors.
+# Model calls per agent loop: a guard against infinite loops, not a quality cap (§5). It applies to the
+# single agent, the coordinator, and each request the coordinator sends an analyst (PROJECT_GUIDE §5:
+# about 30 per analyst). A Check or Compare question needs roughly 8-20 calls. Reaching the guard asks
+# the model once for its best report or findings from what it has, marked "stopped at limit"; it never errors.
 AGENT_MAX_STEPS = 30
 # Condition B's self-review (REFERENCE §7): when the checker flags the draft, the flags go back to
 # the model this many times so it can fix them. They share the step guard above.

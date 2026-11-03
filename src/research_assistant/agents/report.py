@@ -11,14 +11,18 @@ RUN_STATUS = {
 
 def render(report: CheckedReport, records: dict[str, dict], *, question: str, status: str, cutoff: str,
            model: str | None = None, plan: str | None = None, run_id: str | None = None,
-           error: str | None = None) -> str:
+           error: str | None = None, condition: str | None = None, team: list[str] | None = None) -> str:
+    """`team` holds one line per analyst request (condition C): who was asked what, and how it went."""
     number = {record_id: n for n, record_id in enumerate(report.sources, start=1)}
     lines = [f"# {question}", "", f"- Run status: {RUN_STATUS.get(status, status)}", f"- Cutoff: {cutoff}"]
+    lines += [f"- Condition: {condition}"] if condition else []
     lines += [f"- Model: {model}"] if model else []
     lines += [f"- Run: {run_id}"] if run_id else []
     lines += [f"- Error: {error}"] if error else []
     if plan:
         lines += ["", "## Plan", "", plan.strip()]
+    if team:
+        lines += ["", "## Who did what", ""] + [f"- {line}" for line in team]
     for key, heading in SECTIONS:
         lines += ["", f"## {heading} ({report.section_status(key)})", ""]
         claims = report.sections[key]
@@ -56,4 +60,7 @@ def describe(record: dict) -> str:
         return f"`{rid}` {record.get('ticker')} daily prices from {record.get('source')}, {record.get('start')} to {record.get('end')}"
     if kind == "check":
         return f"`{rid}` {record.get('fact_id')} checked against the filing: {record.get('verdict')} {record.get('filing_url', '')}"
+    if kind == "claim":
+        cites = ", ".join(f"`{i}`" for i in record.get("citations") or []) or "nothing"
+        return f"`{rid}` {record.get('author')} analyst finding (v{record.get('version')}): {record.get('text')} Cites {cites}."
     return f"`{rid}` {kind} record"

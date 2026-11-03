@@ -52,6 +52,19 @@ def test_ids_are_stable_and_unknown_or_duplicate_ids_are_noted_not_rejected():
     assert again.sections["risks"][0].id == first.id and again.sections["risks"][0].version == 2
 
 
+def test_a_copied_id_with_a_stray_character_is_read_as_the_claim_it_extends():
+    # Live check 3 Nov 2026: the coordinator wrote claim-1556f111303d3 for claim-1556f111303d.
+    ledger = ClaimLedger()
+    first, _ = stamp(ledger, "fundamentals", key_numbers=[{"text": "Revenue was {fact:fact-aaa111}.", "kind": "fact"}])
+    claim_id = first.sections["key_numbers"][0].id
+    report, changes = stamp(ledger, "coordinator", summary=[{"text": "Revenue grew.", "id": claim_id + "3"}])
+    assert report.sections["summary"][0].id == claim_id and report.sections["summary"][0].version == 2
+    assert changes["notes"] == [f"summary[0]: '{claim_id}3' was read as {claim_id}."]
+    # The reworded version cites nothing; the ledger can still say what the finding cited.
+    assert report.sections["summary"][0].citations == [] and ledger.earlier_citations(claim_id) == ["fact-aaa111"]
+    assert ledger.earlier_citations("claim-unknown") == [] and ledger.earlier_citations(None) == []
+
+
 def test_roles_have_separate_drafts_but_a_copied_claim_keeps_its_lineage():
     ledger = ClaimLedger()
     finding, _ = stamp(ledger, "fundamentals", key_numbers=[{"text": "Revenue was {fact:fact-aaa111}.", "kind": "fact"}])

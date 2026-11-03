@@ -26,14 +26,16 @@ All roles are **the same agent loop** with a different prompt and tool subset. O
 
 | Role | Does | Tools | Must not |
 |---|---|---|---|
-| **Coordinator** | Plans; dispatches analysts; picks the next action, citing the unresolved item it addresses; synthesizes; decides each objection's outcome; sets the final status | all analysts as sub-calls, `screen` | Bypass evidence rules or write numbers itself |
-| **Fundamentals analyst** | Finds the right periods and concepts; computes margins, growth, FCF; flags comparability problems (fiscal year, units, restatements) | `get_financials`, `calculate` | Do arithmetic in prose |
-| **Filings & events analyst** | Reads 10-K sections (risks, MD&A) and 8-K events; separates event date from publication date; attributes management claims | `read_filing_section`, `list_filings` | Treat management claims as established fact |
-| **Market & valuation analyst** | Price history, returns, volatility, drawdown, valuation ratios | `get_prices`, `calculate` | Present adjusted historical prices as tradable prices |
+| **Coordinator** | Plans; dispatches analysts; picks the next action, citing the unresolved item it addresses; synthesizes; decides each objection's outcome; sets the final status | all analysts as sub-calls (`ask_<analyst>` tools in its loop), `find_company`, `calculate`, `screen` | Bypass evidence rules or write numbers itself |
+| **Fundamentals analyst** | Finds the right periods and concepts; computes margins, growth, FCF; flags comparability problems (fiscal year, units, restatements) | `find_company`, `get_financials`, `calculate`, `verify_against_filing` | Do arithmetic in prose |
+| **Filings & events analyst** | Reads 10-K sections (risks, MD&A) and 8-K events; separates event date from publication date; attributes management claims | `find_company`, `read_filing_section`, `list_filings` | Treat management claims as established fact |
+| **Market & valuation analyst** | Price history, returns, volatility, drawdown, valuation ratios | `find_company`, `get_prices`, `get_financials`, `calculate` | Present adjusted historical prices as tradable prices |
 | **Outlook model** (not an LLM) | Statistical probability of beating SPY over the horizon | `get_outlook` | Be changed by narrative |
 | **Critic** | Returns zero or more objections, each tied to a claim version, with an issue type and a requested check | read-only tools + `verify_against_filing` | Be bearish by default, edit evidence, or close an objection by agreeing |
 
 The action trace saves short rationales, not chain-of-thought. A repeated action with no new inputs is skipped (action fingerprint).
+
+Tool lists are enforced (`agents/roles.py`): the loop answers a call to any other tool with an "invalid" result. Decided in Phase 3: every tool the single agent (condition B) has belongs to some role in C, so B vs C isolates specialization rather than tool access. So every analyst can `find_company`, the market analyst also reads `get_financials` (market cap needs a share count, P/E needs earnings), fundamentals has `verify_against_filing` (the critic gets it too in Phase 4), and the coordinator can `calculate` across analysts' records. An analyst keeps its conversation, so the coordinator's follow-up builds on its earlier work.
 
 ## 3. Claims, objections and outcomes
 

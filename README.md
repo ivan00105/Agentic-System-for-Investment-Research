@@ -21,7 +21,7 @@ Requires Python 3.12+ and Node 22.12+. In PowerShell, from this folder:
 
 Then open http://127.0.0.1:8000. The first run needs internet to install dependencies. Keep the terminal open; press Ctrl+C to stop. The server only accepts local connections.
 
-To ask the research agent one question in the terminal (it prints the report and where the step-by-step trace is saved; `--cutoff YYYY-MM-DD` researches as of an earlier date):
+To ask the research agent one question in the terminal (it prints the report and where the step-by-step trace is saved; `--cutoff YYYY-MM-DD` researches as of an earlier date; `--condition C` uses the analyst team instead of the single agent):
 
 ```powershell
 .\.venv\Scripts\python.exe -m research_assistant.cli "Compare Apple and Microsoft: growth, margins, valuation."

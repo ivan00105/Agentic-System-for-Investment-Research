@@ -25,9 +25,10 @@ class ClaimLedger:
         self.versions: dict[str, list[dict]] = {}  # claim ID -> its versions
         self.latest: dict[str, list[str]] = {}  # author -> claim IDs in that author's latest draft
 
-    def stamp(self, author: str, claims: list[tuple[str, Claim, CheckedClaim]]) -> dict:
+    def stamp(self, author: str, claims: list[tuple[str, Claim, CheckedClaim]], replaces: bool = True) -> dict:
         """Give each (where, claim, checked) of one draft its ID and version, set on the CheckedClaim.
-        Returns what changed since the author's previous draft, for the trace."""
+        Returns what changed since the author's previous draft, for the trace. `replaces=False` adds to the
+        author's earlier claims instead (an analyst's follow-up), so nothing counts as dropped."""
         changes = {"new": [], "revised": [], "unchanged": [], "dropped": [], "notes": []}
         taken: list[str] = []
         for where, claim, checked in claims:
@@ -43,14 +44,28 @@ class ClaimLedger:
                                 **content, "reads": checked.text, "status": checked.status})
                 changes["revised" if len(history) > 1 else "new"].append(f"{claim_id} v{len(history)}")
             checked.id, checked.version = claim_id, history[-1]["version"]
-        changes["dropped"] = [i for i in self.latest.get(author, []) if i not in taken]
-        self.latest[author] = taken
+        earlier = self.latest.get(author, [])
+        if replaces:
+            changes["dropped"] = [i for i in earlier if i not in taken]
+            self.latest[author] = taken
+        else:
+            self.latest[author] = earlier + [i for i in taken if i not in earlier]
         return changes
+
+    def earlier_citations(self, claim_id: str | None) -> list[str]:
+        """The citations of the latest version of a claim that had any, e.g. the analyst's finding that a report
+        statement rewords. Keeping a claim's ID never carries its citations; this says what they were."""
+        return next((v["citations"] for v in reversed(self.versions.get(claim_id or "", [])) if v["citations"]), [])
 
     def _id(self, claim: Claim, where: str, taken: list[str], notes: list[str]) -> str:
         if claim.id:
             raw = claim.id.strip().strip("{}").strip()
-            known = next((i for i in (raw, "claim-" + raw.removeprefix("claim:").strip()) if i in self.versions), None)
+            raw = "claim-" + raw.removeprefix("claim:").removeprefix("claim-").strip()
+            # Live check 3 Nov 2026: copied IDs sometimes gain a stray character (claim-1556f111303d3).
+            near = [i for i in self.versions if raw != i and raw.startswith(i) and len(raw) - len(i) <= 2]
+            known = raw if raw in self.versions else near[0] if len(near) == 1 else None
+            if known and known != raw:
+                notes.append(f"{where}: {claim.id!r} was read as {known}.")
             if known and known not in taken:
                 return known
             notes.append(f"{where}: {claim.id!r} is not a claim ID from an earlier draft, or is used twice, "

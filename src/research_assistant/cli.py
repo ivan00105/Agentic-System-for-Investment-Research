@@ -1,5 +1,5 @@
-"""Serve the web app, answer one research question in the terminal with the single agent (condition B), or
-recheck a saved run's numbers offline from its trace."""
+"""Serve the web app, answer one research question in the terminal with the single agent (condition B) or the
+analyst team (condition C), or recheck a saved run's numbers offline from its trace."""
 import argparse
 import sys
 from datetime import date, datetime, time, timezone
@@ -10,13 +10,15 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from . import config
-from .agents import evidence, single_agent
+from .agents import evidence, single_agent, team
 from .data.sec import SecClient
 from .model_access import load_model_settings
 from .tools.result import ToolContext
 
 # Factories, so tests can swap in fixtures and a scripted model.
 sec_client = SecClient
+# Evaluation conditions the CLI can run (REFERENCE §7); A is the web app's fixed pipeline.
+CONDITIONS = {"B": single_agent.run, "C": team.run}
 
 
 def model_client(settings):
@@ -28,6 +30,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("question", nargs="?", help="A research question. Without one, the web app is served.")
     parser.add_argument("--cutoff", type=date.fromisoformat, metavar="YYYY-MM-DD",
                         help="Research as of the end of this day (UTC). Default: now.")
+    parser.add_argument("--condition", choices=sorted(CONDITIONS), default="B",
+                        help="B: one agent with every tool (default). C: a coordinator with fundamentals, "
+                             "filings and market analysts.")
     parser.add_argument("--recheck", type=Path, metavar="TRACE",
                         help="Recheck a saved run's numbers from its trace file, offline (no network, no model).")
     args = parser.parse_args(argv)
@@ -36,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.question is None:
         uvicorn.run("research_assistant.api:create_app", factory=True, host="127.0.0.1", port=8000, workers=1)
         return 0
-    return ask(args.question, args.cutoff)
+    return ask(args.question, args.cutoff, args.condition)
 
 
 def utf8_console():
@@ -45,7 +50,7 @@ def utf8_console():
             stream.reconfigure(encoding="utf-8", errors="replace")
 
 
-def ask(question: str, cutoff_day: date | None) -> int:
+def ask(question: str, cutoff_day: date | None, condition: str = "B") -> int:
     utf8_console()
     load_dotenv(config.PROJECT_ROOT / ".env", override=False, interpolate=False, encoding="utf-8-sig")
     settings = load_model_settings()
@@ -57,7 +62,7 @@ def ask(question: str, cutoff_day: date | None) -> int:
     with sec_client() as sec, model_client(settings) as client:
         if not sec.configured:
             print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
-        result = single_agent.run(question, client, settings, ToolContext(cutoff=cutoff, sec=sec), echo=progress)
+        result = CONDITIONS[condition](question, client, settings, ToolContext(cutoff=cutoff, sec=sec), echo=progress)
     print(result.markdown)
     print(f"Trace saved to {result.trace_path}")
     return 1 if result.status == "failed" else 0
@@ -83,11 +88,16 @@ def progress(event: dict):
         line = f"step {step}: {event['name']} -> {event['result']['status']}" + (" (repeat)" if event["repeat_of"] else "")
     elif kind == "check":
         line = f"checker: {len(event['flags'])} flags"
+    elif kind == "analyst_start":
+        line = ("follow-up: " if event["follow_up"] else "task: ") + " ".join(event["task"].split())
+    elif kind == "analyst_end":
+        line = f"done ({event['status']}): {event['findings']} findings"
     elif kind in ("self_review", "stopped_at_limit", "nudge", "error"):
         line = f"{kind.replace('_', ' ')}" + (f": {event['error']}" if kind == "error" else "")
     else:
         return
-    print(line, file=sys.stderr, flush=True)
+    who = f"[{event['agent']}] " if event.get("agent") else ""  # the role that did it (condition C)
+    print(who + line, file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":

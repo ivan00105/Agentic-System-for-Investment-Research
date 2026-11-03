@@ -1,5 +1,5 @@
 from research_assistant.agents.checker import check, format_value, typed_numbers
-from research_assistant.agents.draft import Draft
+from research_assistant.agents.draft import Claim, Draft
 from research_assistant.agents.report import render
 
 REVENUE = {"id": "fact-aaa111", "kind": "fact", "metric": "revenue", "unit": "USD", "value": "416161000000",
@@ -80,6 +80,13 @@ def test_citations_are_accepted_in_the_forms_models_write():
     draft = Draft(risks=[claim("Supply risk.", ["calc:bbb222", "{fact: aaa111}", "fact-aaa111", "chunk:" + CHUNK["id"][6:]])])
     report = check(draft, RECORDS)
     assert not report.flags and report.sections["risks"][0].citations == ["calc-bbb222", "fact-aaa111", CHUNK["id"]]
+
+
+def test_the_schema_asks_for_citations_but_a_claim_without_them_is_flagged_not_rejected():
+    # Live check 3 Nov 2026: the coordinator left the optional citations key out of every interpretation.
+    assert Claim.model_json_schema()["required"] == ["text", "citations"]
+    report = check(Draft.model_validate({"risks": [{"text": "Supply is concentrated."}]}), RECORDS)
+    assert report.sections["risks"][0].text == "Supply is concentrated." and report.sections["risks"][0].flags
 
 
 def test_limitations_are_checked_and_render_lists_sources_and_flags():

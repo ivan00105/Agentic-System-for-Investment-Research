@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 from .. import config
 from ..model_access import safe_model_error
 from ..tools import registry
-from ..tools.result import ToolContext, ToolResult
+from ..tools.result import Tool, ToolContext, ToolResult
 from .trace import Trace
 
 
@@ -39,13 +39,20 @@ class LoopResult:
     error: str | None = None
 
 
+def toolset(tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = ()) -> dict[str, Tool]:
+    """A role's tools: registry tools by name (None: all of them) plus tools the host adds, e.g. analysts."""
+    return {name: registry.TOOLS[name] for name in (registry.TOOLS if tool_names is None else tool_names)} | {
+        tool.name: tool for tool in extra_tools}
+
+
 def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], context: ToolContext, finish: Finish,
-             trace: Trace, *, tool_names: list[str] | None = None, max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
+             trace: Trace, *, tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = (),
+             max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
     """Ask, run the requested tools, repeat. `messages` grows in place, so a caller can continue the
-    same conversation later (e.g. to send checker flags back). `tool_names` is the role's tool list
-    (None: every tool); the loop runs no other tool, whatever the model asks for."""
-    allowed = list(registry.TOOLS if tool_names is None else tool_names)
-    tools = registry.schemas(allowed) + [finish.schema()]
+    same conversation later (e.g. to send checker flags back). The role's tools are `tool_names` (None: every
+    registry tool) plus `extra_tools`; the loop runs no other tool, whatever the model asks for."""
+    allowed = toolset(tool_names, extra_tools)
+    tools = [tool.schema() for tool in allowed.values()] + [finish.schema()]
     seen: dict[str, tuple[int, ToolResult]] = {}
     steps = 0
     try:
@@ -135,7 +142,7 @@ def _run_tool(call, context, messages, trace, step, seen, allowed):
             result = earlier.model_copy(update={"warnings": [
                 *earlier.warnings, f"Repeated call: same arguments as step {repeat_of}, so it was not run again."]})
         else:
-            result = registry.call(name, arguments, context)
+            result = registry.call(name, arguments, context, allowed)
             seen[key] = (step, result)
     messages.append({"role": "tool", "tool_call_id": call.id, "content": result.model_dump_json()})
     # `records` holds every record this call added in full (e.g. all daily prices behind a series ID), so a
