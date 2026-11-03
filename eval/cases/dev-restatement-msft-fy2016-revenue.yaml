@@ -1,0 +1,56 @@
+id: dev-restatement-msft-fy2016-revenue
+split: dev
+case_type: restatement
+mode: check
+source: Hand-built (restatement after ASC 606 adoption)
+question: What was Microsoft's revenue in fiscal 2016, and has that figure changed since it was first reported?
+cutoff: 2018-09-30
+companies:
+  - ticker: MSFT
+    cik: 789019
+    name: Microsoft Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The figure was restated from 85,320 to 91,154 when Microsoft adopted the new revenue standard (ASC 606) with the full retrospective method in fiscal 2018.
+    - Which filing each figure comes from.
+  must_not:
+    - Gives only one figure for fiscal 2016 revenue without mentioning the restatement.
+    - Treats the 5,834 difference as revenue growth.
+gold:
+  - name: revenue_fy2016_as_first_reported
+    ticker: MSFT
+    value: 85320
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-06-30
+    source:
+      form: 10-K
+      accession: 0001193125-16-662209
+      filed: 2016-07-28
+      url: https://www.sec.gov/Archives/edgar/data/789019/000119312516662209/d187868d10k.htm
+      location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2016 column
+  - name: revenue_fy2016_restated
+    ticker: MSFT
+    value: 91154
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-06-30
+    source:
+      form: 10-K
+      accession: 0001564590-18-019062
+      filed: 2018-08-03
+      url: https://www.sec.gov/Archives/edgar/data/789019/000156459018019062/msft-10k_20180630.htm
+      location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2016 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  The FY2018 10-K says Microsoft early-adopted the new revenue standard on 1 July 2017 with the
+  full retrospective method, restating prior periods; the main change was Windows 10 revenue
+  recognition. Its income statement shows FY2016 total revenue of 91,154 (first reported as
+  85,320, +6.8%) while total cost of revenue stays at 32,780. REFERENCE §5 warns that
+  companyfacts holds later restated values, so a cutoff filter alone returns 91,154 with no hint
+  of the original.

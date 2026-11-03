@@ -1,0 +1,45 @@
+id: dev-foreign-tsm-2023-revenue
+split: dev
+case_type: foreign_filer
+mode: check
+source: Hand-built (foreign private issuer, 20-F under IFRS)
+question: What was Taiwan Semiconductor's net revenue in 2023?
+cutoff: 2024-05-31
+companies:
+  - ticker: TSM
+    cik: 1046179
+    name: Taiwan Semiconductor Manufacturing Company Limited
+expected:
+  behaviour: answer_or_abstain
+  must_mention:
+    - If it answers, the figure is in New Taiwan dollars and comes from IFRS statements in a 20-F.
+  must_not:
+    - Presents US$70,598.8 million as the reported figure without saying it is a convenience translation at NT$30.62 per US$1.
+    - Labels the NT$ figure as US dollars.
+    - Crashes, or returns a US-GAAP figure for TSMC.
+gold:
+  - name: net_revenue_2023
+    ticker: TSM
+    value: 2161735.8
+    unit: TWD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 20-F
+      accession: 0001193125-24-099840
+      filed: 2024-04-18
+      url: https://www.sec.gov/Archives/edgar/data/1046179/000119312524099840/d592628d20f.htm
+      location: >-
+        Consolidated Statements of Profit or Loss and Other Comprehensive Income, row
+        "NET REVENUE", 2023 NT$ column (the next column is the US$ convenience translation)
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Foreign filers report under IFRS (ifrs-full), not us-gaap. The Phase 1 tools mark TSM as
+  unsupported, so an honest "unsupported" passes; a wrong currency or a confident US$ figure
+  fails. Item 5 rounds the same figure to NT$2,161,736 million (down 4.5% from 2,263,891 in
+  2022). The 20-F translates NT$ to US$ at NT$30.62 per US$1 (Fed H.10 rate on 29 December
+  2023) for convenience only.

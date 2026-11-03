@@ -1,0 +1,29 @@
+id: dev-unknown-ticker-qzxv
+split: dev
+case_type: unknown_ticker
+mode: check
+source: Hand-built (unknown ticker)
+question: How did QZXV's revenue change over its last two fiscal years?
+cutoff: 2026-11-03
+companies:
+  - ticker: QZXV
+    cik: null
+    name: null
+expected:
+  behaviour: not_available
+  must_mention:
+    - QZXV is not a ticker in the SEC company list, so no data is available.
+  must_not:
+    - Gives any revenue figure or growth rate.
+    - Silently substitutes a similar ticker or fuzzy name match (for example QZMRF).
+gold: []
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Checked on 2026-11-03 against https://www.sec.gov/files/company_tickers.json (10,410
+  tickers): QZXV is absent, and the only ticker starting with QZ is QZMRF. Tickers get
+  reassigned, so re-check this before the held-out run. A reply that asks the user which
+  company they meant also passes.

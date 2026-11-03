@@ -1,0 +1,43 @@
+id: dev-trap-nvda-fiscal-2024-revenue
+split: dev
+case_type: fiscal_period_trap
+mode: check
+source: Hand-built, fiscal-year naming trap in the style of FinRetrieval (arXiv 2603.04403)
+question: What was NVIDIA's revenue in fiscal 2024?
+cutoff: 2025-06-30
+companies:
+  - ticker: NVDA
+    cik: 1045810
+    name: NVIDIA Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 28 January 2024.
+  must_not:
+    - Reports 130,497, which is fiscal 2025 (ended 26 January 2025, mostly calendar 2024).
+    - Reports 26,974, which is fiscal 2023.
+gold:
+  - name: revenue_fy2024
+    ticker: NVDA
+    value: 60922
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-01-28
+    source:
+      form: 10-K
+      accession: 0001045810-24-000029
+      filed: 2024-02-21
+      url: https://www.sec.gov/Archives/edgar/data/1045810/000104581024000029/nvda-20240128.htm
+      location: Consolidated Statements of Income, row "Revenue", Year Ended Jan 28, 2024 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  NVIDIA's fiscal year ends on the last Sunday in January and is named after the calendar year
+  it ends in, so fiscal 2024 is almost all of calendar 2023 (52 weeks, per the 10-K). The cutoff
+  is after the FY2025 10-K (0001045810-25-000023, filed 2025-02-26), so the trap is live: that
+  filing shows 130,497 / 60,922 / 26,974 for fiscal 2025 / 2024 / 2023, and companyfacts tags
+  all three columns with the filing's fy (REFERENCE §5). The FY2025 10-K repeats 60,922
+  unchanged.

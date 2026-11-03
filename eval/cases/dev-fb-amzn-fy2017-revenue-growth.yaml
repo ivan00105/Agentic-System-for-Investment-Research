@@ -1,0 +1,56 @@
+id: dev-fb-amzn-fy2017-revenue-growth
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_08135 (adapted)
+question: By what percentage did Amazon's revenue grow from 2016 to 2017?
+cutoff: 2018-03-31
+companies:
+  - ticker: AMZN
+    cik: 1018724
+    name: Amazon.com, Inc.
+expected:
+  behaviour: answer
+gold:
+  - name: total_net_sales_2017
+    ticker: AMZN
+    value: 177866
+    unit: USD millions
+    fiscal_period: FY2017
+    period_end: 2017-12-31
+    source:
+      form: 10-K
+      accession: 0001018724-18-000005
+      filed: 2018-02-02
+      url: https://www.sec.gov/Archives/edgar/data/1018724/000101872418000005/amzn-20171231x10k.htm
+      location: Consolidated Statements of Operations, row "Total net sales", 2017 column
+  - name: total_net_sales_2016
+    ticker: AMZN
+    value: 135987
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-12-31
+    source:
+      form: 10-K
+      accession: 0001018724-18-000005
+      filed: 2018-02-02
+      url: https://www.sec.gov/Archives/edgar/data/1018724/000101872418000005/amzn-20171231x10k.htm
+      location: Consolidated Statements of Operations, row "Total net sales", 2016 column
+  - name: revenue_growth_2017
+    ticker: AMZN
+    value: 30.8
+    unit: percent
+    fiscal_period: FY2017 vs FY2016
+    period_end: 2017-12-31
+    derived:
+      formula: total_net_sales_2017 / total_net_sales_2016 - 1
+      inputs: [total_net_sales_2017, total_net_sales_2016]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  177,866 / 135,987 - 1 = 30.796%, which rounds to FinanceBench's 30.8%. Both inputs come from
+  the FY2017 10-K (its 2016 column), so the growth uses one filing's figures.

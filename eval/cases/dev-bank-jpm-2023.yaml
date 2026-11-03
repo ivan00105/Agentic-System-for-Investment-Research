@@ -1,0 +1,54 @@
+id: dev-bank-jpm-2023
+split: dev
+case_type: bank
+mode: check
+source: Hand-built (bank)
+question: What were JPMorgan Chase's total net revenue, net income and operating margin in 2023?
+cutoff: 2024-03-31
+companies:
+  - ticker: JPM
+    cik: 19617
+    name: JPMorgan Chase & Co.
+expected:
+  behaviour: answer
+  must_mention:
+    - Operating margin is not available because a bank's income statement has no operating income line; the metric is unsupported, not zero.
+  must_not:
+    - Reports an operating margin built from an invented operating income figure.
+    - Treats net interest income alone as total net revenue.
+gold:
+  - name: total_net_revenue_2023
+    ticker: JPM
+    value: 158104
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0000019617-24-000225
+      filed: 2024-02-16
+      url: https://www.sec.gov/Archives/edgar/data/19617/000001961724000225/jpm-20231231.htm
+      location: Consolidated statements of income, row "Total net revenue", 2023 column
+  - name: net_income_2023
+    ticker: JPM
+    value: 49552
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0000019617-24-000225
+      filed: 2024-02-16
+      url: https://www.sec.gov/Archives/edgar/data/19617/000001961724000225/jpm-20231231.htm
+      location: Consolidated statements of income, row "Net income", 2023 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Banks usually have no OperatingIncomeLoss (REFERENCE §5), and the Phase 1 tools return bank
+  operating income as unsupported. The gold figures are the reported GAAP lines from the audited
+  income statement; MD&A also discusses managed-basis results, which are not the gold. A
+  pre-tax or pre-provision margin is acceptable only if it is labelled as such and not called
+  operating margin.

@@ -1,0 +1,43 @@
+id: dev-trap-wmt-fiscal-2023-revenue
+split: dev
+case_type: fiscal_period_trap
+mode: check
+source: Hand-built, fiscal-year naming trap in the style of FinRetrieval (arXiv 2603.04403)
+question: What were Walmart's total revenues in fiscal year 2023?
+cutoff: 2024-06-30
+companies:
+  - ticker: WMT
+    cik: 104169
+    name: Walmart Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 31 January 2023.
+  must_not:
+    - Reports 648,125, which is fiscal 2024 (ended 31 January 2024, mostly calendar 2023).
+gold:
+  - name: total_revenues_fy2023
+    ticker: WMT
+    value: 611289
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-01-31
+    source:
+      form: 10-K
+      accession: 0000104169-23-000020
+      filed: 2023-03-17
+      url: https://www.sec.gov/Archives/edgar/data/104169/000010416923000020/wmt-20230131.htm
+      location: >-
+        Consolidated Statements of Income, row "Total revenues", Fiscal Years Ended January 31,
+        2023 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-03
+  checked_by: null
+  check_note: null
+notes: >-
+  Walmart's fiscal year ends 31 January and takes the name of the calendar year it ends in, so
+  fiscal 2023 is February 2022 to January 2023. The cutoff is after the FY2024 10-K
+  (0000104169-24-000056, filed 2024-03-15), which shows 648,125 for fiscal 2024 and repeats
+  611,289 for fiscal 2023. "Total revenues" adds membership and other income to net sales; the
+  "Net sales" row (605,881) is a different figure.
