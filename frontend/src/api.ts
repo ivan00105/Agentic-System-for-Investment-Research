@@ -1,5 +1,5 @@
 export type Mode = 'fresh' | 'frozen' | 'replay'
-export type View = 'research' | 'baseline' | 'discovery' | 'history' | 'connections'
+export type View = 'research' | 'baseline' | 'discovery' | 'history' | 'setup'
 export interface Screen { sector: string; min_operating_margin: string; limit: number }
 // Legacy spending fields remain readable for saved requests and exact-key recovery; new checks omit them.
 export interface RunRequest { kind: 'research' | 'discovery'; mode: Mode; ticker: string | null; cutoff: string; source_run_id: string | null; screen: Screen | null; model_analysis?: boolean; connection_check?: 'sec' | 'model' | null; spending_limit_usd?: string | null; provider_limit_confirmed?: boolean }
@@ -105,6 +105,15 @@ export const agentApi = {
   record: (id: string, record: string) => request<AgentRecord>(`${run(id)}/records/${encodeURIComponent(record)}`),
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),
   universes: () => request<{items: UniverseInfo[]}>('/universes'),
+}
+// Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
+export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
+export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean }
+export interface DataKind { kind: string; label: string; purpose: string; active: string | null; providers: ProviderStatus[] }
+export const setupApi = {
+  status: () => request<{kinds: DataKind[]}>('/status'),
+  // No browser timeout: a model check can take a while, and the provider's own timeout ends it.
+  check: (name: string) => request<{kinds: DataKind[]}>(`/status/${encodeURIComponent(name)}/check`, {...post({}), signal: new AbortController().signal}),
 }
 export const agentRunning = (status: string) => status === 'running' || status === 'stopping' || status === 'waiting'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.
