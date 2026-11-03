@@ -13,6 +13,7 @@ from ..tools import registry
 from ..tools.result import ToolContext
 from . import prompts
 from .checker import CheckedReport, check
+from .claims import ClaimLedger, report_claims
 from .draft import SECTIONS, Draft
 from .loop import Finish, run_loop
 from .report import render
@@ -37,7 +38,7 @@ class AgentRun:
 def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
         max_steps: int = config.AGENT_MAX_STEPS, self_review_passes: int = config.AGENT_SELF_REVIEW_PASSES,
         trace_dir: Path | None = None, echo: Callable[[dict], None] | None = None) -> AgentRun:
-    trace = Trace.new(trace_dir, echo)
+    trace, ledger = Trace.new(trace_dir, echo), ClaimLedger()
     cutoff = context.cutoff.isoformat()
     trace.write("run_start", question=question, cutoff=cutoff, provider=settings.provider, model=settings.model,
                 max_steps=max_steps)
@@ -47,13 +48,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     except (OpenAIError, TimeoutError) as exc:
         error = str(safe_model_error(exc))
         trace.write("error", step=0, error=error, type=type(exc).__name__)
-        return _end(trace, question, settings, context, "failed", None, None, [], error)
+        return _end(trace, question, settings, context, ledger, "failed", None, None, [], error)
 
     messages = [{"role": "system", "content": prompts.load("single_agent", cutoff=cutoff)},
                 {"role": "user", "content": f"{question}\n\nYour plan:\n{plan or '(no plan)'}"}]
     result = run_loop(client, settings.model, kwargs, messages, context, SUBMIT, trace, max_steps=max_steps)
     steps, status, error = result.steps, result.status, result.error
-    report = _check(result.output, context, trace)
+    report = _check(result.output, context, trace, ledger)
     notes = []
     for review in range(1, self_review_passes + 1):
         if not (report and report.flags and status == "finished" and steps < max_steps):
@@ -66,8 +67,8 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
             notes.append(f"The self-review pass ended without a new report ({again.error or again.status}); "
                          "the first draft is shown with its checker flags.")
             break
-        report, status = _check(again.output, context, trace), again.status
-    return _end(trace, question, settings, context, status, plan, report, notes, error)
+        report, status = _check(again.output, context, trace, ledger), again.status
+    return _end(trace, question, settings, context, ledger, status, plan, report, notes, error)
 
 
 def _plan(question, client, model, kwargs, cutoff, trace) -> str:
@@ -82,22 +83,26 @@ def _plan(question, client, model, kwargs, cutoff, trace) -> str:
     return plan
 
 
-def _check(draft: Draft | None, context, trace) -> CheckedReport | None:
+def _check(draft: Draft | None, context, trace, ledger: ClaimLedger) -> CheckedReport | None:
     if draft is None:
         return None
     report = check(draft, context.records)
-    trace.write("check", flags=[asdict(flag) for flag in report.flags], sources=len(report.sources))
+    changes = ledger.stamp("single_agent", report_claims(draft, report))
+    trace.write("check", flags=[asdict(flag) for flag in report.flags], sources=len(report.sources), claims=changes)
     return report
 
 
 def _review_request(report: CheckedReport) -> str:
-    flags = "\n".join(f"- {flag.where}: {flag.problem}" for flag in report.flags)
+    ids = {f"{key}[{i}]": claim.id for key, claims in report.sections.items() for i, claim in enumerate(claims)}
+    flags = "\n".join(f"- {flag.where}" + (f" ({ids[flag.where]})" if ids.get(flag.where) else "") + f": {flag.problem}"
+                      for flag in report.flags)
     return ("The checker found these problems in your report:\n" + flags + "\n\nFix them and call submit_report "
-            "again with the complete corrected report (every section). You may call tools first, e.g. calculate "
-            "for a figure you typed. Remove any statement the evidence doesn't support.")
+            "again with the complete corrected report (every section). Put a revised statement's claim ID in its "
+            "`id`, so the change is recorded as a new version of that claim. You may call tools first, e.g. "
+            "calculate for a figure you typed. Remove any statement the evidence doesn't support.")
 
 
-def _end(trace, question, settings, context, status, plan, report, notes, error) -> AgentRun:
+def _end(trace, question, settings, context, ledger, status, plan, report, notes, error) -> AgentRun:
     if report is None:  # no draft at all: the best partial result is the evidence gathered so far
         report = check(Draft(), context.records)
         report.sources = list(context.records)
@@ -109,5 +114,5 @@ def _end(trace, question, settings, context, status, plan, report, notes, error)
                       model=model, plan=plan, run_id=trace.run_id, error=error)
     trace.write("run_end", status=status, error=error, totals=dict(trace.totals),
                 statuses={key: report.section_status(key) for key, _ in SECTIONS}, report=asdict(report),
-                markdown=markdown)
+                claims=ledger.versions, markdown=markdown)
     return AgentRun(trace.run_id, status, plan, report, markdown, trace.path, dict(trace.totals), error)

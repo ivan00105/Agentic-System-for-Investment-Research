@@ -15,6 +15,11 @@ class Claim(BaseModel):
     kind: Literal["fact", "calculation", "interpretation"] = Field("interpretation", description=(
         "fact: a reported value; calculation: a calculate result; interpretation: your reading of the evidence "
         "(cite the evidence it rests on)."))
+    materiality: Literal["central", "supporting", "minor"] = Field("supporting", description=(
+        "central: the answer depends on it; supporting: it backs a central claim; minor: context."))
+    id: str | None = Field(None, description=(
+        "Leave empty for a new statement. When you revise or repeat a statement that already has a claim ID "
+        "(claim-...), put that ID here so the change is recorded as a new version of the same claim."))
 
     @model_validator(mode="before")
     @classmethod

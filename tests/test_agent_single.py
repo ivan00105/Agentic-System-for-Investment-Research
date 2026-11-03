@@ -1,4 +1,5 @@
 import json
+import re
 
 import httpx
 import openai
@@ -33,7 +34,7 @@ def calculate_margin(messages):
     return reply(tool_calls=[("calculate", {"formula": "ratio", "inputs": inputs})])
 
 
-def submit(stray: bool):
+def submit(stray: bool, bull_id: str | None = None):
     def step(messages):
         margin = next(r for r in reversed(tool_results(messages)) if r["source"] == "calculate")["ids"][0]
         revenue = latest(messages, "revenue")
@@ -41,7 +42,7 @@ def submit(stray: bool):
         draft = {"summary": [{"text": "Apple's operating margin was {calc:%s} in the fiscal year ended 2025-09-27."
                               % margin, "kind": "calculation"}],
                  "key_numbers": [{"text": "Revenue was {fact:%s}." % revenue, "kind": "fact"}],
-                 "bull_case": [{"text": upside, "citations": [margin], "kind": "interpretation"}],
+                 "bull_case": [{"text": upside, "citations": [margin], "kind": "interpretation", "id": bull_id}],
                  "limitations": ["No statistical outlook model is available yet."]}
         return reply(tool_calls=[("submit_report", draft)])
     return step
@@ -57,11 +58,17 @@ def run(tmp_path, *script, **options):
 
 def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     def fix(messages):
-        assert "bull_case[0]: '30%' is typed" in messages[-1]["content"]
-        return submit(stray=False)(messages)
+        flagged = re.search(r"bull_case\[0\] \((claim-\w+)\): '30%' is typed", messages[-1]["content"])
+        return submit(stray=False, bull_id=flagged[1])(messages)
 
     result, client, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=True), fix)
     assert result.status == "finished" and result.error is None and not result.report.flags
+    # The fixed claim is version 2 of the same claim; the untouched summary stays version 1.
+    first_bull = events[[e["kind"] for e in events].index("check")]["claims"]["new"][2]
+    bull, summary = result.report.sections["bull_case"][0], result.report.sections["summary"][0]
+    assert first_bull == f"{bull.id} v1" and bull.version == 2 and summary.version == 1
+    assert events[-1]["claims"][bull.id][0]["text"] == "Margins above 30% leave room."
+    assert [e["claims"]["revised"] for e in events if e["kind"] == "check"] == [[], [f"{bull.id} v2"]]
     assert result.plan.startswith("1. find_company") and "- Model: fake-model (served by Baidu)" in result.markdown
     assert "- Apple's operating margin was 32.0% in the fiscal year ended 2025-09-27. [1]" in result.markdown
     assert "- Revenue was $416.2 billion. [2]" in result.markdown

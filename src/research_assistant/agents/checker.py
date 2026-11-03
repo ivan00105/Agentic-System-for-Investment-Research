@@ -32,6 +32,9 @@ class CheckedClaim:
     kind: str
     citations: list[str]  # IDs that resolved, in order of first use
     flags: list[Flag] = field(default_factory=list)
+    materiality: str = "supporting"
+    id: str | None = None  # claim ID and version, set by claims.ClaimLedger (REFERENCE §3)
+    version: int | None = None
 
     @property
     def status(self) -> str:
@@ -81,7 +84,7 @@ def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
     citations = list(dict.fromkeys(used + cited))
     if not citations:
         flags.append(Flag(where, "No citation: cite the records this statement rests on."))
-    return CheckedClaim(text, claim.kind, citations, flags)
+    return CheckedClaim(text, claim.kind, citations, flags, claim.materiality)
 
 
 def lookup(records: dict[str, dict], raw: str, kind: str | None = None) -> dict | None:

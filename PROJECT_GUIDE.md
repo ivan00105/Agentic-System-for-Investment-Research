@@ -360,7 +360,8 @@ Licences don't matter here (it's an academic project): calling a library and cop
 ### Phase 3: Analyst team
 - [ ] Coordinator + the 3 analyst roles as configs of the same loop. The coordinator merges findings into a report: summary, key numbers, **bull case vs bear case**, risks, and what would change the view.
 - [x] Each role can run only its own tools. The loop answers any other tool call with an "invalid" result instead of running it (before, it only hid the other tools' schemas).
-- [ ] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
+- [x] Claims get stable IDs and versions (REFERENCE §3), so Phase 4 can show exactly which claim the critic changed.
+  - `agents/claims.py`: a claim's ID comes from its first wording (`claim-…`) and is kept when the model repeats it in the claim's `id`; the version goes up only when the text, resolved citations, kind or materiality change. Each `check` event lists new, revised, unchanged and dropped claims, and `run_end` keeps every version.
 - [ ] Frozen evidence: the trace keeps every tool result in full, including the daily prices behind a calculation, so a saved run can be reopened and its numbers rechecked offline. Files are enough; SQLite waits for Phase 7.
 - **Done when:** the same questions work, and the trace shows which analyst did what (condition **C**).
 
