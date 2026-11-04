@@ -2,7 +2,8 @@
 
 The model picks a tool and fills in its arguments; the host runs it and records every step in the trace.
 The loop ends when the model calls the finish tool with valid arguments. Reaching the step guard asks the
-model once for its best answer and returns it marked "stopped_at_limit"; nothing here raises.
+model once for its best answer and returns it marked "stopped_at_limit"; a cancelled run returns "stopped" before
+its next model call. Nothing here raises.
 """
 import json
 from dataclasses import dataclass
@@ -33,10 +34,25 @@ class Finish:
 
 @dataclass
 class LoopResult:
-    status: Literal["finished", "stopped_at_limit", "failed"]
+    status: Literal["finished", "stopped_at_limit", "stopped", "failed"]
     output: BaseModel | None  # the validated finish arguments, if the model handed any in
     steps: int  # model calls used
     error: str | None = None
+
+
+class BadReply(OpenAIError):
+    """A model reply whose body isn't JSON, even after retries."""
+
+
+def create(client, **kwargs):
+    """chat.completions.create, retrying a reply whose body isn't JSON: the SDK retries only errors with a status, and
+    a host's 200 reply cut off mid-body (live Discover check, 3 Nov 2026) raised past every handler."""
+    for _ in range(config.AGENT_BAD_REPLY_RETRIES + 1):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except json.JSONDecodeError as exc:
+            problem = exc
+    raise BadReply(f"The model's reply was not JSON in {config.AGENT_BAD_REPLY_RETRIES + 1} tries: {problem}")
 
 
 def toolset(tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = ()) -> dict[str, Tool]:
@@ -57,6 +73,9 @@ def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], con
     steps = 0
     try:
         while steps < max_steps:
+            if context.stop.is_set():
+                trace.write("cancelled", step=steps)
+                return LoopResult("stopped", None, steps)
             steps += 1
             message = _ask(client, model, request_kwargs, messages, tools, trace, steps)
             if message is None or not message.tool_calls:
@@ -100,7 +119,7 @@ def _finalize(client, model, request_kwargs, messages, tools, finish, trace, ste
 
 def _ask(client, model, request_kwargs, messages, tools, trace, step, **extra):
     # No max_tokens: output-token caps cut reasoning models off mid-answer (PROJECT_GUIDE §5).
-    response = client.chat.completions.create(model=model, messages=messages, tools=tools, **request_kwargs, **extra)
+    response = create(client, model=model, messages=messages, tools=tools, **request_kwargs, **extra)
     usage = response.usage.model_dump() if response.usage else None
     provider = (response.model_extra or {}).get("provider")  # the host that served it (OpenRouter)
     if not response.choices:
@@ -137,6 +156,8 @@ def _run_tool(call, context, messages, trace, step, seen, allowed):
         if name not in allowed:  # REFERENCE §2: a role runs only its own tools; hiding the others isn't enough
             result = ToolResult(status="invalid", source="agent loop", warnings=[
                 f"{name!r} is not one of this role's tools ({', '.join(allowed) or 'none'}), so it was not run."])
+        elif context.stop.is_set():  # cancelled: skip the rest of this step's tools, e.g. the other analysts
+            result = ToolResult(status="unavailable", source="agent loop", warnings=["Not run: the run was cancelled."])
         elif key in seen:  # REFERENCE §2: a repeated action with no new inputs is skipped
             repeat_of, earlier = seen[key]
             result = earlier.model_copy(update={"warnings": [

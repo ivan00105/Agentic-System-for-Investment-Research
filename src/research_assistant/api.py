@@ -9,9 +9,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from . import agent_api, companies_api
 from .application import Application
 from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
 from .data import providers
+from .data.errors import DataError
 from .fixtures import FIXTURE_CUTOFF, seed
 from .store import Store
 
@@ -56,10 +58,12 @@ def create_app(data_dir: Path | None = None):
             seed(store)
             app.state.store = store
             app.state.application = Application(store)
+            app.state.agent_runs = agent_api.AgentRuns(root / "traces")
             try:
                 yield
             finally:
                 app.state.application.close()
+                app.state.agent_runs.stop_all()
 
     app = FastAPI(title="Fieldnote Research", version="0.1.0", lifespan=lifespan)
     app.state.provider_checks = {}  # last live check per provider, for this server's lifetime
@@ -99,7 +103,7 @@ def create_app(data_dir: Path | None = None):
 
     @app.get("/api/status")
     def data_status():
-        """Every data provider by kind: tier, settings, configured or not, and the last check."""
+        """Every data provider by kind: tier, which settings are set (never their values), and the last check."""
         return {"kinds": providers.status(app.state.provider_checks)}
 
     @app.post("/api/status/{name}/check")
@@ -108,8 +112,14 @@ def create_app(data_dir: Path | None = None):
             result = providers.run_check(name)
         except KeyError:
             raise DomainError("No provider with a live check has that name.", "not_found", 404) from None
+        except DataError as exc:
+            raise DomainError(str(exc), exc.code, 409) from None
         app.state.provider_checks[name] = {**result, "checked_at": utcnow().isoformat()}
         return {"kinds": providers.status(app.state.provider_checks)}
+
+    app.include_router(agent_api.router)
+    app.include_router(companies_api.router)
+    app.include_router(companies_api.universes)
 
     @app.post("/api/runs", response_model=Run, status_code=202)
     def submit(body: RunRequest, idempotency_key: str = Header(min_length=8, max_length=128)):

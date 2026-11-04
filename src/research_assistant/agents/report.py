@@ -5,6 +5,7 @@ from .draft import SECTIONS
 RUN_STATUS = {
     "finished": "finished",
     "stopped_at_limit": "stopped at limit: the step guard was reached, so this report is partial",
+    "stopped": "stopped: the run was cancelled, so this report is partial",
     "failed": "failed",
 }
 

@@ -17,11 +17,11 @@ $rules
 ## The report
 
 Call `submit_report` with:
-- `summary`: the direct answer to the question.
-- `key_numbers`: the figures the answer rests on, each with its period.
-- `bull_case` and `bear_case`: the strongest evidence on each side.
-- `risks`: material risks, with their source.
+- `summary`: the answer first. Its first statement answers the question in one or two short sentences; then 3-5 takeaways, one idea each, the most important first.
+- `key_numbers`: the figures the answer rests on, one figure per statement, each labelled with its metric and period.
+- `bull_case` and `bear_case`: the strongest evidence on each side, one point per statement.
+- `risks`: material risks, one per statement, with their source.
 - `what_would_change_view`: observable developments that would change the conclusion.
-- `limitations`: what is missing, unsupported or unchecked.
+- `limitations`: what is missing, unsupported or unchecked, and caveats about method.
 
 For a comparison, cover every company in each section.

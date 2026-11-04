@@ -135,3 +135,32 @@ def test_a_model_failure_in_the_plan_is_a_failed_run_not_an_exception(tmp_path):
     assert result.status == "failed" and "unavailable" in result.error
     assert "- Run status: failed" in result.markdown and "- Error: " in result.markdown
     assert [e["kind"] for e in events] == ["run_start", "error", "run_end"]
+
+
+def cancelled_run(tmp_path, cancel_on, *script):
+    """A run whose user cancels while the model call `cancel_on` is out."""
+    context = make_context(tmp_path)
+
+    def cancel(messages):
+        context.stop.set()
+        return cancel_on(messages)
+
+    result = single_agent.run("Is Apple profitable?", FakeClient(*script, cancel), SETTINGS, context,
+                              trace_dir=tmp_path / "traces")
+    return result, [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_cancelling_gives_a_partial_report_marked_stopped_not_an_error(tmp_path):
+    result, events = cancelled_run(tmp_path, get_financials, PLAN, find_apple)
+    assert result.status == "stopped" and result.error is None
+    assert "- Run status: stopped: the run was cancelled" in result.markdown
+    assert "## Summary (abstained)" in result.markdown and "`company-0000320193` Apple Inc." in result.markdown
+    assert [e["kind"] for e in events][-3:] == ["tool_call", "cancelled", "run_end"]
+    assert events[-1]["status"] == "stopped"
+
+
+def test_cancelling_during_the_self_review_keeps_the_draft(tmp_path):
+    result, events = cancelled_run(tmp_path, submit(stray=False), PLAN, find_apple, get_financials, calculate_margin)
+    assert result.status == "stopped" and "## Summary (cited)" in result.markdown
+    assert "The self-review pass ended without a new report (stopped)" in result.markdown
+    assert events[-1]["status"] == "stopped"

@@ -51,6 +51,9 @@ FIND_COMPANY_MAX_MATCHES = 10
 # rapidfuzz WRatio score (0-100) a name must reach to count as a match. Below ~80 the matches
 # are mostly unrelated companies that share one word.
 FIND_COMPANY_MIN_SCORE = 80
+# Companies the web page's search box lists as the user types. More are counted ("8 of 40 matches"), never
+# dropped silently, and typing more narrows them.
+COMPANY_SUGGEST_MAX = 8
 
 # Fiscal years returned when the agent doesn't ask: enough for growth and trends. Older years are
 # counted in a warning and the agent can ask for them.
@@ -81,6 +84,9 @@ SCREEN_FRAME_LAG_DAYS = 100
 PRICE_PROVIDERS = ("tiingo", "yfinance")
 # Adjusted prices change whenever a dividend or split happens, so cached series refresh daily.
 PRICE_CACHE_MAX_AGE_HOURS = 24
+# Yahoo can list the newest day with a blank close for hours after it closes (seen at 21:23 New York time on
+# 2 Nov 2026), so a series ending that way is refetched after this long; 30 minutes covers one research run.
+PRICE_CACHE_BLANK_CLOSE_MAX_AGE_MINUTES = 30
 # History fetched when the agent gives no start date: three years covers volatility, drawdown and beta.
 PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
 # A day's close counts as known from this New York hour on: the close is 16:00 and end-of-day
@@ -109,11 +115,31 @@ AGENT_CRITIC_ROUNDS = 3
 # outlast OpenRouter's upstream 429s in the 3 Nov 2026 live check; 6 waits about 25 s. Agents also
 # let OpenRouter fall back to another host of the same model. Baseline A keeps the SDK default.
 AGENT_MODEL_RETRIES = 6
+# Retries of a model call whose 200 reply body isn't JSON (a host cut the reply off), which the SDK doesn't retry.
+# Seen once in the 3 Nov 2026 live Discover check; after these the call fails like any other model error.
+AGENT_BAD_REPLY_RETRIES = 2
+
+# Discover (REFERENCE §4): companies explained when the question doesn't say how many. Each one is a full
+# research run (B, C or D), so three keeps a Discover run to about the cost and time of three Check runs.
+DISCOVER_DEFAULT_TOP_K = 3
+# Research runs allowed beyond top-k, to replace candidates whose research failed (PROJECT_GUIDE §5: "top-k plus
+# a few replacements", user-adjustable with --replacements). Candidates the deterministic check rejects cost no
+# model call and don't count. On reaching it the shortlist returns fewer picks and says why.
+DISCOVER_MAX_REPLACEMENTS = 3
+# The research condition of a Discover run started from the web page, unless Advanced options pick another. Each pick
+# is a full research run: B (one agent) keeps three picks to minutes and cents, while D takes about 20 minutes a pick.
+WEB_DISCOVER_CONDITION = "B"
 
 
 def trace_dir() -> Path:
     # One append-only JSONL trace per run, written step by step so a crash still leaves the trace.
     return data_dir() / "traces"
+
+
+def eval_dir() -> Path:
+    # Evaluation batches (eval/run_eval.py): one folder each, with its run index, traces and score tables. Kept apart
+    # from traces/, so evaluation runs don't fill the web app's History.
+    return data_dir() / "eval"
 
 
 # --- Report checker -----------------------------------------------------------------------

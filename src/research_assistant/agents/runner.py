@@ -1,8 +1,8 @@
 """One research run, shared by evaluation conditions B, C and D (REFERENCE §7):
 plan → the lead role's tool loop → draft → deterministic checker → self-review pass(es) → [review] → report.
 In B the lead is a single agent with every tool; in C it is the coordinator, whose tools include the three
-analysts (team.py); D adds the critic's review and the team's revisions (critic.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit or
-failed, with its trace saved."""
+analysts (team.py); D adds the critic's review and the team's revisions (critic.py). Nothing here raises on model or tool trouble; the run ends finished, stopped at limit,
+stopped (cancelled) or failed, with its trace saved."""
 from dataclasses import asdict, dataclass, field
 from functools import partial
 from pathlib import Path
@@ -17,7 +17,7 @@ from . import prompts
 from .checker import CheckedReport, check
 from .claims import ClaimLedger, report_claims
 from .draft import SECTIONS, Draft
-from .loop import Finish, LoopResult, run_loop, toolset
+from .loop import Finish, LoopResult, create, run_loop, toolset
 from .objections import claims_view, evidence_view, issue_list
 from .report import render
 from .roles import Role
@@ -30,7 +30,7 @@ SUBMIT = Finish("submit_report", "Hand in the finished report. Every number is a
 @dataclass
 class AgentRun:
     run_id: str
-    status: str  # finished | stopped_at_limit | failed
+    status: str  # finished | stopped_at_limit | stopped | failed
     plan: str | None
     report: CheckedReport
     markdown: str
@@ -69,8 +69,10 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     with trace.acting_as(lead.name):
         work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)
-        if review and work.draft is not None and work.status != "failed":
+        if review and work.draft is not None and work.status not in ("failed", "stopped"):
             review(work)
+    if context.stop.is_set():  # cancelled: what got done is the partial result, never an error
+        work.status = "stopped"
     return close(trace, question, settings, context, ledger, work, condition, team)
 
 
@@ -114,7 +116,7 @@ def _plan(question, client, model, kwargs, cutoff, trace, lead: Role, extra_tool
     tools = "\n".join(f"- {tool.name}: {tool.description}" for tool in toolset(lead.tools, extra_tools).values())
     messages = [{"role": "system", "content": prompts.load(lead.plan_prompt, cutoff=cutoff, tools=tools)},
                 {"role": "user", "content": question}]
-    response = client.chat.completions.create(model=model, messages=messages, **kwargs)
+    response = create(client, model=model, messages=messages, **kwargs)
     plan = ((response.choices[0].message.content if response.choices else None) or "").strip()
     trace.write("plan", plan=plan, model=response.model, provider=(response.model_extra or {}).get("provider"),
                 usage=response.usage.model_dump() if response.usage else None)

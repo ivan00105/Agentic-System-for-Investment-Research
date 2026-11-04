@@ -216,7 +216,7 @@ test('opting into unavailable model analysis still completes and saves financial
 })
 
 test('fresh retrieval configuration failure is explicit; empty and invalid run states recover', async ({page}) => {
-  await page.goto('/?view=research')
+  await page.goto('/?view=baseline')
   await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
   await page.screenshot({path: path.join(evidenceDir, 'empty-state.png')})
   await page.getByLabel('Research action').selectOption('fresh')
@@ -229,7 +229,7 @@ test('fresh retrieval configuration failure is explicit; empty and invalid run s
   await page.goto('/?view=research&run=missing-run')
   await expect(page.getByRole('alert')).toContainText('Run not found')
   await page.screenshot({path: path.join(evidenceDir, 'error-state.png')})
-  await page.getByRole('button', {name: 'Research', exact: true}).click()
+  await page.getByRole('button', {name: 'Baseline A', exact: true}).click()
   await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
 })
 
@@ -263,7 +263,7 @@ test('an accepted submission with a lost response retries with the same idempote
 test('legacy pending submissions retain their original payload and key', async ({page, request}) => {
   const source = await (await request.get('/api/runs/example-msft')).json()
   const legacy = {request: {kind: 'research', mode: 'frozen', ticker: 'MSFT', cutoff: source.request.cutoff, source_run_id: source.id, screen: null}, key: 'legacy-pending-recovery'}
-  await page.goto('/?view=research')
+  await page.goto('/?view=baseline')
   await page.evaluate(intent => sessionStorage.setItem('fieldnote-pending', JSON.stringify(intent)), legacy)
   await page.reload()
   const submitted = page.waitForRequest(request => request.method() === 'POST' && request.url().endsWith('/api/runs'))
@@ -346,179 +346,16 @@ test('untrusted evidence renders as text and long content stays inside viewport'
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
 })
 
-test('Connections separates setup from attempts and navigation or refresh never submits research', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-  let reads = 0
-  let posts = 0
-  await page.route('**/api/config', route => {reads++; return route.fulfill({json: {...config, connections: {
-    sec: {configured: true, provider: 'SEC', model: null, check: untested},
-    model: {configured: false, provider: 'OpenAI', model: 'selected-model', check: untested},
-  }}})})
-  page.on('request', req => {if (req.method() === 'POST') posts++})
-  await page.goto('/?view=research')
-  await page.getByRole('button', {name: 'Connections', exact: true}).click()
-  await expect(page).toHaveURL(/view=connections/)
-  await expect(page.getByRole('heading', {name: 'Connections', exact: true})).toBeVisible()
-  const sec = page.getByRole('region', {name: 'SEC financial data'})
-  const model = page.getByRole('region', {name: 'Optional model analysis'})
-  await expect(sec.getByText('Configured', {exact: true})).toBeVisible()
-  await expect(sec.getByText('Not tested', {exact: true})).toBeVisible()
-  await expect(model.getByText('Not configured', {exact: true})).toBeVisible()
-  await expect(model.getByText('Not tested', {exact: true})).toBeVisible()
-  await expect(model).toContainText('selected-model')
-  await expect(page.getByRole('region', {name: 'Research controls'})).toHaveCount(0)
-  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
-  await expect(model.getByRole('checkbox')).not.toBeChecked()
-  await expect(model.getByRole('button', {name: 'Test model connection'})).toBeDisabled()
-  await expect(page.getByText('Tests run only when you explicitly click a test button.', {exact: false})).toBeVisible()
-  await expect(page.locator('.connection-setup')).not.toHaveAttribute('open', '')
-  await expect(page.getByText('SEC_USER_AGENT', {exact: true})).toBeHidden()
-  const before = reads
-  await page.getByRole('button', {name: 'Refresh status'}).click()
-  await expect(page.getByRole('button', {name: 'Refresh status'})).toBeEnabled()
-  expect(reads).toBe(before + 1)
-  await page.getByRole('button', {name: 'History', exact: true}).click()
-  await page.getByRole('button', {name: 'Connections', exact: true}).click()
-  await expect(sec.getByText('Not tested', {exact: true})).toBeVisible()
-  expect(reads).toBeGreaterThan(before + 1)
-  expect(posts).toBe(0)
-  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
-  await page.screenshot({path: path.join(evidenceDir, 'desktop-connections.png'), fullPage: true})
-  await page.reload()
-  await page.keyboard.press('Tab')
-  await expect(page.getByRole('link', {name: 'Skip to connections'})).toBeFocused()
-  await page.keyboard.press('Enter')
-  await page.getByRole('button', {name: 'Refresh status'}).focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('button', {name: 'Refresh status'})).toBeEnabled()
-  expect(posts).toBe(0)
-})
-
-test('Connections shows recorded attempts and opens the correct saved investigation kind', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  const checkedAt = '2026-10-27T09:30:00Z'
-  await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-    sec: {configured: true, provider: 'SEC', model: null, check: {status: 'passed', checked_at: checkedAt, run_id: 'example-discovery', message: 'SEC data was retrieved.'}},
-    model: {configured: true, provider: 'OpenAI', model: 'selected-model', check: {status: 'failed', checked_at: checkedAt, run_id: 'example-msft', message: '<img src=x onerror="window.injected=true"> The model attempt failed.'}},
-  }}}))
-  await page.goto('/?view=connections')
-  const sec = page.getByRole('region', {name: 'SEC financial data'})
-  const model = page.getByRole('region', {name: 'Optional model analysis'})
-  await expect(sec.getByText('Check passed', {exact: true})).toBeVisible()
-  await expect(model.getByText('Check failed', {exact: true})).toBeVisible()
-  await expect(sec.locator('time')).toHaveAttribute('datetime', checkedAt)
-  await expect(model.locator('time')).toContainText('27 Oct 2026, 09:30 UTC')
-  await expect(model).toContainText('<img src=x')
-  await expect(model.locator('img')).toHaveCount(0)
-  await sec.getByRole('button', {name: 'Open saved investigation'}).click()
-  await expect(page).toHaveURL(/view=discovery&run=example-discovery/)
-  await expect(page.getByRole('heading', {name: 'Find a candidate. Inspect the reason.'})).toBeVisible()
-  await page.getByRole('button', {name: 'Connections', exact: true}).click()
-  await model.getByRole('button', {name: 'Open saved investigation'}).click()
-  await expect(page).toHaveURL(/view=research&run=example-msft/)
-  await expect(page.getByRole('heading', {name: 'Microsoft MSFT'})).toBeVisible()
-})
-
-test('Connections refresh clears old success while loading and after a configuration outage', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  let reads = 0
-  let release: (() => void) | undefined
-  const gate = new Promise<void>(resolve => {release = resolve})
-  await page.route('**/api/config', async route => {
-    reads++
-    if (reads === 2) {await gate; return route.fulfill({status: 503, json: {error: {message: 'Internal configuration detail'}}})}
-    return route.fulfill({json: {...config, connections: {
-      sec: {configured: true, provider: 'SEC', model: null, check: {status: 'passed', checked_at: '2026-10-27T09:30:00Z', run_id: null, message: 'SEC data was retrieved.'}},
-      model: {configured: false, provider: 'OpenAI', model: null, check: {status: 'not_tested', checked_at: null, run_id: null, message: null}},
-    }}})
-  })
-  await page.goto('/?view=connections')
-  await expect(page.getByText('Check passed', {exact: true})).toBeVisible()
-  await page.getByRole('button', {name: 'Refresh status'}).click()
-  await expect(page.getByRole('status')).toContainText('Loading connection status')
-  await expect(page.getByText('Check passed', {exact: true})).toHaveCount(0)
-  release!()
-  await expect(page.getByRole('alert')).toContainText('Connection status is unavailable')
-  await expect(page.getByText('Check passed', {exact: true})).toHaveCount(0)
-  await expect(page.locator('main')).not.toContainText('Internal configuration detail')
-  await page.getByRole('button', {name: 'Retry connection'}).click()
-  await expect(page.getByText('Check passed', {exact: true})).toBeVisible()
-  await expect(page.getByRole('alert')).toHaveCount(0)
-})
-
-test('Connections supports legacy configuration, mobile keyboard access and collapsed setup details', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  delete config.connections
-  await page.route('**/api/config', route => route.fulfill({json: {...config, sec_configured: false, model_configured: true, model: 'selected-model'}}))
-  await page.setViewportSize({width: 390, height: 844})
-  await page.goto('/?view=connections')
-  const model = page.getByRole('region', {name: 'Optional model analysis'})
-  await expect(model.getByText('Configured', {exact: true})).toBeVisible()
-  await expect(model.getByText('Not tested', {exact: true})).toBeVisible()
-  await expect(model).toContainText('Model service (not recorded)')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
-  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
-  await page.screenshot({path: path.join(evidenceDir, 'mobile-connections.png'), fullPage: true})
-  await page.locator('.connection-setup summary').focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByText('SEC_USER_AGENT', {exact: true})).toBeVisible()
-  await expect(page.getByText('OPENAI_BASE_URL', {exact: true})).toBeVisible()
-  await expect(page.locator('.connection-setup')).toContainText('Existing environment variables take precedence')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
-})
-
-test('model connection check requires source and fresh consent without a local allowance, then saves usage', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
+test('a saved model connection check shows its banner and model usage', async ({page, request}) => {
   const source = await (await request.get('/api/runs/example-msft')).json()
   const real = {...source, id: 'real-saved-source', synthetic: false, request: {...source.request, ticker: 'AAPL'}, report: {...source.report, synthetic: false}}
-  const empty = {...source, id: 'empty-source', report: null}
-  const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-  await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-    sec: {configured: true, provider: 'SEC', model: null, check: untested},
-    model: {configured: true, provider: 'OpenRouter', model: 'test/model', check: untested},
-  }}}))
-  await page.route('**/api/runs?*', route => route.fulfill({json: {items: [source, real, empty], total: 3}}))
+  const payload = {kind: 'research', mode: 'frozen', ticker: 'AAPL', cutoff: source.request.cutoff, source_run_id: real.id, screen: null, model_analysis: true, connection_check: 'model'}
+  let saved = {...real, id: 'mock-model-check', request: payload, report: {...real.report,
+    model_run: {provider: 'openrouter', model: 'test/model', schema_version: 'financial-review-v2', max_output_tokens: null},
+    model_calls: [{role: 'interpretation', provider: 'openrouter', requested_model: 'test/model', returned_model: 'resolved/model', response_id: 'response-example', input_tokens: 100, output_tokens: 20, total_tokens: 120, cost_usd: null, status: 'completed', error_code: null}, {role: 'critic', provider: 'openrouter', requested_model: 'test/model', returned_model: null, response_id: null, input_tokens: null, output_tokens: 2000, total_tokens: null, reasoning_tokens: 1900, provider_status: 'incomplete', incomplete_reason: 'max_output_tokens', cost_usd: '0', status: 'incomplete', error_code: 'model_output_limit', error_message: 'The provider output limit stopped this response; financial results are preserved.'}]}}
   await page.route('**/api/runs/real-saved-source', route => route.fulfill({json: real}))
-  await page.route('**/api/runs/empty-source', route => route.fulfill({json: empty}))
-  const submissions: {payload: Record<string, unknown>; key: string}[] = []
-  let saved: typeof source
-  await page.route('**/api/runs', route => {
-    if (route.request().method() !== 'POST') return route.continue()
-    const payload = route.request().postDataJSON()
-    submissions.push({payload, key: route.request().headers()['idempotency-key']})
-    saved = {...real, id: 'mock-model-check', request: payload, report: {...real.report,
-      model_run: {provider: 'openrouter', model: 'test/model', schema_version: 'financial-review-v2', max_output_tokens: null},
-      model_calls: [{role: 'interpretation', provider: 'openrouter', requested_model: 'test/model', returned_model: 'resolved/model', response_id: 'response-example', input_tokens: 100, output_tokens: 20, total_tokens: 120, cost_usd: null, status: 'completed', error_code: null}, {role: 'critic', provider: 'openrouter', requested_model: 'test/model', returned_model: null, response_id: null, input_tokens: null, output_tokens: 2000, total_tokens: null, reasoning_tokens: 1900, provider_status: 'incomplete', incomplete_reason: 'max_output_tokens', cost_usd: '0', status: 'incomplete', error_code: 'model_output_limit', error_message: 'The provider output limit stopped this response; financial results are preserved.'}]}}
-    return route.fulfill({json: saved})
-  })
   await page.route('**/api/runs/mock-model-check', route => route.fulfill({json: saved}))
-  await page.goto('/?view=connections')
-  const model = page.getByRole('region', {name: 'Optional model analysis'})
-  const button = model.getByRole('button', {name: 'Test model connection'})
-  const consent = model.getByRole('checkbox')
-  const selector = page.getByLabel('Saved evidence for model check')
-  await expect(model).toContainText('OpenRouter')
-  await expect(model).toContainText('Synthetic teaching data: illustrative figures')
-  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
-  await expect(consent).not.toBeChecked()
-  await expect(button).toBeDisabled()
-  await consent.check()
-  await expect(button).toBeEnabled()
-  await selector.selectOption('empty-source')
-  await expect(consent).not.toBeChecked()
-  await expect(model).toContainText('no eligible company evidence')
-  await consent.check()
-  await expect(button).toBeDisabled()
-  await selector.selectOption('real-saved-source')
-  await expect(model).toContainText('Real saved research source')
-  await expect(consent).not.toBeChecked()
-  await consent.check()
-  expect(submissions).toHaveLength(0)
-  await button.click()
-  await expect(page).toHaveURL(/view=research&run=mock-model-check/)
-  expect(submissions).toHaveLength(1)
-  expect(submissions[0].payload).toEqual({kind: 'research', mode: 'frozen', ticker: 'AAPL', cutoff: source.request.cutoff, source_run_id: real.id, screen: null, model_analysis: true, connection_check: 'model'})
+  await page.goto('/?view=research&run=mock-model-check')
   await expect(page.locator('.run-banner')).toContainText('Model connection check')
   await expect(page.getByText('Run completion and provider success are separate;', {exact: false})).toBeVisible()
   await expect(page.locator('.model-usage')).not.toHaveAttribute('open', '')
@@ -544,154 +381,51 @@ test('model connection check requires source and fresh consent without a local a
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
 })
 
-test('SEC check requires configured setup and explicitly submits only the fixed fresh probe', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  const source = await (await request.get('/api/runs/example-msft')).json()
-  const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-  let configured = false
-  let payload: Record<string, unknown> | undefined
-  await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-    sec: {configured, provider: 'SEC', model: null, check: untested},
-    model: {configured: false, provider: 'OpenRouter', model: null, configuration_error: 'Choose a model and configure its provider key.', check: untested},
-  }}}))
-  await page.route('**/api/runs', route => {
-    if (route.request().method() !== 'POST') return route.continue()
-    payload = route.request().postDataJSON()
-    return route.fulfill({json: {...source, id: 'mock-sec-check', request: payload}})
-  })
-  await page.route('**/api/runs/mock-sec-check', route => route.fulfill({json: {...source, id: 'mock-sec-check', request: payload}}))
-  await page.goto('/?view=connections')
-  const button = page.getByRole('button', {name: 'Test SEC connection'})
-  await expect(button).toBeDisabled()
-  await expect(page.getByRole('button', {name: 'Test model connection'})).toBeDisabled()
-  await expect(page.getByText('Choose a model and configure its provider key.')).toBeVisible()
-  configured = true
-  await page.getByRole('button', {name: 'Refresh status'}).click()
-  await expect(button).toBeEnabled()
-  expect(payload).toBeUndefined()
-  const before = Date.now()
-  await button.click()
-  await expect(page).toHaveURL(/view=research&run=mock-sec-check/)
-  expect(payload).toMatchObject({kind: 'research', mode: 'fresh', ticker: 'MSFT', source_run_id: null, screen: null, model_analysis: false, connection_check: 'sec'})
-  expect(payload).not.toHaveProperty('spending_limit_usd')
-  expect(payload).not.toHaveProperty('provider_limit_confirmed')
-  expect(Date.parse(payload!.cutoff as string)).toBeGreaterThanOrEqual(before)
-  await expect(page.locator('.run-banner')).toContainText('SEC connection check')
-})
-
-test('lost model check response locks controls and explicitly recovers the exact intent after reload', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  const source = await (await request.get('/api/runs/example-msft')).json()
-  const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-  await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-    sec: {configured: true, provider: 'SEC', model: null, check: untested},
-    model: {configured: true, provider: 'OpenAI', model: 'test-model', check: untested},
-  }}}))
-  const requests: {payload: Record<string, unknown>; key: string}[] = []
-  await page.route('**/api/runs', route => {
-    if (route.request().method() !== 'POST') return route.continue()
-    requests.push({payload: route.request().postDataJSON(), key: route.request().headers()['idempotency-key']})
-    if (requests.length === 1) return route.abort('connectionfailed')
-    return route.fulfill({json: {...source, id: 'recovered-check', request: requests[0].payload}})
-  })
-  await page.route('**/api/runs/recovered-check', route => route.fulfill({json: {...source, id: 'recovered-check', request: requests[0].payload}}))
-  await page.goto('/?view=connections')
-  await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
-  await page.getByRole('checkbox').check()
-  await page.getByRole('button', {name: 'Test model connection'}).click()
-  await expect(page.getByRole('alert')).toContainText('Connection interrupted')
-  await expect(page.getByRole('button', {name: 'Test SEC connection'})).toBeDisabled()
-  await expect(page.getByLabel('Saved evidence for model check')).toBeDisabled()
-  await page.reload()
-  await expect(page.getByRole('button', {name: 'Retry same submission'})).toBeVisible()
-  await expect(page.getByRole('button', {name: 'Test model connection'})).toBeDisabled()
-  expect(requests).toHaveLength(1)
-  await page.getByRole('button', {name: 'Retry same submission'}).click()
-  await expect(page).toHaveURL(/view=research&run=recovered-check/)
-  expect(requests).toHaveLength(2)
-  expect(requests[1]).toEqual(requests[0])
-  expect(await page.evaluate(() => sessionStorage.getItem('fieldnote-pending-check'))).toBeNull()
-})
-
-
-for (const check of [true, false]) {
-  for (const malformed of ['truncated JSON', 'empty object']) {
-    test(`malformed accepted submission (${check ? 'model check' : 'research'}, ${malformed}) retains its exact key through reload`, async ({page, request}) => {
-      const config = await (await request.get('/api/config')).json()
-      const source = await (await request.get('/api/runs/example-msft')).json()
-      const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-      await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-        sec: {configured: true, provider: 'SEC', model: null, check: untested},
-        model: {configured: true, provider: 'OpenAI', model: 'test-model', check: untested},
-      }}}))
-      const submissions: {payload: Record<string, unknown>; key: string}[] = []
-      await page.route('**/api/runs', route => {
-        if (route.request().method() !== 'POST') return route.continue()
-        submissions.push({payload: route.request().postDataJSON(), key: route.request().headers()['idempotency-key']})
-        if (submissions.length === 1) return route.fulfill({status: 202, contentType: 'application/json', body: malformed === 'truncated JSON' ? '{"id":' : '{}'})
-        return route.fulfill({status: 202, json: {...source, id: 'recovered-malformed-response', request: submissions[0].payload}})
-      })
-      await page.route('**/api/runs/recovered-malformed-response', route => route.fulfill({json: {...source, id: 'recovered-malformed-response', request: submissions[0].payload}}))
-      await page.goto(check ? '/?view=connections' : '/?view=research&run=example-msft')
-      const start = page.getByRole('button', {name: check ? 'Test model connection' : 'Start research →'})
-      if (check) {
-        await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
-        await page.getByRole('checkbox').check()
-      } else {
-        await page.getByLabel('Research action').selectOption('frozen')
-      }
-      await expect(start).toBeEnabled()
-      await start.click()
-      await expect(page.getByRole('alert')).toContainText('The submission response was incomplete. Its outcome is unknown.')
-      await expect(start).toBeDisabled()
-      const storageKey = check ? 'fieldnote-pending-check' : 'fieldnote-pending'
-      const stored = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? 'null'), storageKey)
-      expect(stored).toEqual({request: submissions[0].payload, key: submissions[0].key})
-      await page.reload()
-      const recover = page.getByRole('button', {name: check ? 'Retry same submission' : 'Recover request'})
-      await expect(recover).toBeVisible()
-      await expect(check ? start : page.getByRole('button', {name: 'Open saved report ↗'})).toBeDisabled()
-      expect(submissions).toHaveLength(1)
-      await recover.click()
-      await expect(page).toHaveURL(/view=research&run=recovered-malformed-response/)
-      expect(submissions).toHaveLength(2)
-      expect(submissions[1]).toEqual(submissions[0])
-      expect(await page.evaluate(key => sessionStorage.getItem(key), storageKey)).toBeNull()
+for (const malformed of ['truncated JSON', 'empty object']) {
+  test(`malformed accepted submission (research, ${malformed}) retains its exact key through reload`, async ({page, request}) => {
+    const source = await (await request.get('/api/runs/example-msft')).json()
+    const submissions: {payload: Record<string, unknown>; key: string}[] = []
+    await page.route('**/api/runs', route => {
+      if (route.request().method() !== 'POST') return route.continue()
+      submissions.push({payload: route.request().postDataJSON(), key: route.request().headers()['idempotency-key']})
+      if (submissions.length === 1) return route.fulfill({status: 202, contentType: 'application/json', body: malformed === 'truncated JSON' ? '{"id":' : '{}'})
+      return route.fulfill({status: 202, json: {...source, id: 'recovered-malformed-response', request: submissions[0].payload}})
     })
-  }
+    await page.route('**/api/runs/recovered-malformed-response', route => route.fulfill({json: {...source, id: 'recovered-malformed-response', request: submissions[0].payload}}))
+    await page.goto('/?view=research&run=example-msft')
+    const start = page.getByRole('button', {name: 'Start research →'})
+    await page.getByLabel('Research action').selectOption('frozen')
+    await expect(start).toBeEnabled()
+    await start.click()
+    await expect(page.getByRole('alert')).toContainText('The submission response was incomplete. Its outcome is unknown.')
+    await expect(start).toBeDisabled()
+    const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('fieldnote-pending') ?? 'null'))
+    expect(stored).toEqual({request: submissions[0].payload, key: submissions[0].key})
+    await page.reload()
+    const recover = page.getByRole('button', {name: 'Recover request'})
+    await expect(recover).toBeVisible()
+    await expect(page.getByRole('button', {name: 'Open saved report ↗'})).toBeDisabled()
+    expect(submissions).toHaveLength(1)
+    await recover.click()
+    await expect(page).toHaveURL(/view=research&run=recovered-malformed-response/)
+    expect(submissions).toHaveLength(2)
+    expect(submissions[1]).toEqual(submissions[0])
+    expect(await page.evaluate(() => sessionStorage.getItem('fieldnote-pending'))).toBeNull()
+  })
 }
 
-
-test('model check sends nothing and remains usable when recovery storage is unavailable', async ({page, request}) => {
-  const config = await (await request.get('/api/config')).json()
-  const untested = {status: 'not_tested', checked_at: null, run_id: null, message: null}
-  await page.route('**/api/config', route => route.fulfill({json: {...config, connections: {
-    sec: {configured: true, provider: 'SEC', model: null, check: untested},
-    model: {configured: true, provider: 'OpenAI', model: 'test-model', check: untested},
-  }}}))
-  await page.addInitScript(() => {
-    const original = Storage.prototype.setItem
-    Storage.prototype.setItem = function (key: string, value: string) {
-      if (key === 'fieldnote-pending-check') throw new DOMException('Storage unavailable', 'SecurityError')
-      return original.call(this, key, value)
-    }
-  })
-  let posts = 0
-  await page.route('**/api/runs', route => {
-    if (route.request().method() !== 'POST') return route.continue()
-    posts++
-    return route.abort('blockedbyclient')
-  })
-  await page.goto('/?view=connections')
-  await expect(page.getByRole('region', {name: 'Optional model analysis'})).toContainText('Saved cutoff')
-  await page.getByRole('checkbox').check()
-  const button = page.getByRole('button', {name: 'Test model connection'})
-  await button.click()
-  await expect(page.getByRole('alert')).toContainText('No request was sent. Enable session storage')
-  await expect(button).toBeEnabled()
-  await expect(page.getByRole('button', {name: 'Test SEC connection'})).toBeEnabled()
-  await expect(page.getByLabel('Spending allowance (USD)')).toHaveCount(0)
-  await expect(page.getByRole('button', {name: 'Retry same submission'})).toHaveCount(0)
-  expect(posts).toBe(0)
-  expect(await page.evaluate(() => sessionStorage.getItem('fieldnote-pending-check'))).toBeNull()
+test('the agent page opens on an empty question box whose helpers only fill the text', async ({page}) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', {name: 'Ask about any US-listed company.'})).toBeVisible()
+  await expect(page.getByText('SYNTHETIC TEACHING DATA', {exact: true})).toHaveCount(0)
+  await expect(page.getByRole('heading', {name: 'Recent runs'})).toBeVisible()
+  await expect(page.getByLabel('Your question')).toHaveValue('')
+  await page.getByRole('button', {name: 'Compare NVIDIA and AMD on growth and valuation.'}).click()
+  await expect(page.getByLabel('Your question')).toHaveValue('Compare NVIDIA and AMD on growth and valuation.')
+  await page.locator('.starter', {hasText: 'Find companies'}).click()
+  await expect(page.getByRole('group', {name: 'Where to look'})).toBeVisible()
+  await expect(page.getByRole('button', {name: 'Find companies →'})).toBeEnabled()
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+  await page.getByRole('button', {name: 'Baseline A', exact: true}).click()
+  await expect(page.getByRole('heading', {name: 'Start with a question and a source.'})).toBeVisible()
 })

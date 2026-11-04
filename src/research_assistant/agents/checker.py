@@ -15,6 +15,8 @@ KINDS = "fact|calc|chunk|filing|company|prices|check|screen|claim"
 CITATION = re.compile(rf"\{{?\s*({KINDS})\s*:\s*([A-Za-z0-9_.-]+?)\s*\}}?")
 # A record ID written in the text is a misplaced citation, not a typed figure.
 RECORD_ID = re.compile(rf"\b(?:{KINDS})-[A-Za-z0-9_.-]+")
+# A record ID cut to its last parts ("-7-11" for chunk-...-item_7-11, live check 3 Nov 2026) is no figure either.
+ID_SUFFIX = re.compile(r"(?<![\w.])-\d+(?:-\d+)+(?![\w.%])")
 # Digits glued to a word are names (H20, COVID-19, B200), not figures.
 TYPED_NUMBER = re.compile(r"(?<![\w.-])[$€£]?[-+]?\d[\d,.]*(?:\s?(?:%|pp\b|x\b|bn\b|billion|million|thousand|trillion))?")
 SCALES = ((Decimal(10) ** 12, "trillion"), (Decimal(10) ** 9, "billion"), (Decimal(10) ** 6, "million"))
@@ -139,7 +141,7 @@ def fill(text: str, where: str, records: dict[str, dict]) -> tuple[str, list[str
 
 def typed_numbers(text: str) -> list[str]:
     """Figures typed outside placeholders, after removing names like 10-K, Item 1A and years."""
-    rest = ALLOWED_NUMBERS.sub(" ", RECORD_ID.sub(" ", PLACEHOLDER.sub(" ", text)))
+    rest = ALLOWED_NUMBERS.sub(" ", ID_SUFFIX.sub(" ", RECORD_ID.sub(" ", PLACEHOLDER.sub(" ", text))))
     return [m.group().strip() for m in TYPED_NUMBER.finditer(rest)]
 
 

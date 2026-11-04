@@ -6,6 +6,7 @@ from fake_llm import FakeClient, reply, tool_results
 from pydantic import BaseModel
 from sec_files import make_context
 
+from research_assistant import config
 from research_assistant.agents.loop import Finish, run_loop
 from research_assistant.agents.trace import Trace
 from research_assistant.tools import registry
@@ -140,6 +141,14 @@ def test_a_model_failure_is_a_failed_result_not_an_exception(tmp_path):
     assert events(trace)[-1]["kind"] == "error"
 
 
+def test_a_reply_that_is_not_json_is_retried_then_fails_cleanly(tmp_path):
+    cut_off = json.JSONDecodeError("Expecting value", "\n" * 12, 12)
+    result, _, _ = start(tmp_path, FakeClient(FIND_APPLE, cut_off, submit_found_cik))
+    assert result.status == "finished" and result.steps == 2
+    result, _, trace = start(tmp_path, FakeClient(*[cut_off] * (config.AGENT_BAD_REPLY_RETRIES + 1)))
+    assert result.status == "failed" and events(trace)[-1]["type"] == "BadReply"
+
+
 def test_the_serving_host_is_traced_so_a_fallback_is_never_silent(tmp_path):
     client = FakeClient(reply(tool_calls=[("find_company", {"query": "AAPL"})], provider="Baidu"),
                         lambda m: reply(tool_calls=[("submit_answer", {"cik": "320193"})], provider="DeepInfra"))
@@ -166,3 +175,19 @@ def test_reasoning_details_are_sent_back_but_not_traced(tmp_path):
     _, messages, trace = start(tmp_path, client)
     assert messages[1]["reasoning_details"] == details
     assert "private chain of thought" not in trace.path.read_text(encoding="utf-8")
+
+
+def test_cancelling_stops_before_the_next_model_call_and_skips_the_steps_other_tools(tmp_path):
+    context = make_context(tmp_path)
+
+    def cancel_while_asking(messages):  # the user cancels while this model call is out
+        context.stop.set()
+        return reply(tool_calls=[("find_company", {"query": "AAPL"})])
+
+    trace = Trace(tmp_path / "trace.jsonl", "run-1")
+    result = run_loop(FakeClient(cancel_while_asking), "fake-model", {}, [{"role": "user", "content": "?"}], context,
+                      FINISH, trace)
+    assert result.status == "stopped" and result.output is None and result.steps == 1
+    logged = events(trace)
+    assert [e["kind"] for e in logged] == ["model_call", "tool_call", "cancelled"]
+    assert logged[1]["result"]["warnings"] == ["Not run: the run was cancelled."]

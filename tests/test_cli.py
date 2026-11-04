@@ -3,6 +3,7 @@ from pathlib import Path
 
 import httpx
 import openai
+import pytest
 from fake_llm import FakeClient, reply, resubmit
 from sec_files import make_context
 
@@ -75,3 +76,38 @@ def test_no_question_serves_the_web_app(monkeypatch):
     assert cli.main([]) == 0
     assert calls == [("research_assistant.api:create_app",
                       {"factory": True, "host": "127.0.0.1", "port": 8000, "workers": 1})]
+
+
+def test_universe_runs_discover_and_shows_the_spec_before_research(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "two.yaml"
+    path.write_text('name: Two\nsource: tests\nas_of: 2026-11-03\nnote: A test list.\ncompanies:\n'
+                    '  - {ticker: "AAPL", cik: "0000320193", name: Apple}\n'
+                    '  - {ticker: "JPM", cik: "0000019617", name: JPMorgan}\n', encoding="utf-8")
+    valuation = {"term": "reasonable valuation", "definition": "P/E below 40", "question": "What P/E?"}
+    spec = {"rank_by": "operating_margin", "filters": [{"metric": "operating_margin", "op": ">", "value": 0.25}],
+            "terms": [valuation]}
+    client = FakeClient(reply(tool_calls=[("submit_screen_spec", spec)]))
+    configure(monkeypatch, tmp_path, client)
+    assert cli.main(["Find profitable tech at a reasonable valuation.", "--universe", str(path),
+                     "--define", "reasonable valuation=P/E below 40"]) == 0
+    out, err = capsys.readouterr()
+    assert "## Screen spec" in out and '"reasonable valuation" read as: P/E below 40 (set by the user)' in out
+    assert "- reasonable valuation: P/E below 40" in client.requests[0]["messages"][1]["content"]
+    assert "\nscreen spec:\n  - Universe: Two" in err and "[host] screen -> ok" in err
+    assert err.index("screen spec:") < err.index("[host] screen -> ok")
+
+
+def test_discover_refuses_a_past_cutoff_and_malformed_definitions(capsys):
+    for argv in (["Find tech.", "--universe", "sp500_tech", "--cutoff", "2025-01-01"],
+                 ["Find tech.", "--universe", "sp500_tech", "--define", "cheap"],
+                 ["Who is Apple?", "--define", "cheap=P/E below 15"]):
+        with pytest.raises(SystemExit) as exit_info:
+            cli.main(argv)
+        assert exit_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "current data only" in err and "TERM=MEANING" in err and "need --universe" in err
+
+
+def test_an_unknown_universe_names_the_bundled_ones(capsys):
+    assert cli.main(["Find tech.", "--universe", "nope"]) == 2
+    assert "sp500_tech" in capsys.readouterr().err

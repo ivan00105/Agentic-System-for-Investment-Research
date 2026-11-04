@@ -14,6 +14,8 @@ from openai import (
     AuthenticationError,
     BadRequestError,
     NotFoundError,
+    OpenAI,
+    OpenAIError,
     PermissionDeniedError,
     RateLimitError,
 )
@@ -145,3 +147,26 @@ def safe_model_error(exc: Exception) -> DomainError:
             return DomainError("The model provider requires payment or additional credits. Check the selected provider account.", "model_unavailable", 502)
         return DomainError("The model provider could not complete the request. Saved results remain available; retry explicitly later.", "model_unavailable", 502)
     return DomainError("Model request failed. Saved results remain available.", "model_failed", 502)
+
+
+CHECK_TOOL = {"type": "function", "function": {
+    "name": "confirm", "description": "Confirm that you can call tools.", "parameters": {"type": "object", "properties": {}}}}
+
+
+def check_model() -> str:
+    """One short request with one tool, sent the way agent runs send theirs: it proves the key, the model and
+    tool calling. It costs a fraction of a cent, so the Setup page asks for no consent."""
+    settings = load_model_settings()
+    try:
+        with OpenAI(**settings.client_kwargs) as client:
+            reply = client.chat.completions.create(
+                model=settings.model, messages=[{"role": "user", "content": "Call the confirm tool."}],
+                tools=[CHECK_TOOL], **settings.request_kwargs(fallbacks=True))
+    except OpenAIError as exc:
+        error, status = safe_model_error(exc), getattr(exc, "status_code", None)
+        raise DomainError(f"{error} (HTTP {status})" if status else str(error), error.code, error.status) from None
+    served = reply.model or settings.model
+    if not (reply.choices and reply.choices[0].message.tool_calls):
+        raise DomainError(f"{settings.label} answered with {served} but did not call the test tool. "
+                          "Agent runs need a model that calls tools.", "model_schema", 502)
+    return f"{settings.label} answered with {served} and called the test tool."
