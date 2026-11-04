@@ -8,6 +8,8 @@ from sec_files import make_context
 
 from research_assistant import cli
 from research_assistant.agents import critic, single_agent
+from research_assistant.agents.checker import CheckedClaim, CheckedReport
+from research_assistant.agents.claims import ClaimLedger
 from research_assistant.agents.draft import Draft
 from research_assistant.agents.evidence import inject_wrong_period
 from research_assistant.agents.roles import CRITIC
@@ -376,3 +378,19 @@ def test_a_new_version_alone_does_not_close_an_objection_as_corrected(tmp_path, 
     assert f"Round 1: the claim changed to v2, but no evidence it fixes the problem ({why}), so it stays open." \
         in o["notes"]
 
+
+def test_a_claim_citing_one_with_an_unresolved_objection_is_flagged_one_level_only():
+    def claim(claim_id, *cites):
+        return CheckedClaim(f"Text of {claim_id}.", "interpretation", list(cites), [], "central", claim_id, 1)
+
+    report = CheckedReport({"summary": [claim("claim-a"), claim("claim-b", "claim-a"), claim("claim-c", "claim-b")]},
+                           [], [], [])
+    review = critic.Critic(QUESTION, None, SETTINGS, None, None, ClaimLedger(), None, 1, 1)
+    review.raised = [critic.Raised("objection-1", 1, "claim-a", 1, "summary[0]", "coordinator", "wrong_period", True,
+                                   "Wrong year.", [], "Check it.", outcome="unresolved")]
+    review._qualify(report)
+    a, b, c = report.sections["summary"]
+    assert [f.problem for f in a.flags] == ["Objection objection-1 (wrong period) is unresolved: Wrong year."]
+    assert [f.problem for f in b.flags] == ["It cites claim-a, which has unresolved objection objection-1 (wrong "
+                                            "period)."]
+    assert c.flags == [] and len(report.flags) == 2

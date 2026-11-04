@@ -248,7 +248,10 @@ class Critic:
         return resolved, unknown
 
     def _qualify(self, report: CheckedReport):
-        """A claim with a material objection left unresolved, or that cites a withdrawn claim, is qualified."""
+        """A claim with a material objection left unresolved, or that cites a withdrawn claim, is qualified. So is a
+        claim that cites one with such an objection: one step only, not the whole chain."""
+        versions = {c.id: c.version for claims in report.sections.values() for c in claims}
+        open_ = {(o.claim, o.version): o for o in self.raised if o.outcome == "unresolved" and o.material}
         for key, claims in report.sections.items():
             for i, c in enumerate(claims):
                 problems = [f"Objection {o.id} ({o.issue.replace('_', ' ')}) is unresolved: {o.problem}"
@@ -257,6 +260,8 @@ class Critic:
                 problems += [f"It cites {cited}, which was withdrawn after "
                              f"{self.ledger.withdrawn[cited]['objection']}." for cited in c.citations
                              if cited in self.ledger.withdrawn]
+                problems += [f"It cites {cited}, which has unresolved objection {o.id} ({o.issue.replace('_', ' ')})."
+                             for cited in c.citations if cited != c.id and (o := open_.get((cited, versions.get(cited))))]
                 for problem in problems:
                     c.flags.append(Flag(f"{key}[{i}]", problem))
                     report.flags.append(c.flags[-1])
