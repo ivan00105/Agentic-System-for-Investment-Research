@@ -43,6 +43,7 @@ export function RunView({id, onOpenRun, onNew}: {id: string; onOpenRun: (id: str
       <div className="report-section">
         <div className="section-label">AGENT RUN · {run.condition ?? 'starting'}</div>
         <h2 className="agent-run-question">{run.question ?? 'Starting…'}</h2>
+        {run.preferences && <div className="preferences-shown"><div className="section-label">YOUR PREFERENCES</div><p>{run.preferences}</p><p className="muted">From Help me start. The agents read this note with the question; it shapes what they stress, not the evidence rules.</p></div>}
         <div className="run-state" aria-live="polite"><span className={running ? 'pulse-dot' : 'status-dot'} /><strong>{STATUS[run.status] ?? run.status}</strong>{run.started_at && <span>Started {stamp(run.started_at)}</span>}</div>
         {running && <div className="run-actions"><button className="secondary" disabled={run.status === 'stopping'} onClick={() => void cancel()}>{run.status === 'stopping' ? 'Stopping…' : 'Cancel run'}</button>
           <p className="muted">Cancelling keeps what the agents found so far as a partial report. It takes effect after the current model or tool call. The run keeps going if you leave this page.</p></div>}

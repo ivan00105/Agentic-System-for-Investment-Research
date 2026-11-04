@@ -5,6 +5,7 @@ import os
 import re
 from pathlib import Path
 
+from . import preferences
 from .checker import PLACEHOLDER, lookup
 from .draft import SECTIONS
 from .evidence import load
@@ -29,7 +30,8 @@ def summary(path: Path) -> dict | None:
     if first is None:
         return None
     end = last if last and last.get("kind") == "run_end" else {}
-    return {"run_id": path.stem, "question": first.get("question"), "condition": first.get("condition"),
+    question, note = preferences.split(first.get("question"))
+    return {"run_id": path.stem, "question": question, "preferences": note, "condition": first.get("condition"),
             "cutoff": first.get("cutoff"), "model": first.get("model"), "started_at": first.get("at"),
             "status": end.get("status"), "ended_at": end.get("at"), "totals": end.get("totals")}
 

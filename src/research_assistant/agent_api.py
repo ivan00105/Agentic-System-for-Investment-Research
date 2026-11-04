@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, StringConstraints, ValidationError, model_validator
 
 from . import cli, config
-from .agents import discover, saved
+from .agents import discover, preferences, saved
 from .agents.discover_spec import ScreenSpec
 from .agents.trace import Trace
 from .contracts import DomainError
@@ -46,6 +46,8 @@ class StartRun(BaseModel):
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     # Discover: wait for the user to check or edit the drafted spec, even when it has no vague terms.
     edit_spec: bool = False
+    # "Help me start": what matters most, horizon, comfort with price swings, sectors. Added to the question.
+    preferences: str | None = None
 
 
 class Answers(BaseModel):
@@ -206,7 +208,8 @@ def start(body: StartRun, request: Request):
     condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
     cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
     settings = replace(settings, model=body.model) if body.model else settings
-    return runs(request).view(runs(request).start(body.question, condition, settings, cutoff, declared,
+    question = preferences.attach(body.question, body.preferences)
+    return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
                                                   body.edit_spec and declared is not None))
 
 

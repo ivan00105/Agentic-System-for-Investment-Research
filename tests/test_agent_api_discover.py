@@ -107,3 +107,15 @@ def test_a_professional_run_waits_to_review_the_spec_and_takes_an_edit(web):
     assert events[0]["model"] == "other/model" and web.model.requests[0]["model"] == "other/model"
     [spec] = [e for e in events if e["kind"] == "screen_spec"]
     assert spec["spec"]["rank_by"] == "revenue" and spec["spec"]["filters"][0]["value"] == 1e15
+
+
+def test_the_screener_reads_the_preferences_note(web):
+    web.model = FakeClient(SPEC)
+    run_id = start(web, "Find companies.", discover={"tickers": ["AAPL"]}, preferences="Comfort with price swings: low.")
+    run = waiting(web, run_id)
+    assert run["question"] == "Find companies." and run["preferences"] == "Comfort with price swings: low."
+    assert web.model.requests[0]["messages"][1]["content"].endswith(
+        "<preferences>\nComfort with price swings: low.\n</preferences>")
+    assert "time horizon" in web.model.requests[0]["messages"][0]["content"]  # the screener's prompt says how
+    web.post(f"/api/agent-runs/{run_id}/cancel", json={})
+    wait(web, run_id)

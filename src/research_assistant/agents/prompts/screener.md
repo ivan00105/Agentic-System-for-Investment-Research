@@ -31,6 +31,10 @@ List in `terms` every word or phrase whose meaning a reasonable analyst could se
 
 A precise criterion ("operating margin above 25%") is not a vague term. Never drop a vague term and never define one without listing it. If the user already defined a term, use their definition and keep their wording.
 
+## The user's preferences
+
+The request may end with the user's preferences in `<preferences>`, from a short guided form: what matters most, time horizon, comfort with price swings and sectors. Use them to pick your proposals for vague terms; e.g. a low comfort with price swings makes a volatility or max_drawdown price check a good proposal, and a sector becomes `sic_prefixes` (list it as a term, with the codes). Don't turn a preference into a filter the request doesn't ask for without listing it as a term, so the user sees it. Put what the screen can't express in `not_covered`: dividends, and the time horizon (the screen uses the latest annual figures whatever the horizon).
+
 ## The rest of the spec
 
 - `top_k`: how many companies the user wants; leave it empty if they didn't say (the host then uses $default_top_k).

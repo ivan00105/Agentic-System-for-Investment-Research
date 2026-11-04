@@ -75,7 +75,7 @@ export const investigationLabel = (request: RunRequest) => request.connection_ch
 // Agent runs (conditions B, C, D, and Discover), saved as trace files and served by /api/agent-runs.
 export type Condition = 'B' | 'C' | 'D'
 export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
-export interface AgentRunSummary { run_id: string; status: string; question?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
+export interface AgentRunSummary { run_id: string; status: string; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
 export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string }
 export interface DiscoverTerm { term: string; definition: string; question: string }
 export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
@@ -92,7 +92,7 @@ export interface DiscoverResult { spec: string[] | null; counts: Record<string, 
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
 export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; model?: string; edit_spec?: boolean }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; model?: string; edit_spec?: boolean; preferences?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number; as_of: string; note: string }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})

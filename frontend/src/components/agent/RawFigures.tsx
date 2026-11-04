@@ -22,7 +22,7 @@ export function Exports({runId, report}: {runId: string; report: AgentReport}) {
   return <div className="export-buttons" role="group" aria-label="Export this report">
     <button type="button" className="secondary" onClick={() => download(`${runId}-figures.csv`, 'text/csv', toCsv(figures as unknown as Record<string, unknown>[], COLUMNS))}>Figures (CSV)</button>
     <button type="button" className="secondary" onClick={() => download(`${runId}-sources.csv`, 'text/csv', toCsv(sources, ['n', 'id', 'kind', 'group', 'label', 'text', 'url']))}>Sources (CSV)</button>
-    <button type="button" className="secondary" onClick={() => download(`${runId}.json`, 'application/json', JSON.stringify({run_id: runId, question: report.question, model: report.model, cutoff: report.cutoff, status: report.status, figures, sources}, null, 2))}>Figures and sources (JSON)</button>
+    <button type="button" className="secondary" onClick={() => download(`${runId}.json`, 'application/json', JSON.stringify({run_id: runId, question: report.question, preferences: report.preferences ?? null, model: report.model, cutoff: report.cutoff, status: report.status, figures, sources}, null, 2))}>Figures and sources (JSON)</button>
     {report.markdown && <button type="button" className="secondary" onClick={() => download(`${runId}.md`, 'text/markdown', report.markdown)}>Report (Markdown)</button>}
   </div>
 }
