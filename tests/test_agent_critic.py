@@ -348,3 +348,31 @@ def test_a_review_of_a_historical_run_stays_historical(tmp_path, monkeypatch, ca
     events = printed_trace(capsys.readouterr().out)
     assert events[0]["historical"] is True
     assert [e["result"]["status"] for e in events if e["kind"] == "tool_call"] == ["invalid"]
+
+
+@pytest.mark.parametrize("outcomes,why", [
+    ([], "no outcome was given"),
+    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without a citation"),
+])
+def test_a_new_version_alone_does_not_close_an_objection_as_corrected(tmp_path, outcomes, why):
+    # Codex review: any new claim version closed its objection as corrected, with no outcome or evidence.
+    def revise_without_evidence(messages):
+        request = next(m["content"] for m in reversed(messages) if "raised these objections" in str(m.get("content")))
+        found = re.search(r"- (objection-\w+) on", request)[1]
+        [finding] = by_source(messages)["fundamentals analyst"]["data"]["findings"]
+        return calls(("submit_revision", {
+            "key_numbers": [{"text": finding["text"], "kind": "fact", "materiality": "central", "id": finding["claim"]}],
+            "outcomes": [{"objection": found, **outcome} for outcome in outcomes]}))
+
+    def objects(messages):
+        claim, version = claim_in(messages[1]["content"], "key_numbers[0]")
+        return calls(("submit_objections", {"objections": [objection(claim, version, "wrong_period")]}))
+
+    result, _, events = run_d(tmp_path, PLAN, calls(("ask_fundamentals", {"task": TASK})), financials, wrong_finding,
+                              report, resubmit, objects, route, corrected_finding, revise_without_evidence, CLEAN,
+                              critic_rounds=2)
+    [o] = events[-1]["objections"]
+    assert (o["outcome"], o["new_version"]) == ("unresolved", None)
+    assert f"Round 1: the claim changed to v2, but no evidence it fixes the problem ({why}), so it stays open." \
+        in o["notes"]
+
