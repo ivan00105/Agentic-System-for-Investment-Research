@@ -36,6 +36,10 @@ Most of the idea holds up. Three parts need adjusting so the result is professio
 
 **Something the original plan missed:** valuation and risk. A stock can be an excellent business and still a bad investment at its price. The original plan only used prices for the forecast. We add a **market & valuation analyst**: P/E, P/S, FCF yield, volatility, drawdown, beta vs SPY.
 
+### Who it's for
+
+Beginner to professional investors researching US-listed stocks, over horizons from weeks to years. One engine serves them all: a detail level changes only how much help the page gives, and "Help me start" covers someone with no company or criteria in mind. It stays decision support, never personal advice.
+
 ### What a user can do
 
 | Mode | Example |
@@ -407,6 +411,13 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
   Each card also shows which provider is active and has a Test button. Keys stay in `.env`, not typed into the browser. Drop the consent dialog around the model test.
   - The page replaces Connections (`?view=setup`; old links still work) with five cards from `data/providers.py`: SEC filings, fundamentals, company lookup, daily prices and the model. OpenRouter, OpenAI and an OpenAI-compatible endpoint are separate model providers, and only the one `RESEARCH_MODEL_PROVIDER` picks can be active. The browser learns only whether a setting is set. A failed check is kept while the server runs, and an unconfigured provider isn't tested. The model test sends one short tool-calling request (a fraction of a cent) instead of the consent-gated baseline A run.
   - Checked live on 4 Nov 2026 with the project's `.env`: the three SEC providers and OpenRouter configured, yfinance ready, Tiingo, OpenAI and the compatible endpoint not configured. The SEC, Yahoo and OpenRouter tests passed (`deepseek/deepseek-v4.1-flash` called the test tool).
+- [x] **Every level of user** (5 Nov 2026), one engine shown for beginners to professionals (§1 "Who it's for"):
+  - [x] **Detail level** (Beginner / Standard / Professional) in the top bar, kept in the browser. Beginner: plain headings, a list explaining each finance term once, and the guided start. Professional: Advanced options open (agents, model, a Discover spec edited as JSON), a raw figure table with formulas and inputs, and CSV/JSON/Markdown exports. REFERENCE §9.
+  - [x] **Help me start**: four multiple-choice questions, each with a recommended answer and "Not sure", become a Find question plus a preferences note that the screener and coordinator read, the trace keeps and the run page shows. REFERENCE §9.
+  - [x] **Answer choices** in Discover's questions: 2-3 concrete readings per vague term, one recommended, plus Other; on the page and in the terminal. REFERENCE §4.
+  - [x] **Bigger lists**: the full S&P 500 (`sp500`, the default) and every SEC filer with a ticker (`sec_all`, 8,004 companies; a frames screen took 11 s and 9 requests). REFERENCE §4.
+  - [x] **Clear modes**: picking 2-4 companies says the question is now a comparison, and a Discover shortlist has "Compare these".
+  - Checked live on 5 Nov 2026 with `deepseek/deepseek-v4.1-flash` on OpenRouter (run `20261104-172139-4c9aef`). As a Beginner, Help me start (steady profits, years, a calm ride, health care) built "Find companies among S&P 500 in health care with high profit margins and steady share prices." and its note. The screener used the note: "steady share prices" became volatility at most 25% and a drawdown no worse than -30%, "health care" a listed SIC term, and the horizon went under "not checked". Switched to Professional while the run waited, the spec editor was open with the draft. 20 of 500 passed the screen and only Johnson & Johnson passed the price checks; its research said the margin isn't steady (a one-off legal gain). 14 model calls, $0.06, 6 minutes. Its report showed 39 raw figures and the exports in Professional, and 23 explained terms in Beginner. Fixed during the check: the model's recommended option was a rewording of its definition, so each term showed two near-identical choices (that option now takes the definition's words); and an edited spec sent to a run started without the review option was dropped (it is now used whenever sent).
 
 ### Phase 8: Evaluation (start writing cases during Phase 2)
 - [x] Prompt caching measured before the A–D runs (§7's first cost lever). Trace totals now count `cached_tokens` per run and per role.
