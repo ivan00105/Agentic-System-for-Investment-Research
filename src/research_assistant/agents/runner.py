@@ -64,8 +64,9 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     they fill with one line per request, shown in the report. `review` gets the finished work and may revise it
     (condition D's critic)."""
     ledger = ledger or ClaimLedger()
-    trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=condition,
-                lead=lead.name, provider=settings.provider, model=settings.model, max_steps=max_steps)
+    trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), historical=context.historical,
+                condition=condition, lead=lead.name, provider=settings.provider, model=settings.model,
+                max_steps=max_steps)
     with trace.acting_as(lead.name):
         work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)

@@ -87,8 +87,8 @@ def run_case(case: dict, condition: str, repeat: int, batch: Path, client, setti
         baseline_a.run(case, cutoff, trace, batch / "baseline_a")
         return
     with injected(case.get("injection")) as count:
-        result = cli.CONDITIONS[condition](case["question"], client, settings, ToolContext(cutoff=cutoff, sec=sec),
-                                           trace=trace)
+        context = ToolContext(cutoff=cutoff, sec=sec, historical=True)  # every case has its own past cutoff
+        result = cli.CONDITIONS[condition](case["question"], client, settings, context, trace=trace)
     if case.get("injection"):
         append(batch, entry | {"injected": count[0]})
     cost = result.totals.get("cost")

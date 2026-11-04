@@ -247,7 +247,7 @@ def test_a_missing_risk_is_corrected_by_adding_a_claim(tmp_path):
     assert f"  - Outcome: corrected by adding `{risk.id}` in round 1: Added the supplier risk. [1]" in result.markdown
 
 
-def saved_run(tmp_path):
+def saved_run(tmp_path, historical=False):
     """A condition B run whose key number is the latest fiscal year's revenue, with three years in the evidence."""
     def submit(messages):
         latest = revenue(messages, 0)
@@ -259,7 +259,9 @@ def saved_run(tmp_path):
     client = FakeClient(reply("1. get_financials"), calls(("get_financials", {"cik": "0000320193", "metrics":
                                                                              ["revenue"], "years": 3})), submit,
                         resubmit)
-    return single_agent.run(QUESTION, client, SETTINGS, make_context(tmp_path), trace_dir=tmp_path / "traces")
+    context = make_context(tmp_path)
+    context.historical = historical
+    return single_agent.run(QUESTION, client, SETTINGS, context, trace_dir=tmp_path / "traces")
 
 
 def test_the_injected_period_moves_one_figure_to_the_latest_earlier_year_it_does_not_use():
@@ -324,3 +326,25 @@ def test_inject_needs_a_saved_run_to_review(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--inject", "wrong_period"])
     assert exc.value.code == 2 and "--inject needs --review TRACE" in capsys.readouterr().err
+
+
+def test_a_review_of_a_historical_run_stays_historical(tmp_path, monkeypatch, capsys):
+    path = saved_run(tmp_path, historical=True).trace_path
+
+    def critic_objects(messages):
+        claim, version = claim_in(messages[1]["content"], "key_numbers[0]")
+        return calls(("submit_objections", {"objections": [objection(claim, version, "wrong_period")]}))
+
+    def leave_it(messages):
+        request = next(m["content"] for m in reversed(messages) if "raised these objections" in str(m.get("content")))
+        draft = json.loads(request[request.index("{"):])
+        return calls(("submit_revision", {**draft, "outcomes": [{
+            "objection": re.search(r"- (objection-\w+) on", request)[1], "outcome": "unresolved",
+            "explanation": "No screen as of the cutoff.", "citations": [COMPANY]}]}))
+
+    screen = calls(("screen", {"universe": ["AAPL"], "rank_by": "revenue", "year": 2024}))
+    configure(monkeypatch, tmp_path, FakeClient(critic_objects, screen, leave_it, CLEAN))
+    assert cli.main(["--review", str(path)]) == 0
+    events = printed_trace(capsys.readouterr().out)
+    assert events[0]["historical"] is True
+    assert [e["result"]["status"] for e in events if e["kind"] == "tool_call"] == ["invalid"]

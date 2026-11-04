@@ -40,14 +40,16 @@ def run(path: Path, client, settings: ModelSettings, sec: SecClient, *, inject: 
     if not (saved.start and saved.end and saved.end.get("draft")):
         raise NotReviewable(f"{path} holds no final draft to review.")
     question, cutoff = saved.start["question"], datetime.fromisoformat(saved.start["cutoff"])
-    context = ToolContext(cutoff=cutoff, sec=sec, records=dict(saved.records))
+    context = ToolContext(cutoff=cutoff, sec=sec, records=dict(saved.records),
+                          historical=bool(saved.start.get("historical")))
     ledger = ClaimLedger()  # the saved run's claims, so every claim keeps its ID and version
     ledger.versions = copy.deepcopy(saved.end.get("claims") or {})
     ledger.latest[COORDINATOR.name] = [c["id"] for claims in saved.end["report"]["sections"].values()
                                        for c in claims if c.get("id")]
     condition = f"D review of saved run {Path(path).stem}" + (f", with an injected {inject} defect" if inject else "")
     trace = Trace.new(trace_dir, echo)
-    trace.write("run_start", question=question, cutoff=cutoff.isoformat(), condition=condition, lead=COORDINATOR.name,
+    trace.write("run_start", question=question, cutoff=cutoff.isoformat(), historical=context.historical,
+                condition=condition, lead=COORDINATOR.name,
                 provider=settings.provider, model=settings.model, max_steps=max_steps, reviewed=str(path))
     # The evidence it starts from, frozen here too: this trace can be rechecked or reviewed again on its own, even
     # if no tool runs during the review.

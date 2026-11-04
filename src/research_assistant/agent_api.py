@@ -76,7 +76,8 @@ class AgentRuns:
              cutoff: datetime | None, universe: universes.Universe | None):
         try:
             with cli.sec_client() as sec, cli.model_client(settings) as client:
-                context = ToolContext(cutoff=cutoff or datetime.now(timezone.utc), sec=sec, stop=stop)
+                context = ToolContext(cutoff=cutoff or datetime.now(timezone.utc), sec=sec, stop=stop,
+                                      historical=cutoff is not None)
                 if universe:
                     discover.run(question, client, settings, context, universe, research=cli.CONDITIONS[condition],
                                  condition=cli.LABELS[condition], ask=self._asker(trace.run_id, stop), trace=trace)

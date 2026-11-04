@@ -168,3 +168,15 @@ def test_conditions_must_be_named_and_cases_must_exist(tmp_path, capsys):
     assert "--conditions takes some of A, B, C and D" in capsys.readouterr().err
     with pytest.raises(SystemExit, match="No such case: dev-nope"):
         run_eval.main(["--conditions", "B", "--cases", "dev-nope", "--case-dir", str(cases(tmp_path, CASE))])
+
+
+def test_an_eval_run_has_a_historical_cutoff_so_screen_refuses(tmp_path, monkeypatch):
+    client = FakeClient(reply("1. screen"), reply(tool_calls=[("screen", {"universe": ["AAPL"], "rank_by": "revenue",
+                                                                          "year": 2024})]),
+                        reply(tool_calls=[("submit_report", {"limitations": ["No screen."]})]), resubmit)
+    configure(monkeypatch, tmp_path, client)
+    folder, out = cases(tmp_path, CASE), tmp_path / "batch"
+    run_eval.main(["--conditions", "B", "--case-dir", str(folder), "--out", str(out)])
+    [entry] = [json.loads(line) for line in (out / "runs.jsonl").read_text(encoding="utf-8").splitlines()]
+    events = evidence.load(out / entry["trace"]).events
+    assert [e["result"]["status"] for e in events if e["kind"] == "tool_call"] == ["invalid"]

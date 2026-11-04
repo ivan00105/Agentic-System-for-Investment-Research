@@ -111,3 +111,16 @@ def test_discover_refuses_a_past_cutoff_and_malformed_definitions(capsys):
 def test_an_unknown_universe_names_the_bundled_ones(capsys):
     assert cli.main(["Find tech.", "--universe", "nope"]) == 2
     assert "sp500_tech" in capsys.readouterr().err
+
+
+def test_a_past_cutoff_makes_screen_refuse_and_a_live_run_does_not(tmp_path, monkeypatch, capsys):
+    def script():
+        return FakeClient(reply("1. screen"), reply(tool_calls=[("screen", {"universe": ["AAPL"], "rank_by": "revenue",
+                                                                            "year": 2024})]),
+                          reply(tool_calls=[("submit_report", REPORT)]), resubmit)
+    configure(monkeypatch, tmp_path, script())
+    assert cli.main(["Rank Apple.", "--cutoff", "2026-11-01"]) == 0
+    assert "step 1: screen -> invalid" in capsys.readouterr().err
+    configure(monkeypatch, tmp_path, script())
+    assert cli.main(["Rank Apple."]) == 0
+    assert "step 1: screen -> ok" in capsys.readouterr().err
