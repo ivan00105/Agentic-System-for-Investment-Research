@@ -35,3 +35,14 @@ test('picking a second company says the question is now a comparison', async ({p
   await expect(page.getByRole('status').filter({hasText: 'side-by-side comparison'})).toContainText('You picked 2 companies')
   await expect(page.getByLabel('Your question')).toHaveValue(/^Compare Apple Inc\. \(AAPL\) and Microsoft Corp \(MSFT\)/)
 })
+
+test('Find offers the full S&P 500 and every SEC filer, which says why when SEC is not set up', async ({page}) => {
+  await page.goto('/')
+  await page.locator('.starter', {hasText: 'Find companies'}).click()
+  const where = page.getByRole('group', {name: 'Where to look'})
+  await expect(where.getByRole('radio', {name: /^S&P 500 500 companies/})).toBeChecked()
+  await expect(where).toContainText('survivorship bias')
+  const everyone = where.getByRole('radio', {name: /Every SEC filer with a ticker/})
+  await expect(everyone).toBeDisabled() // the test server has no SEC_USER_AGENT
+  await expect(where).toContainText('SEC_USER_AGENT')
+})

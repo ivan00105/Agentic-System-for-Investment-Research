@@ -94,7 +94,7 @@ export interface AgentReport extends AgentRunSummary { status_label: string; err
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
 export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; model?: string; edit_spec?: boolean; preferences?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
-export interface UniverseInfo { id: string; name: string; companies: number; as_of: string; note: string }
+export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
 const run = (id: string) => `/agent-runs/${encodeURIComponent(id)}`
 export const agentApi = {

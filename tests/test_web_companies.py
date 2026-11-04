@@ -51,3 +51,16 @@ def test_search_without_sec_access_says_what_to_set(web, tmp_path, monkeypatch):
 def test_the_bundled_discover_universes_are_listed_with_their_size(web):
     [tech] = [u for u in web.get("/api/universes").json()["items"] if u["id"] == "sp500_tech"]
     assert tech["companies"] > 50 and tech["name"].startswith("S&P 500") and tech["as_of"]
+
+
+def test_the_full_sp500_is_offered_with_its_survivorship_note(web):
+    [sp500] = [u for u in web.get("/api/universes").json()["items"] if u["id"] == "sp500"]
+    assert sp500["companies"] == 500 and sp500["as_of"] == "2026-11-05" and "survivorship" in sp500["note"]
+
+
+def test_every_sec_filer_is_offered_when_sec_answers_and_explained_when_not(web, tmp_path, monkeypatch):
+    everyone = web.get("/api/universes").json()["items"][-1]
+    assert everyone["id"] == "sec_all" and everyone["available"] and everyone["dynamic"] and everyone["companies"] > 3
+    monkeypatch.setattr(cli, "sec_client", lambda: SecClient("", tmp_path / "empty"))
+    everyone = web.get("/api/universes").json()["items"][-1]
+    assert not everyone["available"] and everyone["companies"] is None and "SEC_USER_AGENT" in everyone["problem"]

@@ -136,3 +136,14 @@ def test_the_page_gets_each_terms_options_and_a_picked_one_sets_the_term(web):
     assert "- large: revenue of at least $50 billion" in web.model.requests[1]["messages"][-1]["content"]
     events = [json.loads(line) for line in (web.traces / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
     assert next(e for e in events if e["kind"] == "screen_spec")["terms"] == {"large": "user"}
+
+
+def test_a_find_over_every_sec_filer_tells_the_screener_the_size_not_the_names(web):
+    web.model = FakeClient(SPEC)
+    run_id = start(web, "Find large companies.", discover={"name": "sec_all"})
+    run = waiting(web, run_id)
+    assert run["questions"]["shown"][0].startswith("Universe: Every SEC filer with a ticker")
+    prompt = web.model.requests[0]["messages"][0]["content"]
+    assert "aren't listed here" in prompt and "- AAPL:" not in prompt
+    web.post(f"/api/agent-runs/{run_id}/cancel", json={})
+    wait(web, run_id)

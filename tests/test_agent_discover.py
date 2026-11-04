@@ -264,6 +264,16 @@ def test_each_vague_term_offers_options_and_its_definition_is_the_recommended_on
     assert Term(**cheap).options == []  # no options: the page and terminal ask for free text, as before
 
 
+def test_the_full_sp500_is_bundled_with_its_date_sectors_and_survivorship_note():
+    sp500 = universe.load("sp500")
+    assert len(sp500.members) == 503 and len(sp500.ciks) == 500  # GOOG/GOOGL, FOX/FOXA, NWS/NWSA
+    assert len({m.sector for m in sp500.members}) == 11 and all(m.sector for m in sp500.members)
+    assert sp500.as_of == "2026-11-05" and "wikipedia" in sp500.source and "survivorship" in sp500.note
+    tickers = {m.ticker for m in sp500.members}
+    assert {"BRK-B", "BF-B", "ON", "T"} <= tickers and not any("." in t for t in tickers)  # SEC's ticker style
+    assert set(universe.load("sp500_tech").ciks) <= set(sp500.ciks)
+
+
 def test_the_saved_shortlist_gives_each_candidate_its_tickers_for_compare_these(tmp_path, declared):
     from research_assistant.agents import saved
     result, _, _ = find(tmp_path, declared, spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}],
@@ -271,3 +281,18 @@ def test_the_saved_shortlist_gives_each_candidate_its_tickers_for_compare_these(
     candidates = saved.report(result.trace_path)["discover"]["candidates"]
     apple = next(c for c in candidates if c["cik"] == "0000320193")
     assert apple["outcome"] == "picked" and apple["tickers"] == ["AAPL"]
+
+
+def test_every_sec_filer_with_a_ticker_is_a_universe_described_without_its_member_list(tmp_path):
+    from research_assistant.agents.discover_spec import describe
+    from research_assistant.data.companies import listed_companies
+    sec = make_context(tmp_path).sec
+    everyone = universe.load(universe.ALL_FILERS, sec)
+    listed = listed_companies(sec)
+    assert len(everyone.ciks) == len(listed) and not everyone.show_members and "survivorship" in everyone.note
+    assert len(everyone.members) == sum(len(c.tickers) for c in listed.values())
+    text = describe(everyone)
+    assert f"{len(everyone.ciks)} companies" in text and "aren't listed here" in text and "- AAPL:" not in text
+    assert "- AAPL: Apple Inc." in describe(universe.load("sp500"))
+    with pytest.raises(universe.UniverseError, match="needs SEC access"):
+        universe.load(universe.ALL_FILERS)

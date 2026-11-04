@@ -14,6 +14,7 @@ from . import config
 from .agents import critic, discover, evidence, isolated_review, single_agent, team
 from .agents.progress import describe
 from .data import universe
+from .data.errors import DataError
 from .data.sec import SecClient
 from .model_access import load_model_settings
 from .tools.result import ToolContext
@@ -45,7 +46,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="With --review: first plant a labelled test defect in the saved draft.")
     parser.add_argument("--universe", metavar="NAME_OR_FILE",
                         help="Discover: screen this declared universe (bundled: " + ", ".join(universe.bundled())
-                             + "; or a YAML file), then research the top candidates with --condition.")
+                             + f"; {universe.ALL_FILERS} for every SEC filer with a ticker; or a YAML file), then "
+                             "research the top candidates with --condition.")
     parser.add_argument("--define", action="append", default=[], metavar="TERM=MEANING",
                         help="With --universe: define a vague term up front, e.g. 'reasonable valuation=P/E below "
                              "40'. Terms left open are asked about when the terminal is interactive.")
@@ -111,14 +113,19 @@ def ask(question: str, cutoff_day: date | None, condition: str = "B") -> int:
 
 
 def find(question: str, name: str, condition: str, defined: dict[str, str], replacements: int) -> int:
-    try:
-        declared = universe.load(name)
+    try:  # a bad name fails before anything else; every SEC filer needs the SEC client first
+        declared = None if name == universe.ALL_FILERS else universe.load(name)
     except universe.UniverseError as exc:
         print(exc, file=sys.stderr)
         return 2
     if (settings := model_settings()) is None:
         return 2
     with sec_client() as sec, model_client(settings) as client:
+        try:
+            declared = declared or universe.load(name, sec)
+        except (universe.UniverseError, DataError) as exc:
+            print(exc, file=sys.stderr)
+            return 2
         if not sec.configured:
             print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
         result = discover.run(question, client, settings, ToolContext(cutoff=datetime.now(timezone.utc), sec=sec),

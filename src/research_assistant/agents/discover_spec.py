@@ -148,9 +148,14 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
 
 
 def describe(universe: Universe) -> str:
+    about = (f"{universe.name}: {len(universe.members)} tickers, {len(universe.ciks)} companies (share classes count "
+             f"once). Source: {universe.source}, as of {universe.as_of}. {universe.note}")
+    if not universe.show_members:  # thousands of names would crowd out everything else; the screen still covers all
+        return (f"{about}\n\nThe members aren't listed here, since there are thousands, but the screen covers every "
+                "one. Small companies and shells are among them, so a size filter (e.g. revenue) is often worth "
+                "proposing.")
     members = "\n".join(f"- {m.ticker}: {m.name}" + (f" ({m.sector})" if m.sector else "") for m in universe.members)
-    return (f"{universe.name}: {len(universe.members)} tickers, {len(universe.ciks)} companies (share classes count "
-            f"once). Source: {universe.source}, as of {universe.as_of}. {universe.note}\n\n{members}")
+    return f"{about}\n\n{members}"
 
 
 def _key(text: str) -> str:

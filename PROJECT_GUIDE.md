@@ -453,7 +453,7 @@ With 3 people: merge Data + Outlook, merge UI + Evaluation/report, and keep Agen
 | Price data source | Several providers (see [REFERENCE: data providers](docs/REFERENCE.md#data-providers-by-kind-options-and-order)). The zero-key default is **yfinance**. When `TIINGO_API_KEY` is set, **Tiingo** goes first, because it has raw (as-traded) prices plus split and dividend fields. Every result is labelled with its source. Get the free Tiingo key before the evaluation is frozen. |
 | LLM | Keep OpenRouter with a cheap tool-calling model. Freeze the model ID before the evaluation. Check whether the HKU ITS quota supports function calling. |
 | Framework | Plain Python loop. LangGraph only if the team already knows it. |
-| Discover universe | Decided in Phase 5: a declared YAML list, stated as a survivorship-biased snapshot. Bundled: `sp500_tech` (today's S&P 500 Information Technology and Communication Services members); add others as files. |
+| Discover universe | Decided in Phase 5: a declared YAML list, stated as a survivorship-biased snapshot. Bundled: `sp500` (the whole S&P 500, the default) and `sp500_tech` (its Information Technology and Communication Services members); add others as files. `sec_all` (every SEC filer with a ticker, about 8,000) is built from SEC's ticker list on the day; costs and caveats in REFERENCE §4. |
 | Outlook in the final demo? | Decide after Phase 4. If built, show it as a clearly labelled statistical card, never used for ranking. |
 
 ---

@@ -201,7 +201,7 @@ def start(body: StartRun, request: Request):
     if body.discover:
         try:
             with cli.sec_client() as sec:
-                declared = (universes.load(body.discover.name) if body.discover.name
+                declared = (universes.load(body.discover.name, sec) if body.discover.name
                             else universes.from_tickers(sec, body.discover.tickers))
         except (universes.UniverseError, DataError) as exc:
             raise DomainError(str(exc), "bad_universe", 422) from exc

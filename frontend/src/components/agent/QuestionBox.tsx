@@ -47,8 +47,8 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
   const built = buildQuestion(kind, companies, topics, {count, among: universe ? `among ${universe.name}` : 'from my list'})
   useEffect(() => { if (!edited && built) setQuestion(built) }, [built, edited])
 
-  // Help me start searches the biggest bundled list.
-  const widest = [...universes].sort((a, b) => b.companies - a.companies)[0]
+  // Help me start searches the biggest bundled list, never every SEC filer (thousands of small companies and shells).
+  const widest = universes.filter(u => !u.dynamic).sort((a, b) => (b.companies ?? 0) - (a.companies ?? 0))[0]
   function guide({question: text, note: written}: {question: string; note: string}) {
     setKind('find'); setCompanies([]); setTopics([]); setQuestion(text); setEdited(true); setNote(written); setGuided(false); setError('')
     if (widest) setAmong(widest.id)
@@ -88,7 +88,7 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
         hint={find ? 'Pick any number, then choose "My own list" below.' : companies.length >= COMPARE_MAX ? 'A comparison takes up to four companies. To screen more, use Find companies with your own list.' : 'One company checks it; two to four compare them. Any SEC filer works.'} />
       {!find && companies.length > 1 && <p className="mode-note" role="status">You picked {companies.length} companies, so this is now a side-by-side comparison. Remove all but one to check a single company{companies.length >= COMPARE_MAX ? ', or use Find companies to screen a longer list' : ''}.</p>}
       {find && <fieldset className="find-options"><legend>Where to look</legend>
-        {universes.map(u => <label className="radio" key={u.id}><input type="radio" name="among" checked={among === u.id} onChange={() => setAmong(u.id)} /><span>{u.name}<small>{u.companies} companies, as of {u.as_of}. {u.note}</small></span></label>)}
+        {universes.map(u => <label className="radio" key={u.id}><input type="radio" name="among" checked={among === u.id} disabled={u.available === false} onChange={() => setAmong(u.id)} /><span>{u.name}<small>{u.companies != null ? `${u.companies.toLocaleString('en-US')} companies` : 'Size unknown'}, as of {u.as_of}. {u.note}{u.problem && ` ${u.problem}`}</small></span></label>)}
         <label className="radio"><input type="radio" name="among" checked={among === 'mine'} onChange={() => setAmong('mine')} /><span>My own list<small>The {companies.length} compan{companies.length === 1 ? 'y' : 'ies'} picked above.</small></span></label>
         <label className="count">How many to return (optional)<input type="number" min={1} step={1} value={count} onChange={e => setCount(e.target.value)} /></label>
       </fieldset>}
