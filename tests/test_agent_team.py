@@ -171,3 +171,25 @@ def test_a_failed_analyst_is_reported_and_a_follow_up_continues_its_conversation
     assert ends == [("failed", 0), ("finished", 0)]
     assert [e["follow_up"] for e in events if e["kind"] == "analyst_start"] == [False, True]
     assert "market and valuation analyst (failed, 1 model calls, 0 findings)" in result.markdown
+
+
+def test_a_report_claim_citing_a_flagged_finding_is_flagged_too(tmp_path):
+    # Codex review: a flagged analyst finding became a clean "cited" claim once the coordinator cited it.
+    def typed_submit(messages):
+        revenue = latest(messages, "revenue")
+        return calls(("submit_findings", {"findings": [{"text": "Revenue was about $416 billion.",
+                                                        "citations": [revenue]}]}))
+
+    def cite_finding(messages):
+        [finding] = by_source(messages)["fundamentals analyst"]["data"]["findings"]
+        assert finding["flags"]
+        return calls(("submit_report", {"summary": [{"text": "Apple is a large business.",
+                                                     "citations": [finding["claim"]]}]}))
+
+    result, _, events = run(tmp_path, PLAN, calls(("ask_fundamentals", {"task": FUNDAMENTALS_TASK})),
+                            fundamentals_financials, typed_submit, cite_finding, resubmit)
+    [summary] = result.report.sections["summary"]
+    finding = summary.citations[0]
+    assert summary.status == "qualified"
+    assert any(f.problem.startswith(f"Cites claim {finding}, which was flagged: ") and "typed" in f.problem
+               for f in summary.flags)
