@@ -15,6 +15,7 @@ expected:
     - Nets capex against "Proceeds from sale of PP&E and other assets" (262) without saying so.
 gold:
   - name: capex_fy2018
+    metric: capex
     ticker: MMM
     value: 1577
     unit: USD millions

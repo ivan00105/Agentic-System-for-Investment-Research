@@ -137,3 +137,11 @@ def test_saved_traces_reopen_even_when_unfinished_or_markdown_only(web):
         {"seq": None, "at": None, "kind": "plan", "role": None, "text": "plan ready"}]
     assert web.get("/api/agent-runs/notes").status_code == 404
     assert web.get("/api/agent-runs/..%2Fresearch").status_code == 404
+
+
+def test_a_run_with_a_cutoff_is_historical_so_screen_refuses(web):
+    web.model = FakeClient(reply("1. screen"), reply(tool_calls=[("screen", {"universe": ["AAPL"], "rank_by": "revenue",
+                                                                             "year": 2024})]),
+                           reply(tool_calls=[("submit_report", REPORT)]), resubmit)
+    run = wait(web, start(web, "Rank Apple.", condition="B", cutoff="2026-11-01"))
+    assert "step 1: screen -> invalid" in [line["text"] for line in run["progress"]]

@@ -6,13 +6,16 @@
 
 Each run's trace goes to <batch>/traces/ and a line to <batch>/runs.jsonl before the run starts, so a crash still
 shows up in the scores. The same command again with the same --out skips the runs that ended (failed ones too, so the
-failure rate stays honest) and reruns the ones that crashed. A runs only on the cases the old pipeline supports; B, C
-and D get every case. On a prompt-injection case the case's text is appended to what the target tool returns, so
+failure rate stays honest) and reruns the ones that crashed. A batch's manifest.json records its set-up (model,
+prompts, config values, case files, git commit), and a resume with any of them changed is refused, so one batch never
+mixes two set-ups. A runs only on the cases the old pipeline supports; B, C and D get every case. On a prompt-injection case the case's text is appended to what the target tool returns, so
 every condition reads the same injected filing text, and the trace freezes it.
 """
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from contextlib import contextmanager, nullcontext
 from dataclasses import replace
@@ -22,6 +25,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from research_assistant import cli, config
+from research_assistant.agents import prompts
 from research_assistant.agents.saved import summary
 from research_assistant.agents.trace import Trace
 from research_assistant.tools import registry
@@ -33,6 +37,63 @@ import score
 CONDITIONS = ("A", "B", "C", "D")
 ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 ITEM = re.compile(r"\bItem\s+(\w+)", re.IGNORECASE)
+MANIFEST = "manifest.json"
+PROMPTS = Path(prompts.__file__).parent
+# The config.py values a run's result depends on (not timeouts, retries or cache ages).
+CONFIG_KEYS = ("AGENT_MAX_STEPS", "AGENT_SELF_REVIEW_PASSES", "AGENT_CRITIC_ROUNDS", "FIND_COMPANY_MAX_MATCHES",
+               "FIND_COMPANY_MIN_SCORE", "FINANCIALS_DEFAULT_YEARS", "LIST_FILINGS_MAX_RESULTS", "SECTION_PAGE_CHARS",
+               "SECTION_HEADING_MAX_CHARS", "SECTION_SEARCH_MAX_CHUNKS", "SCREEN_DEFAULT_TOP_K", "SCREEN_FRAME_LAG_DAYS",
+               "PRICE_PROVIDERS", "PRICE_DEFAULT_LOOKBACK_DAYS", "PRICE_CLOSE_AVAILABLE_HOUR", "TRADING_DAYS_PER_YEAR",
+               "CHECKER_ALLOWED_NUMBER_PATTERNS", "REPORT_DECIMALS")
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def git_commit() -> str | None:
+    try:
+        done = subprocess.run(["git", "rev-parse", "HEAD"], cwd=config.PROJECT_ROOT, capture_output=True, text=True)
+    except OSError:
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def manifest(settings, cases: list[dict], case_dir: Path) -> dict:
+    """What this batch's results depend on, besides the data: the model, prompts, config, case files and code."""
+    return {"provider": settings and settings.provider, "model": settings and settings.model,
+            "prompts": {path.name: digest(path) for path in sorted(PROMPTS.glob("*.md"))},
+            "config": json.loads(json.dumps({key: getattr(config, key) for key in CONFIG_KEYS})),
+            "cases": {case["id"]: digest(case_dir / f"{case['id']}.yaml") for case in cases}, "commit": git_commit()}
+
+
+def check_manifest(batch: Path, current: dict) -> str | None:
+    """Writes a new batch's manifest, or adds new cases to an old one. Returns why a resume is refused, if it is."""
+    path = batch / MANIFEST
+    if not path.is_file():
+        if score.read_index(batch):
+            return (f"{batch} has runs but no {MANIFEST} (it was made before batches kept one), so a resume can't "
+                    "check that it ran with the same set-up. Score it with --rescore, or start a new batch with "
+                    "another --out.")
+        path.write_text(json.dumps(current, indent=1), encoding="utf-8")
+        return None
+    saved, problems = json.loads(path.read_text(encoding="utf-8")), []
+    for key in ("provider", "model", "commit"):  # None: not known then (an A-only batch) or now
+        if saved.get(key) is not None and current[key] is not None and saved[key] != current[key]:
+            problems.append(f"{key}: {saved[key]} then, {current[key]} now")
+    for key in ("prompts", "config"):
+        old = saved.get(key) or {}
+        if changed := sorted(k for k in old.keys() | current[key].keys() if old.get(k) != current[key].get(k)):
+            problems.append(f"{key}: {', '.join(changed)} changed")
+    old_cases = saved.get("cases") or {}
+    if changed := [i for i in current["cases"] if i in old_cases and old_cases[i] != current["cases"][i]]:
+        problems.append(f"case files: {', '.join(changed)} changed")
+    if problems:
+        return (f"{batch} ran with another set-up, so resuming it would mix results: {'; '.join(problems)}. "
+                "Start a new batch with another --out.")
+    known = {key: current[key] for key in ("provider", "model", "commit") if saved.get(key) is None}
+    path.write_text(json.dumps(saved | known | {"cases": old_cases | current["cases"]}, indent=1), encoding="utf-8")
+    return None
 
 
 @contextmanager
@@ -87,8 +148,8 @@ def run_case(case: dict, condition: str, repeat: int, batch: Path, client, setti
         baseline_a.run(case, cutoff, trace, batch / "baseline_a")
         return
     with injected(case.get("injection")) as count:
-        result = cli.CONDITIONS[condition](case["question"], client, settings, ToolContext(cutoff=cutoff, sec=sec),
-                                           trace=trace)
+        context = ToolContext(cutoff=cutoff, sec=sec, historical=True)  # every case has its own past cutoff
+        result = cli.CONDITIONS[condition](case["question"], client, settings, context, trace=trace)
     if case.get("injection"):
         append(batch, entry | {"injected": count[0]})
     cost = result.totals.get("cost")
@@ -137,6 +198,9 @@ def main(argv: list[str] | None = None) -> int:
     load_dotenv(config.PROJECT_ROOT / ".env", override=False, interpolate=False, encoding="utf-8-sig")
     settings = None
     if set(conditions) - {"A"} and (settings := cli.model_settings()) is None:
+        return 2
+    if refused := check_manifest(batch, manifest(settings, chosen, args.case_dir)):
+        print(refused, file=sys.stderr)
         return 2
     done = ended(batch)
     with cli.sec_client() as sec, (cli.model_client(settings) if settings else nullcontext()) as client:

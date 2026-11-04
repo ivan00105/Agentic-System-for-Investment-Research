@@ -8,6 +8,8 @@ from sec_files import make_context
 
 from research_assistant import cli
 from research_assistant.agents import critic, single_agent
+from research_assistant.agents.checker import CheckedClaim, CheckedReport
+from research_assistant.agents.claims import ClaimLedger
 from research_assistant.agents.draft import Draft
 from research_assistant.agents.evidence import inject_wrong_period
 from research_assistant.agents.roles import CRITIC
@@ -247,7 +249,7 @@ def test_a_missing_risk_is_corrected_by_adding_a_claim(tmp_path):
     assert f"  - Outcome: corrected by adding `{risk.id}` in round 1: Added the supplier risk. [1]" in result.markdown
 
 
-def saved_run(tmp_path):
+def saved_run(tmp_path, historical=False):
     """A condition B run whose key number is the latest fiscal year's revenue, with three years in the evidence."""
     def submit(messages):
         latest = revenue(messages, 0)
@@ -259,7 +261,9 @@ def saved_run(tmp_path):
     client = FakeClient(reply("1. get_financials"), calls(("get_financials", {"cik": "0000320193", "metrics":
                                                                              ["revenue"], "years": 3})), submit,
                         resubmit)
-    return single_agent.run(QUESTION, client, SETTINGS, make_context(tmp_path), trace_dir=tmp_path / "traces")
+    context = make_context(tmp_path)
+    context.historical = historical
+    return single_agent.run(QUESTION, client, SETTINGS, context, trace_dir=tmp_path / "traces")
 
 
 def test_the_injected_period_moves_one_figure_to_the_latest_earlier_year_it_does_not_use():
@@ -324,3 +328,69 @@ def test_inject_needs_a_saved_run_to_review(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--inject", "wrong_period"])
     assert exc.value.code == 2 and "--inject needs --review TRACE" in capsys.readouterr().err
+
+
+def test_a_review_of_a_historical_run_stays_historical(tmp_path, monkeypatch, capsys):
+    path = saved_run(tmp_path, historical=True).trace_path
+
+    def critic_objects(messages):
+        claim, version = claim_in(messages[1]["content"], "key_numbers[0]")
+        return calls(("submit_objections", {"objections": [objection(claim, version, "wrong_period")]}))
+
+    def leave_it(messages):
+        request = next(m["content"] for m in reversed(messages) if "raised these objections" in str(m.get("content")))
+        draft = json.loads(request[request.index("{"):])
+        return calls(("submit_revision", {**draft, "outcomes": [{
+            "objection": re.search(r"- (objection-\w+) on", request)[1], "outcome": "unresolved",
+            "explanation": "No screen as of the cutoff.", "citations": [COMPANY]}]}))
+
+    screen = calls(("screen", {"universe": ["AAPL"], "rank_by": "revenue", "year": 2024}))
+    configure(monkeypatch, tmp_path, FakeClient(critic_objects, screen, leave_it, CLEAN))
+    assert cli.main(["--review", str(path)]) == 0
+    events = printed_trace(capsys.readouterr().out)
+    assert events[0]["historical"] is True
+    assert [e["result"]["status"] for e in events if e["kind"] == "tool_call"] == ["invalid"]
+
+
+@pytest.mark.parametrize("outcomes,why", [
+    ([], "no outcome was given"),
+    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without a citation"),
+])
+def test_a_new_version_alone_does_not_close_an_objection_as_corrected(tmp_path, outcomes, why):
+    # Codex review: any new claim version closed its objection as corrected, with no outcome or evidence.
+    def revise_without_evidence(messages):
+        request = next(m["content"] for m in reversed(messages) if "raised these objections" in str(m.get("content")))
+        found = re.search(r"- (objection-\w+) on", request)[1]
+        [finding] = by_source(messages)["fundamentals analyst"]["data"]["findings"]
+        return calls(("submit_revision", {
+            "key_numbers": [{"text": finding["text"], "kind": "fact", "materiality": "central", "id": finding["claim"]}],
+            "outcomes": [{"objection": found, **outcome} for outcome in outcomes]}))
+
+    def objects(messages):
+        claim, version = claim_in(messages[1]["content"], "key_numbers[0]")
+        return calls(("submit_objections", {"objections": [objection(claim, version, "wrong_period")]}))
+
+    result, _, events = run_d(tmp_path, PLAN, calls(("ask_fundamentals", {"task": TASK})), financials, wrong_finding,
+                              report, resubmit, objects, route, corrected_finding, revise_without_evidence, CLEAN,
+                              critic_rounds=2)
+    [o] = events[-1]["objections"]
+    assert (o["outcome"], o["new_version"]) == ("unresolved", None)
+    assert f"Round 1: the claim changed to v2, but no evidence it fixes the problem ({why}), so it stays open." \
+        in o["notes"]
+
+
+def test_a_claim_citing_one_with_an_unresolved_objection_is_flagged_one_level_only():
+    def claim(claim_id, *cites):
+        return CheckedClaim(f"Text of {claim_id}.", "interpretation", list(cites), [], "central", claim_id, 1)
+
+    report = CheckedReport({"summary": [claim("claim-a"), claim("claim-b", "claim-a"), claim("claim-c", "claim-b")]},
+                           [], [], [])
+    review = critic.Critic(QUESTION, None, SETTINGS, None, None, ClaimLedger(), None, 1, 1)
+    review.raised = [critic.Raised("objection-1", 1, "claim-a", 1, "summary[0]", "coordinator", "wrong_period", True,
+                                   "Wrong year.", [], "Check it.", outcome="unresolved")]
+    review._qualify(report)
+    a, b, c = report.sections["summary"]
+    assert [f.problem for f in a.flags] == ["Objection objection-1 (wrong period) is unresolved: Wrong year."]
+    assert [f.problem for f in b.flags] == ["It cites claim-a, which has unresolved objection objection-1 (wrong "
+                                            "period)."]
+    assert c.flags == [] and len(report.flags) == 2

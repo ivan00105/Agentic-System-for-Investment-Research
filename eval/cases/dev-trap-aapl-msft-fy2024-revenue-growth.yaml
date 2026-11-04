@@ -21,6 +21,7 @@ expected:
     - Presents the two growth rates as covering the same period.
 gold:
   - name: aapl_net_sales_fy2024
+    metric: revenue
     ticker: AAPL
     value: 391035
     unit: USD millions
@@ -33,6 +34,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm
       location: Consolidated Statements of Operations, row "Total net sales", September 28, 2024 column
   - name: aapl_net_sales_fy2023
+    metric: revenue
     ticker: AAPL
     value: 383285
     unit: USD millions
@@ -45,6 +47,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm
       location: Consolidated Statements of Operations, row "Total net sales", September 30, 2023 column
   - name: aapl_revenue_growth_fy2024
+    metric: revenue_growth
     ticker: AAPL
     value: 2.0
     unit: percent
@@ -55,6 +58,7 @@ gold:
       inputs: [aapl_net_sales_fy2024, aapl_net_sales_fy2023]
     tolerance: 0.05
   - name: msft_revenue_fy2024
+    metric: revenue
     ticker: MSFT
     value: 245122
     unit: USD millions
@@ -67,6 +71,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
       location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2024 column
   - name: msft_revenue_fy2023
+    metric: revenue
     ticker: MSFT
     value: 211915
     unit: USD millions
@@ -79,6 +84,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
       location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2023 column
   - name: msft_revenue_growth_fy2024
+    metric: revenue_growth
     ticker: MSFT
     value: 15.7
     unit: percent

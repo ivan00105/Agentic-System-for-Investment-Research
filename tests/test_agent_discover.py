@@ -198,3 +198,25 @@ def test_a_bad_universe_says_what_to_fix(tmp_path):
     (tmp_path / "bad.yaml").write_text("name: x\n", encoding="utf-8")
     with pytest.raises(universe.UniverseError, match="needs name, source, as_of and companies"):
         universe.load(str(tmp_path / "bad.yaml"))
+
+
+def test_research_runs_with_no_claims_count_as_failed(tmp_path, declared):
+    # Codex review: a run that stopped at its limit with no claims, or abstained in every section, was a pick.
+    def short(question, *args, **kwargs):
+        return single_agent.run(question, *args, max_steps=1, **kwargs)
+
+    stopped = [reply("1. find_company"), reply(tool_calls=[("find_company", {"query": "AAPL"})]),
+               reply(tool_calls=[("submit_report", {"limitations": ["Ran out of steps."]})])]
+    abstained = [reply("1. say so"), reply(tool_calls=[("submit_report", {"limitations": ["Nothing found."]})])]
+    client = FakeClient(spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}], top_k=1),
+                        *stopped, *abstained)
+    result = discover.run("Find big companies.", client, SETTINGS, make_context(tmp_path, cutoff=CUTOFF), declared,
+                          research=short, condition="B", trace_dir=tmp_path / "traces")
+    apple, jpm = (next(c for c in result.candidates if c.cik == cik) for cik in ("0000320193", "0000019617"))
+    assert (apple.outcome, apple.run.status) == ("research failed", "stopped_at_limit")
+    assert apple.error == "The research run stopped at its step limit with no claims."
+    assert (jpm.outcome, jpm.run.status) == ("research failed", "finished")
+    assert jpm.error == "The research run abstained in every section."
+    assert result.counts["failed"] == 2 and result.counts["returned"] == 0
+    events = [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
+    assert [e["error"] for e in events if e["kind"] == "research_end"] == [apple.error, jpm.error]

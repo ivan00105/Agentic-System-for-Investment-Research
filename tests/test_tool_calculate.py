@@ -184,3 +184,41 @@ def test_market_cap_says_when_splits_could_not_be_checked(apple):
     series = prices(context, "prices-short", [{"date": "2026-10-30", "close": 105.0, "adj_close": 105.0, "split": 1.0}])
     cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
     assert cap.status == "ok" and any("could not be checked" in note for note in cap.data["notes"])
+
+
+def test_market_cap_rejects_revenue_as_the_share_count(apple):
+    # Codex review: revenue was accepted as the share count and came back as a clean market cap.
+    context, ids = apple
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    result = calc(context, "market_cap", prices=series, shares=ids["2025-09-27", "revenue"])
+    assert result.status == "invalid" and "share count" in result.warnings[0]
+
+
+def test_pe_rejects_eps_as_net_income(apple):
+    context, ids = apple
+    eps = {**context.records[ids["2025-09-27", "net_income"]], "id": "fact-eps", "metric": "eps_diluted",
+           "unit": "USD/shares", "value": "7.46"}
+    context.remember(eps)
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    result = calc(context, "pe", market_cap=cap.ids[0], net_income="fact-eps")
+    assert result.status == "invalid" and "USD amount" in result.warnings[0]
+
+
+def test_valuation_needs_a_market_cap_result(apple):
+    context, ids = apple
+    result = calc(context, "ps", market_cap=ids["2025-09-27", "net_income"], revenue=ids["2025-09-27", "revenue"])
+    assert result.status == "invalid" and "market_cap" in result.warnings[0]
+
+
+def test_free_cash_flow_rejects_a_share_count_as_capex(apple):
+    context, ids = apple
+    result = calc(context, "fcf", operating_cash_flow=ids["2025-09-27", "operating_cash_flow"],
+                  capex=ids["2026-07-17", "shares_outstanding"])
+    assert result.status == "invalid" and "USD amount" in result.warnings[0]
+
+
+def test_market_cap_needs_a_price_series(apple):
+    context, ids = apple
+    result = calc(context, "market_cap", prices=ids["2025-09-27", "revenue"], shares=ids["2026-07-17", "shares_outstanding"])
+    assert result.status == "invalid" and "price series" in result.warnings[0]

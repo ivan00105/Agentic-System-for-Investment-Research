@@ -62,3 +62,11 @@ def test_unknown_ticker_and_incomplete_year(tmp_path):
     assert any(w.startswith("NOPE: no SEC filer") for w in result.warnings)
     future, _ = screen(tmp_path, year=2026, rank_by="revenue")
     assert future.status == "invalid" and "latest is 2025" in future.warnings[0]
+
+
+def test_a_historical_run_refuses_to_screen(tmp_path):
+    # Codex review: frames hold today's latest-filed values, so a past cutoff could see later filings.
+    context = make_context(tmp_path)
+    context.historical = True
+    result = run(ScreenInput(universe=UNIVERSE, year=2024, rank_by="revenue"), context)
+    assert result.status == "invalid" and "cutoff" in result.warnings[0] and result.data is None

@@ -33,6 +33,8 @@ class ToolContext:
 
     cutoff: datetime
     sec: SecClient
+    # True when the user set a past cutoff: tools whose data can't be dated as of it (SEC frames) refuse.
+    historical: bool = False
     # Every citable record returned so far in this run, by ID. calculate and the checker resolve IDs here.
     records: dict[str, dict] = field(default_factory=dict)
     # Price providers to try, best first; None means config order. The evaluation pins this list.

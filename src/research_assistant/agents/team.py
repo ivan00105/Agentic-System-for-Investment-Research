@@ -92,7 +92,8 @@ class Desk:
                                        replaces=False)
             for c in checked:  # each finding is citable by its claim ID, which brings its own citations
                 context.remember({"id": c.id, "kind": "claim", "author": role.name, "version": c.version,
-                                  "text": c.text, "citations": c.citations})
+                                  "text": c.text, "citations": c.citations, "status": c.status,
+                                  "flags": [flag.problem for flag in c.flags]})
             gaps = [fill(text, f"gaps[{i}]", context.records) for i, text in enumerate(findings.gaps)]
             self.trace.write("analyst_end", status=result.status, steps=result.steps, error=result.error,
                              findings=len(checked), claims=claims)

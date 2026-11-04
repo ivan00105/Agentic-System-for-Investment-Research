@@ -34,6 +34,7 @@ UNITS = {"ratio": "ratio", "growth": "ratio", "change_pp": "pp", "cagr": "ratio"
          "pe": "x", "ps": "x", "pb": "x", "fcf_yield": "ratio", "ev": "USD", "total_return": "ratio",
          "volatility": "ratio", "max_drawdown": "ratio", "beta": "x"}
 PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta"}
+USD_ROLES = {"net_income", "revenue", "equity", "debt", "cash", "operating_cash_flow", "capex", "fcf"}
 
 
 class CalculateInput(BaseModel):
@@ -85,6 +86,19 @@ def _closes(series: dict, field: str = "adj_close") -> dict[str, float]:
     # A blank (None or NaN) close is unknown and left out, never treated as a price.
     return {row["date"]: row[field] for row in series["rows"]
             if isinstance(row.get(field), (int, float)) and math.isfinite(row[field])}
+
+
+def _check_roles(r: dict[str, dict]) -> None:
+    """Each named role gets the kind of record it means, so revenue can't stand in for a share count."""
+    for role, record in r.items():
+        if role in ("prices", "benchmark") and record["kind"] != "prices":
+            raise Rejected(f"{record['id']} is not a price series from get_prices ({role}).")
+        if role == "shares" and (record["kind"] != "fact" or record.get("unit") != "shares"):
+            raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a share count (shares).")
+        if role in USD_ROLES and (record["kind"] not in ("fact", "calc") or record.get("unit") != "USD"):
+            raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a USD amount ({role}).")
+        if role == "market_cap" and (record["kind"] != "calc" or record.get("formula") != "market_cap"):
+            raise Rejected(f"{record['id']} is {_label(record)}, not a market_cap result from calculate (market_cap).")
 
 
 def _company(formula: str, r: dict[str, dict]) -> tuple[str | None, list[str]]:
@@ -201,6 +215,7 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
         return ToolResult(status="invalid", source="calculate", warnings=problems)
     records = {role: context.records[args.inputs[role]] for role in roles}
     try:
+        _check_roles(records)
         cik, company_notes = _company(args.formula, records)
         outcome, start, end, notes = _compute(args.formula, records)
     except Rejected as exc:

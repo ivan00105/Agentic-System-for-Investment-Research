@@ -15,6 +15,7 @@ expected:
     - Reports 15,333, the "balances without adoption of Topic 606" figure from the revenue note.
 gold:
   - name: total_current_assets_fy2019
+    metric: total_current_assets
     ticker: NKE
     value: 16525
     unit: USD millions

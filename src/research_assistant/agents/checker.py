@@ -91,8 +91,10 @@ def _claim(claim: Claim, where: str, records: dict[str, dict]) -> CheckedClaim:
         found = lookup(records, match[2], match[1]) if match else lookup(records, raw.strip())
         if found is None:
             flags.append(Flag(where, f"Citation {raw!r} is not an ID any tool returned in this run."))
-        else:  # an analyst's finding (condition C) brings the records it cites
+        else:  # an analyst's finding (condition C) brings the records it cites, and its flags
             cited += [found["id"], *(found.get("citations") or [])] if found.get("kind") == "claim" else [found["id"]]
+            if found.get("kind") == "claim" and found.get("flags"):
+                flags.append(Flag(where, f"Cites claim {found['id']}, which was flagged: {'; '.join(found['flags'])}"))
     citations = list(dict.fromkeys(used + cited))
     if not citations:
         flags.append(Flag(where, "No citation: cite the records this statement rests on."))

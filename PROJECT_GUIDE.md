@@ -10,7 +10,7 @@ Revised 2 November 2026 after reviewing the code, the course guideline and every
 
 - **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
 - **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
-- **Where we are:** the data plumbing, storage and UI work, the Phase 1 tools (`tools/`, 8 tools), the Phase 2 single agent (`agents/`, CLI only, condition B), the Phase 3 analyst team (CLI `--condition C`), the Phase 4 critic with its revision loop (CLI `--condition D`) and Phase 5 Discover over a declared universe (CLI `--universe`) are built. **The UI hookup isn't.** The web app still runs the old fixed pipeline plus two LLM calls that only add comments (baseline A).
+- **Where we are:** the data plumbing, the Phase 1 tools (`tools/`, 8 tools), the Phase 2 single agent (condition B), the Phase 3 analyst team (C), the Phase 4 critic with its revision loop (D) and Phase 5 Discover over a declared universe are built, in the CLI and in the web app (Phase 7): one question box that runs B, C or D (default D), Find for Discover, History and a Setup & status page. The old fixed pipeline (baseline A) has its own page. The Phase 8 evaluation runner works; the rest of the case set and the full A–D run are next.
 - **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
 - **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A and as a fallback when no API key is set.
 - **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
@@ -54,7 +54,7 @@ Most of the idea holds up. Three parts need adjusting so the result is professio
 | Multi-step execution | An agent loop per analyst plus coordinator orchestration. |
 | Verification & self-correction | A deterministic citation and number checker, a critic, and a revision loop with defended / corrected / withdrawn / unresolved outcomes. |
 | Multi-agent (optional) | The analyst team. We also test whether it beats a single agent. |
-| Memory / state | Run trace and evidence stored in SQLite; reopenable history. |
+| Memory / state | Each run's trace and frozen evidence saved as a file; reopenable history. |
 | External data | SEC EDGAR APIs and a price data source. |
 | Evaluation | Four conditions (A–D) on frozen cases, reporting accuracy, support, critic benefit and harm, cost and latency. |
 
@@ -77,7 +77,7 @@ flowchart TD
     CK --> CR[Critic: objections per claim]
     CR -->|material objection + feasible fix| CO
     CR -->|nothing left to fix| FIN[Final report + trace<br/>supported / qualified / abstained]
-    FIN --> DB[(SQLite: runs, trace, evidence)]
+    FIN --> TR[(Trace file per run:<br/>every step and frozen evidence)]
 ```
 
 **Tools** (each one plain Python; the LLM only picks one and fills in its arguments):
@@ -243,7 +243,7 @@ Rule: add a technique when a **measured** problem calls for it, not because it's
 | Prompt caching | **Already on** | The model's hosts cache automatically; measured in Phase 8 |
 | Expose tools as an **MCP server** | Optional | Cheap once `tools/registry.py` exists; lets Claude/other clients use our tools. Good demo bonus. |
 | LLM-as-judge | Evaluation triage only | Never the sole ground truth |
-| Tracing platforms (Langfuse, LangSmith) | No | Our SQLite trace is enough |
+| Tracing platforms (Langfuse, LangSmith) | No | Our JSONL trace files are enough |
 | Fine-tuning, RL, factor mining, trading execution | No | Out of scope |
 
 ---
@@ -264,7 +264,7 @@ src/research_assistant/
     prompts/       # one .md per role
   outlook/         # statistical model: train offline, predict as a tool
   pipeline.py      # today's deterministic flow = baseline A
-  store.py         # SQLite runs, trace, evidence
+  store.py         # baseline A's SQLite runs (agent runs are trace files in data/traces/)
   api/             # FastAPI routes only
 eval/
   cases/           # one YAML per case (question, cutoff, gold answers)
@@ -318,7 +318,7 @@ flowchart LR
     P5 --> P7
     P2 --> P8[8 Evaluation]
     P5 --> P8
-    P6 --> P8
+    P6 -. optional .-> P8
     P7 --> P9[9 Report + demo]
     P8 --> P9
 ```
@@ -421,7 +421,7 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
   - The rest hand-built (injection, bank, foreign filer, unknown ticker, restatement). See [REFERENCE §10](docs/REFERENCE.md#evaluation-datasets-and-papers).
 - [x] `eval/run_eval.py` runs A–D on frozen evidence and produces tables: accuracy, support, critic fixes vs damage, cost, latency, failures ([REFERENCE §7](docs/REFERENCE.md#7-evaluation-protocol)).
   - `python eval/run_eval.py --conditions B --cases ID,ID` writes a batch folder in `data/eval/`: `runs.jsonl`, the traces, `scores.md`, `scores.json` and each report for the human checks. Run it again with the same `--out` and it skips the runs that already ended. `--rescore BATCH` (or `python eval/score.py BATCH`) scores offline from the frozen records. A runs the old pipeline without its model review, only on cases whose companies are all among its five. An injection case's text is appended to the target tool result, and the trace freezes it.
-  - Scoring rules are in `eval/score.py`'s docstring. A gold item counts as correct when a number the report shows (a placeholder's record) matches its value, company and period end. must_mention/must_not lines, claim support and whether objections were valid are marked "needs review".
+  - Scoring rules are in `eval/score.py`'s docstring. A gold item counts as correct when a number the report shows (a placeholder's record) measures the gold's `metric` and matches its value, company, period end and period kind; a report with typed figures counts as answering. A batch's `manifest.json` (model, prompts, config, case files, git commit) makes a resume with a changed set-up stop with a message. must_mention/must_not lines, claim support and whether objections were valid are marked "needs review".
   - Trial, 4 Nov 2026, NVIDIA fiscal-2024 trap, Amazon FY2017 growth and unknown ticker QZXV. **B** passed all 3, got 4/4 gold items, 7 model calls a run, $0.0128 in total, about 1 min each. **A** (no model cost) showed NVIDIA's fiscal 2025 revenue for the fiscal 2024 question and failed on Amazon's 2018 filing ("issuer does not match").
 
 ### Phase 9: Report + demo

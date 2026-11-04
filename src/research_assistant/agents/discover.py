@@ -1,8 +1,8 @@
 """Discover mode (PROJECT_GUIDE §1, REFERENCE §4): the question becomes a screen spec shown to the user (vague terms
 asked about or stated), `screen` ranks a declared universe, and each ranked candidate in turn gets the acceptance
 test on its latest 10-K and price, then a research run by condition B, C or D. A candidate that fails the test, or
-whose research fails, is replaced by the next one. The result is a shortlist with counts; fewer than k is fine and
-says why.
+whose research fails (including a run that ends with no claims in any section), is replaced by the next one. The
+result is a shortlist with counts; fewer than k is fine and says why.
 
 The Discover trace holds the spec step, the host's tool calls and one event per candidate; each research run keeps
 its own trace, and the Discover run's totals add theirs in.
@@ -112,10 +112,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
         except Exception as exc:  # a bug in one research run must not lose the others; its own trace shows where
             candidate.error = f"The research run crashed ({type(exc).__name__}: {exc}). This is a bug."
         run = candidate.run
-        candidate.outcome = "research failed" if run is None or run.status == "failed" else "picked"
+        if run is not None and run.status != "failed" and not any(run.report.sections.values()):
+            candidate.error = ("The research run stopped at its step limit with no claims."
+                               if run.status == "stopped_at_limit" else "The research run abstained in every section.")
+        candidate.outcome = "research failed" if run is None or run.status == "failed" or candidate.error else "picked"
         trace.write("research_end", rank=candidate.rank, cik=candidate.cik, run_id=run and run.run_id,
                     trace=run and str(run.trace_path), status=run.status if run else "crashed",
-                    error=run.error if run else candidate.error, totals=run.totals if run else None)
+                    error=candidate.error or (run.error if run else None), totals=run.totals if run else None)
     counts = _counts(screened.data["counts"], ranked, top_k)
     if counts["returned"] < top_k and not any(n.startswith("Stopped at the research limit") for n in notes):
         notes.append(f"Every ranked candidate was checked: {counts['returned']} of the {top_k} asked for passed.")

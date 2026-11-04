@@ -19,6 +19,7 @@ expected:
     - Crashes, or returns a US-GAAP figure for TSMC.
 gold:
   - name: net_revenue_2023
+    metric: revenue
     ticker: TSM
     value: 2161735.8
     unit: TWD millions

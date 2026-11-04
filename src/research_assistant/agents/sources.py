@@ -113,7 +113,7 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
         title = f"{record.get('form')} filed {record.get('filed')}"
         excerpt = record.get("description") or ""
         rows = [("Period", record.get("report_date")), ("Accepted", record.get("accepted_at")),
-                ("8-K items", ", ".join(record.get("items") or []) or None)]
+                ("8-K items", ", ".join(map(_item, record.get("items") or [])) or None)]
     elif kind == "prices":
         closes = [r for r in record.get("rows") or [] if r.get("close") is not None]
         title = f"{record.get('ticker')} daily prices, {record.get('start')} to {record.get('end')}"
@@ -140,3 +140,8 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
             "available_at": record.get("available_at"), "url": url,
             "rows": [{"label": k, "value": str(v)} for k, v in rows if v is not None],
             "links": [{"id": i, "label": chip(records.get(i), records)} for i in links if i in records]}
+
+
+def _item(entry) -> str:
+    """An 8-K item as list_filings stores it ({code, name}), or a plain code from older traces."""
+    return f"{entry.get('code')} {entry.get('name')}" if isinstance(entry, dict) else str(entry)

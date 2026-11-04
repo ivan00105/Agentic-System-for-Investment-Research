@@ -105,7 +105,8 @@ def ask(question: str, cutoff_day: date | None, condition: str = "B") -> int:
     with sec_client() as sec, model_client(settings) as client:
         if not sec.configured:
             print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
-        result = CONDITIONS[condition](question, client, settings, ToolContext(cutoff=cutoff, sec=sec), echo=progress)
+        context = ToolContext(cutoff=cutoff, sec=sec, historical=cutoff_day is not None)
+        result = CONDITIONS[condition](question, client, settings, context, echo=progress)
     return show(result)
 
 

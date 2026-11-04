@@ -60,6 +60,10 @@ def _value(metric: str, base: dict) -> Decimal | None:
 
 
 def run(args: ScreenInput, context: ToolContext) -> ToolResult:
+    if context.historical:
+        return ToolResult(status="invalid", source="SEC frames", warnings=[
+            f"screen can't run as of a past cutoff ({context.cutoff.date()}): SEC frames hold today's latest-filed "
+            "values, which may come from filings after it. Check each company with get_financials instead."])
     latest = (context.cutoff.date() - timedelta(days=config.SCREEN_FRAME_LAG_DAYS)).year - 1
     year = args.year or latest
     if year > latest:
@@ -135,4 +139,5 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("screen", "Screen companies on annual SEC data (revenue, growth, margins, net income, free cash flow, SIC "
             "industry) with pass/fail/unknown filters, then rank the passes by one metric. Unknown never passes. "
-            "Returns counts and the top candidates; verify them with get_financials.", ScreenInput, run, "SEC frames")
+            "Returns counts and the top candidates; verify them with get_financials. Live runs only: refused when the "
+            "run has a past cutoff.", ScreenInput, run, "SEC frames")

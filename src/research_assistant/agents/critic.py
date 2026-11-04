@@ -4,9 +4,9 @@ up to config.AGENT_CRITIC_ROUNDS reviews by a critic, the same loop with read-on
 The critic hands in objections, each tied to a claim ID and version. The coordinator routes each to the analyst that
 owns the claim (a follow-up through ask_<role>, which continues that analyst's conversation) and answers with a
 revised report and one outcome per objection: defended, corrected, withdrawn or unresolved. The claim ledger, not the
-coordinator's word, decides whether a claim changed: a correction is a new claim version, a withdrawal a claim gone
-from the report. An objection the coordinator doesn't settle stays open for the next round; what is still open when
-the review stops is shown as unresolved, never dropped.
+coordinator's word, decides whether a claim changed: a correction is a new claim version the coordinator calls
+corrected and backs with a citation, a withdrawal a claim gone from the report. An objection the coordinator doesn't
+settle stays open for the next round; what is still open when the review stops is shown as unresolved, never dropped.
 """
 import json
 from dataclasses import asdict, dataclass, field
@@ -219,10 +219,13 @@ class Critic:
                 # A missing risk is fixed by adding a claim, so the claim it qualifies may stay as it was.
                 o.close("corrected", n, explanation, citations)
                 o.new_claims = added
-            elif claim.version != o.version:
+            elif claim.version != o.version and out and out.outcome == "corrected" and citations:
                 o.close("corrected", n, explanation, citations, new_version=claim.version)
-                if out is None:
-                    o.notes.append("No outcome was given; the claim's new version is recorded as the correction.")
+            elif claim.version != o.version:
+                why = "no outcome was given" if out is None else (
+                    "corrected without a citation" if out.outcome == "corrected" else f"called {out.outcome}")
+                o.notes.append(f"Round {n}: the claim changed to v{claim.version}, but no evidence it fixes the problem "
+                               f"({why}), so it stays open.")
             else:
                 o.notes.append(f"Round {n}: " + (f"called {out.outcome}, but the claim is unchanged at v{o.version}"
                                                  if out else "no outcome was given") + ", so it stays open.")
@@ -245,7 +248,10 @@ class Critic:
         return resolved, unknown
 
     def _qualify(self, report: CheckedReport):
-        """A claim with a material objection left unresolved, or that cites a withdrawn claim, is qualified."""
+        """A claim with a material objection left unresolved, or that cites a withdrawn claim, is qualified. So is a
+        claim that cites one with such an objection: one step only, not the whole chain."""
+        versions = {c.id: c.version for claims in report.sections.values() for c in claims}
+        open_ = {(o.claim, o.version): o for o in self.raised if o.outcome == "unresolved" and o.material}
         for key, claims in report.sections.items():
             for i, c in enumerate(claims):
                 problems = [f"Objection {o.id} ({o.issue.replace('_', ' ')}) is unresolved: {o.problem}"
@@ -254,6 +260,8 @@ class Critic:
                 problems += [f"It cites {cited}, which was withdrawn after "
                              f"{self.ledger.withdrawn[cited]['objection']}." for cited in c.citations
                              if cited in self.ledger.withdrawn]
+                problems += [f"It cites {cited}, which has unresolved objection {o.id} ({o.issue.replace('_', ' ')})."
+                             for cited in c.citations if cited != c.id and (o := open_.get((cited, versions.get(cited))))]
                 for problem in problems:
                     c.flags.append(Flag(f"{key}[{i}]", problem))
                     report.flags.append(c.flags[-1])
@@ -289,9 +297,9 @@ class Critic:
                 "own the claim, ask the analyst whose evidence it rests on, or check it yourself with calculate.\n"
                 "2. Decide the outcome from what the check finds, not from agreeing with the critic:\n"
                 "- defended: the evidence answers the objection; cite the record or check that shows it.\n"
-                "- corrected: revise the claim so it rests on the right evidence, keep its claim ID in `id`, and fix "
-                "what depends on it.\n- withdrawn: remove the claim when the evidence doesn't support it, and "
-                "reconsider what depended on it.\n- unresolved: no tool can settle it; say what it affects.\n"
+                "- corrected: revise the claim so it rests on the right evidence, keep its claim ID in `id`, fix what "
+                "depends on it, and cite the records that show the fix.\n- withdrawn: remove the claim when the "
+                "evidence doesn't support it, and reconsider what depended on it.\n- unresolved: no tool can settle it; say what it affects.\n"
                 "3. Call submit_revision with the complete report (every section; every statement you keep has its "
                 "claim ID in `id`, and an unchanged statement stays exactly as it is) and one outcome per objection."
                 "\n\nYour current report, with each statement's claim ID:\n"
