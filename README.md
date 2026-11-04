@@ -1,15 +1,15 @@
 # Fieldnote
 
-An agentic AI research assistant for US stocks (COMP7608 project). You can **check** a stock or **discover** stocks that match what you want, and every number in the report is traced to its source.
+An agentic AI research assistant for US stocks. You can **check** a stock or **discover** stocks that match what you want, and every number in the report is traced to its source.
 
 **Status:** the data, storage and UI layers work. The agent team (coordinator, analysts, critic) is being built. Live retrieval currently covers Microsoft, Apple, Amazon, Alphabet and NVIDIA. The bundled saved reports use **invented figures** for demonstration.
 
-| Read | For |
-|---|---|
-| [PROJECT_GUIDE.md](PROJECT_GUIDE.md) | What we're building, where we are and what to do next. **Start here.** |
-| [AGENTS.md](AGENTS.md) | Rules for people and AI coding tools working on the repo |
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Rules, finance cautions, evaluation, data providers and libraries |
-| `docs/archive/` | Old plans and records (history only) |
+| Read                                   | For                                                                    |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| [PROJECT_GUIDE.md](PROJECT_GUIDE.md)   | What we're building, where we are and what to do next. **Start here.** |
+| [AGENTS.md](AGENTS.md)                 | Rules for people and AI coding tools working on the repo               |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Rules, finance cautions, evaluation, data providers and libraries      |
+| `docs/archive/`                        | Old plans and records (history only)                                   |
 
 ## Run
 
@@ -49,25 +49,25 @@ if (-not (Test-Path -LiteralPath .env)) { Copy-Item .env.example .env }
 notepad .env
 ```
 
-| Variable | Purpose |
-|---|---|
-| `SEC_USER_AGENT` | App name and your real contact email, required by SEC for financial data |
-| `RESEARCH_MODEL_PROVIDER` | `openrouter`, `openai` (default) or `compatible` |
-| `RESEARCH_MODEL` | Model ID (currently must support the Responses API with structured outputs) |
-| `OPENROUTER_API_KEY` / `OPENAI_API_KEY` | Key for the chosen provider |
-| `OPENAI_BASE_URL` | Endpoint for a `compatible` provider (for example a local Ollama) |
-| `RESEARCH_DATA_DIR` | Optional: a different folder for the database and saved sources |
+| Variable                                | Purpose                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `SEC_USER_AGENT`                        | App name and your real contact email, required by SEC for financial data    |
+| `RESEARCH_MODEL_PROVIDER`               | `openrouter`, `openai` (default) or `compatible`                            |
+| `RESEARCH_MODEL`                        | Model ID (currently must support the Responses API with structured outputs) |
+| `OPENROUTER_API_KEY` / `OPENAI_API_KEY` | Key for the chosen provider                                                 |
+| `OPENAI_BASE_URL`                       | Endpoint for a `compatible` provider (for example a local Ollama)           |
+| `RESEARCH_DATA_DIR`                     | Optional: a different folder for the database and saved sources             |
 
 The **Connections** page shows what is configured and has a test button for each connection.
 
 ## Develop
 
-| Task | Command |
-|---|---|
-| Backend tests | `.\.venv\Scripts\python.exe -m pytest -q` |
-| Lint | `.\.venv\Scripts\python.exe -m ruff check .` |
-| Frontend typecheck + build | `npm.cmd --prefix frontend run build` |
-| Browser tests (stop the server first; they use port 8000) | `npm.cmd --prefix frontend test` |
-| Frontend dev server (with the Python server running) | `npm.cmd --prefix frontend run dev`, then open port 5173 |
+| Task                                                      | Command                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------- |
+| Backend tests                                             | `.\.venv\Scripts\python.exe -m pytest -q`                |
+| Lint                                                      | `.\.venv\Scripts\python.exe -m ruff check .`             |
+| Frontend typecheck + build                                | `npm.cmd --prefix frontend run build`                    |
+| Browser tests (stop the server first; they use port 8000) | `npm.cmd --prefix frontend test`                         |
+| Frontend dev server (with the Python server running)      | `npm.cmd --prefix frontend run dev`, then open port 5173 |
 
 Tests never use your `.env` and never call real services. To back up, copy the whole `data/` folder while the server is stopped.
