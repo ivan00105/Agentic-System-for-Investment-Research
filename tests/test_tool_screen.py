@@ -99,7 +99,7 @@ def test_margin_outliers_are_aligned_or_flagged(tmp_path):
     rows = {r["cik"]: r for r in context.records[result.ids[0]]["rows"]}
     assert rows["0001829311"]["eligibility"] == "unknown"
     assert rows["0001829311"]["checks"] == ["unknown: operating_margin 7,288% is above 100%: income beyond revenue "
-                                            "(gains, other income) or revenue under a tag the screen doesn't read"]
+                                            "(gains, other income) or revenue under a tag that isn't read"]
     assert rows["0001829311"]["values"]["operating_margin"] == str(round(Decimal(444211000) / 6095000, 6))  # kept
     assert rows["0001549084"]["checks"] == ["unknown: operating_margin inputs are for different fiscal years "
                                             "(ending 2025-12-31, 2026-05-31)"]
@@ -112,7 +112,7 @@ def test_a_flagged_rank_value_is_counted_not_ranked(tmp_path):
     assert any(w.startswith("1 eligible companies were not ranked because their operating_margin") for w in result.warnings)
     rows = {r["cik"]: r for r in context.records[result.ids[0]]["rows"]}
     assert rows["0001829311"]["flags"] == ["operating_margin 7,288% is above 100%: income beyond revenue (gains, "
-                                           "other income) or revenue under a tag the screen doesn't read"]
+                                           "other income) or revenue under a tag that isn't read"]
 
 
 def test_a_historical_run_refuses_to_screen(tmp_path):

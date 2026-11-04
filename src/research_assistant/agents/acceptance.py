@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from ..tools import registry
 from ..tools.result import ToolContext, ToolResult
-from ..tools.screen import OPERATORS
+from ..tools.screen import OPERATORS, implausible
 from .checker import format_value
 from .trace import Trace
 
@@ -89,7 +89,10 @@ class Acceptance:
             return Line("unknown", f"{rule}: unknown ({exc})")
         if record.get("value") is None:
             return Line("unknown", f"{rule}: unknown ({record.get('reason') or 'no value'})", [record["id"]])
-        passed = OPERATORS[criterion.op](Decimal(str(record["value"])), Decimal(str(criterion.value)))
+        value = Decimal(str(record["value"]))
+        if doubt := implausible(criterion.metric, value):  # as in the screen: unknown, but the record stays cited
+            return Line("unknown", f"{rule}: unknown ({doubt})", [record["id"]])
+        passed = OPERATORS[criterion.op](value, Decimal(str(criterion.value)))
         if record.get("formula") == "growth":  # its start is the earlier year's, so a span would read as two years
             period = f"fiscal year ending {record['end']} against the one before"
         elif record.get("start"):

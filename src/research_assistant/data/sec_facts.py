@@ -123,11 +123,15 @@ def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[dat
         periods.setdefault((fact.start, fact.end), []).append((priority, tag, fact))
     chosen, warnings = [], []
     for (_, end), candidates in sorted(periods.items(), key=lambda item: item[0][1], reverse=True):
-        # The latest filing before the cutoff is the best knowledge of that period; within it, the best tag.
+        # The latest filing before the cutoff is the best knowledge of that period; within it, the best tag,
+        # except that a larger total replaces contract revenue. Restatements compare values under that tag only.
         latest = max(f.filed for _, _, f in candidates)
         accession = max(f.accession for _, _, f in candidates if f.filed == latest)
-        best = min(p for p, _, f in candidates if f.accession == accession)
-        same = [f for p, _, f in candidates if f.accession == accession and p == best]
+        in_filing = [(p, f) for p, _, f in candidates if f.accession == accession]
+        tag = concept.tags[min(p for p, _ in in_filing)]
+        if tag in CONTRACT_REVENUE_TAGS:
+            tag = _total_tag([f for _, f in in_filing], tag)
+        same = [f for _, f in in_filing if f.tag == tag]
         if len({f.value for f in same}) > 1:
             warnings.append(f"{concept.metric} for the period ending {end} has conflicting values in filing "
                             f"{accession}; withheld until checked by hand.")
@@ -138,6 +142,13 @@ def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[dat
             fact = replace(fact, original_value=earlier[0].value, original_accession=earlier[0].accession)
         chosen.append(fact)
     return chosen, warnings
+
+
+def _total_tag(facts: list[Fact], tag: str) -> str:
+    """As in `_broadest`: the largest non-contract total above contract revenue, in one filing and period, wins."""
+    floor = max(f.value for f in facts if f.tag == tag)
+    totals = [f for f in facts if f.tag not in CONTRACT_REVENUE_TAGS and f.value > floor]
+    return max(totals, key=lambda f: f.value).tag if totals else tag
 
 
 def frame(sec, concept: Concept, year: int) -> dict[str, dict]:

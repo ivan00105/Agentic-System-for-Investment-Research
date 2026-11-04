@@ -77,7 +77,7 @@ SCREEN_DEFAULT_TOP_K = 5
 # filers file their 10-K within 60-90 days, so earlier frames are mostly empty.
 SCREEN_FRAME_LAG_DAYS = 100
 # A margin above 100% can't come from sales alone (gains, other income, or a partial revenue tag), so the
-# screen flags it unknown instead of ranking it.
+# screen and Discover's acceptance test flag it unknown instead of ranking or passing it.
 SCREEN_MAX_MARGIN = 1.0
 # 52/53-week fiscal years end a few days off the month end, so inputs ending within a week are the same year.
 SCREEN_PERIOD_SLACK_DAYS = 7

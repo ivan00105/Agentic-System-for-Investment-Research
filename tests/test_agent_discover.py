@@ -6,7 +6,7 @@ import openai
 import pandas as pd
 import pytest
 from fake_llm import FakeClient, reply, resubmit
-from sec_files import make_context
+from sec_files import SecFiles, make_context
 
 from research_assistant.agents import discover, single_agent
 from research_assistant.agents.acceptance import Acceptance
@@ -183,6 +183,24 @@ def test_price_checks_use_the_latest_close_and_10k(tmp_path, monkeypatch):
     assert pe.state == "fail" and pe.text.startswith("pe < 20.0x: ") and verdict.state == "fail"
     record = context.records[pe.ids[0]]
     assert record["formula"] == "pe" and context.records[record["inputs"]["market_cap"]]["formula"] == "market_cap"
+
+
+def test_a_margin_above_100_percent_is_unknown_but_still_cited(tmp_path):
+    # BitMine's CY2025 values: operating income, mostly crypto gains, was 73 times its revenue.
+    filing = {"accn": "0001829311-25-000050", "form": "10-K", "filed": "2025-11-21", "start": "2024-09-01",
+              "end": "2025-08-31"}
+    facts = {"cik": 1829311, "entityName": "BitMine", "facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [filing | {"val": 6095000}]}},
+        "OperatingIncomeLoss": {"units": {"USD": [filing | {"val": 444211000}]}}}}}
+    files = SecFiles({"/api/xbrl/companyfacts/CIK0001829311.json": httpx.Response(200, json=facts)})
+    context = make_context(tmp_path, files=files)
+    verdict = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001829311", ["BMNR"], [Filter(metric="operating_margin", op=">", value=0.25)])
+    (line,) = verdict.lines
+    assert (verdict.state, line.state) == ("unknown", "unknown")
+    assert line.text == ("operating margin > 25.0%: unknown (7,288% is above 100%: income beyond revenue (gains, "
+                         "other income) or revenue under a tag that isn't read)")
+    assert context.records[line.ids[0]]["formula"] == "ratio"
 
 
 def test_the_bundled_universe_is_declared_with_its_source():

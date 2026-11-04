@@ -64,9 +64,14 @@ def _doubt(metric: str, value: Decimal, entries: dict) -> str | None:
     ends = sorted({e["end"] for need in NEEDS[metric] if need[1] == 0 and (e := entries[need]) and e.get("end")})
     if ends and (date.fromisoformat(ends[-1]) - date.fromisoformat(ends[0])).days > config.SCREEN_PERIOD_SLACK_DAYS:
         return f"inputs are for different fiscal years (ending {', '.join(ends)})"
+    return implausible(metric, value)
+
+
+def implausible(metric: str, value: Decimal) -> str | None:
+    """Why a margin can't be taken at face value, or None. Discover's acceptance test uses it too."""
     if metric.endswith("_margin") and value > config.SCREEN_MAX_MARGIN:
         return (f"{value:,.0%} is above {config.SCREEN_MAX_MARGIN:.0%}: income beyond revenue (gains, other income) "
-                "or revenue under a tag the screen doesn't read")
+                "or revenue under a tag that isn't read")
     return None
 
 

@@ -70,6 +70,52 @@ def test_conflicting_values_in_one_filing_are_withheld_not_fatal(tmp_path):
     assert any("conflicting values" in w for w in result.warnings)
 
 
+def trimmed(cik: int, **tags):
+    """A trimmed companyfacts payload; each row is (value, start, end, accession, filed) from a 10-K."""
+    rows = {name: {"units": {"USD": [{"start": s, "end": e, "val": v, "accn": a, "form": "10-K", "filed": f}
+                                     for v, s, e, a, f in found]}} for name, found in tags.items()}
+    files = SecFiles({f"/api/xbrl/companyfacts/CIK{cik:010d}.json": httpx.Response(
+        200, json={"cik": cik, "entityName": "Test filer", "facts": {"us-gaap": rows}})})
+    return {"cik": str(cik), "files": files}
+
+
+UDR_2025, UDR_2026 = ("0000074208-25-000009", "2025-02-12"), ("0000074208-26-000013", "2026-02-11")
+
+
+def test_a_larger_total_replaces_contract_revenue_and_keeps_its_tag(tmp_path):
+    # UDR, a REIT: ASC 606 contract revenue leaves out lease income. FY2025 values are real, FY2024 synthetic.
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (10964000, "2024-01-01", "2024-12-31", *UDR_2026),
+        (11361000, "2025-01-01", "2025-12-31", *UDR_2026)], Revenues=[
+        (1670000000, "2024-01-01", "2024-12-31", *UDR_2026), (1712317000, "2025-01-01", "2025-12-31", *UDR_2026)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    latest, prior = result.data["metrics"]["revenue"]["values"]
+    assert (latest["value"], latest["tag"], latest["accession"]) == ("1712317000", "us-gaap:Revenues", UDR_2026[0])
+    # The earlier 10-K tagged only contract revenue: another tag, not a restatement.
+    assert (prior["value"], prior["tag"], prior.get("original_value")) == ("1670000000", "us-gaap:Revenues", None)
+    assert not any("restated" in w for w in result.warnings)
+
+
+def test_sales_including_excise_tax_never_replace_net_sales(tmp_path):
+    # Brown-Forman: the tax-inclusive figure is contract revenue too, so the tax-exclusive one stays.
+    filing = ("0000014693-26-000021", "2026-06-12")
+    filer = trimmed(14693, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (3928000000, "2025-05-01", "2026-04-30", *filing)], RevenueFromContractWithCustomerIncludingAssessedTax=[
+        (5082000000, "2025-05-01", "2026-04-30", *filing)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert [(v["value"], v["tag"]) for v in result.data["metrics"]["revenue"]["values"]] == [
+        ("3928000000", "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax")]
+
+
+def test_a_conflicting_total_is_withheld_not_swapped_for_contract_revenue(tmp_path):
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (11361000, "2025-01-01", "2025-12-31", *UDR_2026)], Revenues=[
+        (1712317000, "2025-01-01", "2025-12-31", *UDR_2026), (1500000000, "2025-01-01", "2025-12-31", *UDR_2026)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert values(result, "revenue") == [("2024-12-31", "10964000")]
+    assert any("2025-12-31 has conflicting values" in w for w in result.warnings)
+
+
 def test_bank_operating_income_is_unsupported_but_revenue_works(tmp_path):
     result, _ = financials(tmp_path, cik="19617", metrics=["revenue", "operating_income"])
     assert result.status == "partial"
