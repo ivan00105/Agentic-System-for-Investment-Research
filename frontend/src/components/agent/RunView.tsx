@@ -1,14 +1,14 @@
 // One agent run: its question and state, Discover's questions while it waits, the live timeline, then the report.
 import { useEffect, useState } from 'react'
 import { agentApi, agentRunning, stamp } from '../../api'
-import type { AgentProgress, AgentReport as Report } from '../../api'
+import type { AgentProgress, AgentReport as Report, CompanyMatch } from '../../api'
 import { AgentReport } from './AgentReport'
 import { DiscoverQuestions, DiscoverReport } from './Discover'
 import { useLevel } from '../../level'
 import { STATUS } from './labels'
 import { RunTimeline } from './RunTimeline'
 
-export function RunView({id, onOpenRun, onNew}: {id: string; onOpenRun: (id: string) => void; onNew: () => void}) {
+export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRun: (id: string) => void; onNew: () => void; onCompare: (companies: CompanyMatch[]) => void}) {
   const [run, setRun] = useState<AgentProgress | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
@@ -54,6 +54,6 @@ export function RunView({id, onOpenRun, onNew}: {id: string; onOpenRun: (id: str
       </div>
     </section>
     {report?.discover && report.error && <div className="notice error" role="alert">The run failed: {report.error}</div>}
-    {report && (report.discover ? <DiscoverReport result={report.discover} onOpenRun={onOpenRun} /> : <AgentReport runId={id} report={report} />)}
+    {report && (report.discover ? <DiscoverReport result={report.discover} onOpenRun={onOpenRun} onCompare={onCompare} /> : <AgentReport runId={id} report={report} />)}
   </>
 }

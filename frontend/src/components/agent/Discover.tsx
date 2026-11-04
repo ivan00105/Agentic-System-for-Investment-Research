@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { agentApi } from '../../api'
-import type { DiscoverQuestionSet, DiscoverResult, DiscoverTerm } from '../../api'
+import type { CompanyMatch, DiscoverQuestionSet, DiscoverResult, DiscoverTerm } from '../../api'
 import { useLevel } from '../../level'
 import { Badge } from '../Badge'
 import { tone } from './labels'
@@ -65,9 +65,12 @@ export function DiscoverQuestions({runId, questions, onAnswered}: {runId: string
   </section>
 }
 
-export function DiscoverReport({result, onOpenRun}: {result: DiscoverResult; onOpenRun: (id: string) => void}) {
+const COMPARE_MAX = 4 // what a comparison takes (the question box's limit)
+
+export function DiscoverReport({result, onOpenRun, onCompare}: {result: DiscoverResult; onOpenRun: (id: string) => void; onCompare: (companies: CompanyMatch[]) => void}) {
   const picks = result.candidates.filter(c => c.outcome === 'picked')
   const others = result.candidates.filter(c => c.outcome !== 'picked')
+  const comparable = picks.filter(c => c.tickers?.length).map(c => ({cik: c.cik, name: c.name ?? c.cik, tickers: c.tickers!, exchanges: []}))
   return <div className="report-body">
     {result.spec && <section className="report-section"><div className="section-label">THE SCREEN</div><ul className="spec-lines">{result.spec.map((line, i) => <li key={i}>{line}</li>)}</ul></section>}
     {Object.keys(result.counts).length > 0 && <section className="report-section"><div className="screen-stats">{COUNTS.map(([key, label]) => <span key={key}><strong>{result.counts[key] ?? 0}</strong>{label}</span>)}</div></section>}
@@ -79,6 +82,10 @@ export function DiscoverReport({result, onOpenRun}: {result: DiscoverResult; onO
         <Checks lines={c.lines} />
         {c.run_id && <button className="secondary" onClick={() => onOpenRun(c.run_id!)}>Open its full report →</button>}
       </li>)}</ol>}
+      {comparable.length >= 2 && <div className="compare-picks">
+        <button className="primary" onClick={() => onCompare(comparable.slice(0, COMPARE_MAX))}>{comparable.length > COMPARE_MAX ? `Compare the first ${COMPARE_MAX} →` : 'Compare these →'}</button>
+        <p className="muted">Opens a side-by-side comparison of {comparable.length > COMPARE_MAX ? `the top ${COMPARE_MAX} of these ${comparable.length} picks (a comparison takes up to ${COMPARE_MAX})` : 'these picks'} in the question box, so you can check it before it runs.{comparable.length < picks.length && ` ${picks.length - comparable.length} pick${picks.length - comparable.length === 1 ? ' has' : 's have'} no ticker and can't be added.`}</p>
+      </div>}
     </section>
     {others.length > 0 && <section className="report-section"><h2>Checked but not picked</h2><ul className="shortlist">{others.map(c => <li key={c.cik}>
       <div className="section-heading"><h3>{c.name ?? c.cik}</h3><Badge tone="amber">{c.outcome}</Badge></div>

@@ -262,3 +262,12 @@ def test_each_vague_term_offers_options_and_its_definition_is_the_recommended_on
     assert [o.definition for o in missing.options] == ["P/E below 15", "P/E below 25", "P/S below 3"]
     assert missing.options[0].recommended and not any(o.recommended for o in missing.options[1:])
     assert Term(**cheap).options == []  # no options: the page and terminal ask for free text, as before
+
+
+def test_the_saved_shortlist_gives_each_candidate_its_tickers_for_compare_these(tmp_path, declared):
+    from research_assistant.agents import saved
+    result, _, _ = find(tmp_path, declared, spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}],
+                                                top_k=1), *research("AAPL", "0000320193"))
+    candidates = saved.report(result.trace_path)["discover"]["candidates"]
+    apple = next(c for c in candidates if c["cik"] == "0000320193")
+    assert apple["outcome"] == "picked" and apple["tickers"] == ["AAPL"]

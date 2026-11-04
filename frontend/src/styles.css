@@ -476,3 +476,7 @@ h2{font-size:19px}
 @media(max-width:640px){.starter-cards{grid-template-columns:1fr}}
 .term .radio{margin:6px 0}
 .term input:not([type=radio]){width:100%}
+/* Modes: the comparison note and Compare these */
+.mode-note{width:100%;font-size:12px;background:var(--green-soft);border-left:3px solid var(--green);padding:9px 12px;margin:0;color:var(--ink)}
+.compare-picks{border-top:1px solid var(--line);padding-top:16px;margin-top:4px}
+.compare-picks .muted{margin:8px 0 0}

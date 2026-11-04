@@ -97,8 +97,11 @@ def _discover(run, folder: Path) -> dict:
     lines and, for a researched one, its own run and that report's answer."""
     spec = next((e for e in reversed(run.events) if e["kind"] == "screen_spec"), None)
     checks = {e["rank"]: e for e in run.events if e["kind"] == "candidate"}
+    screens = [r for r in run.records.values() if r.get("kind") == "screen"]  # its rows hold each company's tickers
+    tickers = {row["cik"]: row.get("tickers") or [] for r in screens for row in r.get("rows", [])}
     candidates = [{key: c.get(key) for key in ("rank", "cik", "name", "outcome", "verdict", "run_id")}
-                  | {"lines": (checks.get(c["rank"]) or {}).get("lines", []), "answer": _answer(folder, c.get("run_id"))}
+                  | {"tickers": tickers.get(c["cik"], []), "lines": (checks.get(c["rank"]) or {}).get("lines", []),
+                     "answer": _answer(folder, c.get("run_id"))}
                   for c in run.end["candidates"]]
     return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates}
 

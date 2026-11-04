@@ -25,9 +25,9 @@ const EXAMPLES: {kind: Kind | null; text: string}[] = [
   {kind: 'find', text: 'Find large, profitable tech companies at a reasonable valuation.'},
 ]
 
-export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
-  const [kind, setKind] = useState<Kind | null>(null)
-  const [companies, setCompanies] = useState<CompanyMatch[]>([])
+export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => void; initial?: CompanyMatch[] | null}) {
+  const [kind, setKind] = useState<Kind | null>(initial?.length ? 'compare' : null)
+  const [companies, setCompanies] = useState<CompanyMatch[]>(initial ?? [])
   const [topics, setTopics] = useState<Topic[]>([])
   const [universes, setUniverses] = useState<UniverseInfo[]>([])
   const [among, setAmong] = useState('mine') // a bundled universe's id, or the user's own list
@@ -35,7 +35,7 @@ export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
   const [question, setQuestion] = useState('')
   const [edited, setEdited] = useState(false)
   const {level} = useLevel()
-  const [guided, setGuided] = useState(level === 'beginner')
+  const [guided, setGuided] = useState(level === 'beginner' && !initial?.length)
   const [note, setNote] = useState('') // the preferences note "Help me start" wrote; the user can edit it
   const [options, setOptions] = useState<Options>({condition: '', model: '', editSpec: level === 'professional', cutoff: ''})
   useEffect(() => setOptions(o => ({...o, editSpec: level === 'professional'})), [level])
@@ -86,6 +86,7 @@ export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
     <form onSubmit={submit}>
       <CompanyPicker picked={companies} onChange={pickCompanies} label={find ? 'Your own list of companies' : 'Companies'} max={find ? undefined : COMPARE_MAX}
         hint={find ? 'Pick any number, then choose "My own list" below.' : companies.length >= COMPARE_MAX ? 'A comparison takes up to four companies. To screen more, use Find companies with your own list.' : 'One company checks it; two to four compare them. Any SEC filer works.'} />
+      {!find && companies.length > 1 && <p className="mode-note" role="status">You picked {companies.length} companies, so this is now a side-by-side comparison. Remove all but one to check a single company{companies.length >= COMPARE_MAX ? ', or use Find companies to screen a longer list' : ''}.</p>}
       {find && <fieldset className="find-options"><legend>Where to look</legend>
         {universes.map(u => <label className="radio" key={u.id}><input type="radio" name="among" checked={among === u.id} onChange={() => setAmong(u.id)} /><span>{u.name}<small>{u.companies} companies, as of {u.as_of}. {u.note}</small></span></label>)}
         <label className="radio"><input type="radio" name="among" checked={among === 'mine'} onChange={() => setAmong('mine')} /><span>My own list<small>The {companies.length} compan{companies.length === 1 ? 'y' : 'ies'} picked above.</small></span></label>
