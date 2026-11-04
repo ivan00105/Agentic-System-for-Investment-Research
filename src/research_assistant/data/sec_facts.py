@@ -50,6 +50,9 @@ CONCEPTS = {c.metric: c for c in (
                                    "us-gaap:CommonStockSharesOutstanding"), "shares", "cover"),
 )}
 FISCAL_YEAR_METRICS = ("revenue", "net_income", "operating_cash_flow")
+# ASC 606 contract revenue leaves out lease income (REITs) and interest (banks), so it can be a slice of the total.
+CONTRACT_REVENUE_TAGS = ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+                         "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax")
 
 
 @dataclass(frozen=True)
@@ -142,12 +145,13 @@ def frame(sec, concept: Concept, year: int) -> dict[str, dict]:
 
     Frames hold each company's latest-filed value (restated, not point-in-time) for the fiscal period
     closest to the calendar year, so callers must say so and verify shortlisted names with companyfacts.
+    A company keeps its best tag's value, except that a larger total for the same period replaces contract revenue.
     """
     from .errors import DataError
     from .sec import cik10
 
-    values: dict[str, dict] = {}
-    for tag in concept.tags:  # best tag first; a company keeps its first hit
+    hits: dict[str, list[dict]] = {}
+    for tag in concept.tags:  # best tag first
         taxonomy, name = tag.split(":")
         period = f"CY{year}" if concept.kind == "duration" else f"CY{year}Q4I"
         try:
@@ -157,8 +161,16 @@ def frame(sec, concept: Concept, year: int) -> dict[str, dict]:
                 continue  # no filer used this tag for that year
             raise
         for row in rows:
-            cik = cik10(row["cik"])
-            if cik not in values:
-                values[cik] = {"value": Decimal(str(row["val"])), "tag": tag, "accession": row.get("accn"),
-                               "end": row.get("end"), "name": row.get("entityName")}
-    return values
+            hits.setdefault(cik10(row["cik"]), []).append({
+                "value": Decimal(str(row["val"])), "tag": tag, "accession": row.get("accn"), "end": row.get("end"),
+                "name": row.get("entityName")})
+    return {cik: _broadest(found) for cik, found in hits.items()}
+
+
+def _broadest(found: list[dict]) -> dict:
+    best = found[0]
+    if best["tag"] not in CONTRACT_REVENUE_TAGS:
+        return best
+    totals = [f for f in found if f["tag"] not in CONTRACT_REVENUE_TAGS and f["end"] == best["end"]
+              and f["value"] > best["value"]]
+    return max(totals, key=lambda f: f["value"], default=best)

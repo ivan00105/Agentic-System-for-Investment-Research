@@ -3,7 +3,7 @@
 Unknown never passes. Ties break on CIK, a stable ID, never alphabetically.
 """
 import operator
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -59,6 +59,17 @@ def _value(metric: str, base: dict) -> Decimal | None:
     return fundamentals.ratio(numerator, get(("revenue", 0))).value
 
 
+def _doubt(metric: str, value: Decimal, entries: dict) -> str | None:
+    """Why a value can't be compared with other companies' values, or None."""
+    ends = sorted({e["end"] for need in NEEDS[metric] if need[1] == 0 and (e := entries[need]) and e.get("end")})
+    if ends and (date.fromisoformat(ends[-1]) - date.fromisoformat(ends[0])).days > config.SCREEN_PERIOD_SLACK_DAYS:
+        return f"inputs are for different fiscal years (ending {', '.join(ends)})"
+    if metric.endswith("_margin") and value > config.SCREEN_MAX_MARGIN:
+        return (f"{value:,.0%} is above {config.SCREEN_MAX_MARGIN:.0%}: income beyond revenue (gains, other income) "
+                "or revenue under a tag the screen doesn't read")
+    return None
+
+
 def run(args: ScreenInput, context: ToolContext) -> ToolResult:
     if context.historical:
         return ToolResult(status="invalid", source="SEC frames", warnings=[
@@ -90,16 +101,23 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
         ciks = sorted({cik for values in frames.values() for cik in values})
     rows = []
     for cik in ciks:
-        base = {need: frames[need].get(cik, {}).get("value") for need in wanted}
-        values = {metric: _value(metric, base) for metric in metrics}
+        entries = {need: frames[need].get(cik) for need in wanted}
+        values = {metric: _value(metric, {n: e and e["value"] for n, e in entries.items()}) for metric in metrics}
+        # A doubtful value stays visible but counts as unknown: never passes, never ranked.
+        doubts = {m: why for m, v in values.items() if v is not None and (why := _doubt(m, v, entries))}
         checks = []
         for f in args.filters:
             value = values[f.metric]
-            checks.append(("unknown", f"{f.metric} unavailable") if value is None else
-                          ("pass" if OPERATORS[f.op](value, Decimal(str(f.value))) else "fail", f"{f.metric} {f.op} {f.value}"))
+            if value is None:
+                checks.append(("unknown", f"{f.metric} unavailable"))
+            elif f.metric in doubts:
+                checks.append(("unknown", f"{f.metric} {doubts[f.metric]}"))
+            else:
+                passed = OPERATORS[f.op](value, Decimal(str(f.value)))
+                checks.append(("pass" if passed else "fail", f"{f.metric} {f.op} {f.value}"))
         name = next((frames[n][cik]["name"] for n in frames if cik in frames[n]), None) or getattr(listed.get(cik), "name", None)
         rows.append({"cik": cik, "name": name, "tickers": list(getattr(listed.get(cik), "tickers", ())),
-                     "values": values, "checks": checks})
+                     "values": values, "doubts": doubts, "checks": checks})
     for row in rows:
         if args.sic_prefixes and all(c[0] == "pass" for c in row["checks"]):
             try:
@@ -112,22 +130,28 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
         states = {c[0] for c in row["checks"]}
         row["eligibility"] = "fail" if "fail" in states else "unknown" if "unknown" in states else "pass"
     eligible = [r for r in rows if r["eligibility"] == "pass"]
-    ranked = [r for r in eligible if r["values"][args.rank_by] is not None]
+    missing = sum(r["values"][args.rank_by] is None for r in eligible)
+    doubted = sum(args.rank_by in r["doubts"] for r in eligible)
+    ranked = [r for r in eligible if r["values"][args.rank_by] is not None and args.rank_by not in r["doubts"]]
     ranked.sort(key=lambda r: r["cik"])
     ranked.sort(key=lambda r: r["values"][args.rank_by], reverse=args.descending)  # stable: ties stay in CIK order
     top_k = args.top_k or config.SCREEN_DEFAULT_TOP_K
     counts = {"screened": len(rows), "eligible": len(eligible), "failed": sum(r["eligibility"] == "fail" for r in rows),
               "unknown": sum(r["eligibility"] == "unknown" for r in rows), "unranked": len(eligible) - len(ranked),
               "returned": min(top_k, len(ranked))}
-    if counts["unranked"]:
-        warnings.append(f"{counts['unranked']} eligible companies have no {args.rank_by} and could not be ranked.")
+    if missing:
+        warnings.append(f"{missing} eligible companies have no {args.rank_by} and could not be ranked.")
+    if doubted:
+        warnings.append(f"{doubted} eligible companies were not ranked because their {args.rank_by} can't be compared "
+                        "with the others; each one's flag in the screen record says why.")
     if not args.universe:
         warnings.append(f"The universe is every company in SEC's {year} frames, today's filers only (survivorship bias).")
 
     def shown(row, rank=None):
         return {"rank": rank, "cik": row["cik"], "name": row["name"], "tickers": row["tickers"], "sic": row.get("sic"),
                 "values": {m: (None if v is None else str(round(v, 6))) for m, v in row["values"].items()},
-                "eligibility": row["eligibility"], "checks": [f"{state}: {why}" for state, why in row["checks"]]}
+                "eligibility": row["eligibility"], "checks": [f"{state}: {why}" for state, why in row["checks"]],
+                "flags": [f"{m} {why}" for m, why in row["doubts"].items()]}
     spec = args.model_dump(mode="json") | {"year": year, "top_k": top_k}
     record = {"id": make_id("screen", spec, year), "kind": "screen", "spec": spec, "counts": counts,
               "rows": [shown(r) for r in rows]}
