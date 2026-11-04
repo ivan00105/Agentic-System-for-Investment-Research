@@ -128,14 +128,27 @@ def find(question: str, name: str, condition: str, defined: dict[str, str], repl
 
 
 def ask_user(term) -> str | None:
-    """A vague term's question on the terminal: an answer sets it, Enter accepts the proposal. None when no one can
-    be asked (no terminal, or its input is empty), so the proposal stands labelled "assumed"."""
+    """A vague term's question on the terminal: an option's number or a definition sets it, Enter accepts the
+    proposal. None when no one can be asked (no terminal, or its input is empty), so the proposal stands labelled
+    "assumed"."""
     if not sys.stdin.isatty():  # on Windows the NUL device counts as a terminal; input() then hits EOF below
         return None
-    print(f"\n{term.question}\n  Proposed: {term.definition}\n  Your definition (Enter accepts): ", end="",
-          file=sys.stderr, flush=True)
+    options = getattr(term, "options", None) or []
+    choices = "".join(f"\n  {n}. {o.definition}" + (" (recommended)" if o.recommended else "")
+                      for n, o in enumerate(options, 1))
+    print(f"\n{term.question}" + (f"{choices}\n  Type a number or your own definition (Enter accepts the "
+                                   "recommended one): " if options else
+                                   f"\n  Proposed: {term.definition}\n  Your definition (Enter accepts): "),
+          end="", file=sys.stderr, flush=True)
     try:
-        return input()
+        while True:
+            answer = input()
+            if not (options and answer.strip().isdigit()):
+                return answer
+            if 1 <= int(answer) <= len(options):
+                chosen = options[int(answer) - 1]
+                return "" if chosen.recommended else chosen.definition
+            print(f"  Pick 1 to {len(options)}, or type a definition: ", end="", file=sys.stderr, flush=True)
     except EOFError:
         print("(no answer)", file=sys.stderr)
         return None

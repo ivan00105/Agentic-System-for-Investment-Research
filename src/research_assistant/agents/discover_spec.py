@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .. import config
 from ..data.universe import Universe
@@ -30,10 +30,34 @@ class PriceCheck(BaseModel):
                                      "market cap in US dollars.")
 
 
+class Option(BaseModel):
+    definition: str = Field(min_length=1, description="A concrete reading the screen can apply: a filter, price "
+                                                      "check or ranking, with its threshold.")
+    recommended: bool = False
+
+
 class Term(BaseModel):
     term: str = Field(min_length=1, description="The vague words as the user wrote them.")
     definition: str = Field(min_length=1, description="The filter, price check or ranking it became, with its threshold.")
     question: str = Field(min_length=1, description="One short question that lets the user set it.")
+    options: list[Option] = Field(default_factory=list, description="2-3 concrete readings the user can pick from; "
+                                  "the one marked recommended is `definition`.")
+
+    @model_validator(mode="after")
+    def _recommend_the_definition(self):
+        """The spec applies `definition`, so that option is the recommended one (flag, don't reject). Live check 5 Nov
+        2026: the model often marks a shorter rewording of it, so that option takes the definition's words; with
+        none marked, the definition is added first."""
+        if self.options:
+            key = self.definition.strip()
+            if not any(o.definition.strip() == key for o in self.options):
+                marked = next((i for i, o in enumerate(self.options) if o.recommended), None)
+                if marked is None:
+                    self.options.insert(0, Option(definition=self.definition))
+                else:
+                    self.options[marked] = Option(definition=self.definition)
+            self.options = [o.model_copy(update={"recommended": o.definition.strip() == key}) for o in self.options]
+        return self
 
 
 class ScreenSpec(BaseModel):

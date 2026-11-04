@@ -21,7 +21,7 @@ def test_discover_waits_for_the_users_answers_with_the_draft_spec_in_view(web):
         "rank_by": "operating_margin", "terms": [{**LARGE, "definition": "revenue of at least $100 billion"}]})]))
     run_id = start(web, "Find large companies.", discover={"tickers": ["aapl", "MSFT"]})
     run = waiting(web, run_id)
-    assert run["questions"]["terms"] == [LARGE]
+    assert run["questions"]["terms"] == [{**LARGE, "options": []}]
     assert run["questions"]["shown"][0].startswith("Universe: your list, 2 companies")
     assert any("proposed: waiting for the user's answer" in line for line in run["questions"]["shown"])
     assert web.get("/api/agent-runs").json()["items"][0]["status"] == "waiting"
@@ -119,3 +119,20 @@ def test_the_screener_reads_the_preferences_note(web):
     assert "time horizon" in web.model.requests[0]["messages"][0]["content"]  # the screener's prompt says how
     web.post(f"/api/agent-runs/{run_id}/cancel", json={})
     wait(web, run_id)
+
+
+def test_the_page_gets_each_terms_options_and_a_picked_one_sets_the_term(web):
+    options = [{"definition": "revenue of at least $10 billion", "recommended": True},
+               {"definition": "revenue of at least $50 billion"}]
+    web.model = FakeClient(reply(tool_calls=[("submit_screen_spec", {
+        "rank_by": "operating_margin", "terms": [{**LARGE, "options": options}]})]), reply(tool_calls=[(
+            "submit_screen_spec", {"rank_by": "operating_margin", "terms": [
+                {**LARGE, "definition": "revenue of at least $50 billion", "options": options}]})]))
+    run_id = start(web, "Find large companies.", discover={"tickers": ["AAPL"]})
+    run = waiting(web, run_id)
+    assert run["questions"]["terms"][0]["options"] == [options[0], {**options[1], "recommended": False}]
+    web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {"large": "revenue of at least $50 billion"}})
+    wait(web, run_id)
+    assert "- large: revenue of at least $50 billion" in web.model.requests[1]["messages"][-1]["content"]
+    events = [json.loads(line) for line in (web.traces / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert next(e for e in events if e["kind"] == "screen_spec")["terms"] == {"large": "user"}

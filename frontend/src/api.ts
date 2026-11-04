@@ -77,7 +77,7 @@ export type Condition = 'B' | 'C' | 'D'
 export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
 export interface AgentRunSummary { run_id: string; status: string; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
 export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string }
-export interface DiscoverTerm { term: string; definition: string; question: string }
+export interface DiscoverTerm { term: string; definition: string; question: string; options?: {definition: string; recommended: boolean}[] }
 export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
 export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }

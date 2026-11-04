@@ -27,7 +27,8 @@ Valuation and risk need prices, so the host checks them on each candidate in tur
 List in `terms` every word or phrase whose meaning a reasonable analyst could set differently, such as "large", "cheap", "reasonable valuation", "fast-growing", "profitable", "safe", "best", or "top" without a metric to rank by. For each one:
 - `term`: the words as the user wrote them;
 - `definition`: the filter, price check or ranking you made it, with its threshold;
-- `question`: one short question that lets the user set it, naming your proposal.
+- `question`: one short question that lets the user set it, naming your proposal;
+- `options`: 2-3 concrete readings the user can pick from, each one a filter, price check or ranking this screen can apply, with its threshold. One is your `definition`, word for word, marked `recommended`. For example "cheap": P/E below 15 (recommended), P/E below 25, P/S below 3. The screen has no sector averages or medians, so don't offer "below the sector median". The page also offers "Other" with a text box, so don't add one.
 
 A precise criterion ("operating margin above 25%") is not a vague term. Never drop a vague term and never define one without listing it. If the user already defined a term, use their definition and keep their wording.
 

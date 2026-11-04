@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { agentApi } from '../../api'
-import type { DiscoverQuestionSet, DiscoverResult } from '../../api'
+import type { DiscoverQuestionSet, DiscoverResult, DiscoverTerm } from '../../api'
 import { useLevel } from '../../level'
 import { Badge } from '../Badge'
 import { tone } from './labels'
@@ -13,30 +13,45 @@ export function DiscoverQuestions({runId, questions, onAnswered}: {runId: string
   const {level} = useLevel()
   const drafted = questions.spec ? JSON.stringify(questions.spec, null, 2) : ''
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [picked, setPicked] = useState<Record<string, string>>({}) // an option's index, or "other"
   const [specText, setSpecText] = useState(drafted)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editing = !!drafted && specText.trim() !== drafted.trim()
+  const choice = (t: DiscoverTerm) => picked[t.term] ?? String(Math.max(0, t.options?.findIndex(o => o.recommended) ?? 0))
+  // The recommended option, or an empty Other box, accepts the proposal as before; another option or text sets the term.
+  function answer(t: DiscoverTerm) {
+    const option = t.options?.length && choice(t) !== 'other' ? t.options[Number(choice(t))] : null
+    return option ? (option.recommended ? '' : option.definition) : (answers[t.term] ?? '').trim()
+  }
   async function submit(event: FormEvent) {
     event.preventDefault()
     let spec: unknown
     if (editing) { try { spec = JSON.parse(specText) } catch (e) { setError(`The edited spec isn't valid JSON: ${(e as Error).message}`); return } }
     setBusy(true); setError('')
-    try { await agentApi.answer(runId, editing ? {} : Object.fromEntries(questions.terms.map(t => [t.term, (answers[t.term] ?? '').trim()])), spec); onAnswered() }
+    try { await agentApi.answer(runId, editing ? {} : Object.fromEntries(questions.terms.map(t => [t.term, answer(t)])), spec); onAnswered() }
     catch (e) { setError((e as Error).message) }
     finally { setBusy(false) }
   }
   return <section className="discover-questions" aria-labelledby="questions-title">
     <h3 id="questions-title">Check the screen before anything runs</h3>
-    <p className="muted">{questions.terms.length ? 'The screener turned your request into the screen below. Some words could mean different things, so it proposes a meaning for each. Leave a box empty to accept the proposal, or write your own meaning.' : 'The screener turned your request into the screen below. No word in it needed a choice.'} Nothing is screened or researched until you answer.</p>
+    <p className="muted">{questions.terms.length ? 'The screener turned your request into the screen below. Some words could mean different things, so it offers a few meanings for each, with the one it recommends picked already. Pick another, or choose Other and write your own.' : 'The screener turned your request into the screen below. No word in it needed a choice.'} Nothing is screened or researched until you answer.</p>
     <ul className="spec-lines">{questions.shown.map((line, i) => <li key={i}>{line}</li>)}</ul>
     <form onSubmit={submit}>
       {questions.terms.map((term, i) => <fieldset key={term.term} className="term" disabled={editing}>
         <legend>"{term.term}"</legend>
         <p>{term.question}</p>
-        <p className="muted">Proposed: {term.definition}</p>
-        <label htmlFor={`term-${i}`}>Your meaning (leave empty to accept)</label>
-        <input id={`term-${i}`} value={answers[term.term] ?? ''} onChange={e => setAnswers(a => ({...a, [term.term]: e.target.value}))} placeholder={term.definition} />
+        {term.options?.length ? <>
+          {[...term.options.map((o, j) => [String(j), o.definition, o.recommended] as const), ['other', 'Other', false] as const].map(([value, text, recommended]) => <label key={value} className="radio">
+            <input type="radio" name={`term-${i}`} checked={choice(term) === value} onChange={() => setPicked(p => ({...p, [term.term]: value}))} />
+            <span>{text}{recommended && <strong className="recommended"> (recommended)</strong>}</span></label>)}
+          {choice(term) === 'other' && <><label htmlFor={`term-${i}-other`}>Your meaning (leave empty to keep the recommended one)</label>
+            <input id={`term-${i}-other`} value={answers[term.term] ?? ''} onChange={e => setAnswers(a => ({...a, [term.term]: e.target.value}))} placeholder={term.definition} /></>}
+        </> : <>
+          <p className="muted">Proposed: {term.definition}</p>
+          <label htmlFor={`term-${i}`}>Your meaning (leave empty to accept)</label>
+          <input id={`term-${i}`} value={answers[term.term] ?? ''} onChange={e => setAnswers(a => ({...a, [term.term]: e.target.value}))} placeholder={term.definition} />
+        </>}
       </fieldset>)}
       {drafted && <details className="spec-editor" open={level === 'professional'}><summary>Edit the screen spec directly</summary>
         <p className="muted">The spec as JSON: filters and price checks (metric, op, value), sic_prefixes, rank_by, descending, top_k, terms and not_covered. An edited spec is used exactly as written, with no model call{questions.terms.length ? ', and the boxes above are ignored' : ''}.</p>

@@ -474,3 +474,5 @@ h2{font-size:19px}
 .preferences-shown p{white-space:pre-line;font-size:13px;margin:4px 0}
 @media(max-width:1190px){.starter-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.starter-cards{grid-template-columns:1fr}}
+.term .radio{margin:6px 0}
+.term input:not([type=radio]){width:100%}

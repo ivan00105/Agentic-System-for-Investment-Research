@@ -249,3 +249,16 @@ def test_a_spec_with_no_vague_terms_still_waits_for_review_when_asked(tmp_path, 
                              review=True)
     assert len(shown) == 1 and [e["terms"] for e in events if e["kind"] == "questions"] == [[]]
     assert not [e for e in events if e["kind"] == "spec_edit"] and result.interpretation.spec.top_k == 1
+
+
+def test_each_vague_term_offers_options_and_its_definition_is_the_recommended_one():
+    from research_assistant.agents.discover_spec import Term
+    cheap = {"term": "cheap", "definition": "P/E below 15", "question": "What P/E is cheap?"}
+    marked_wrong = Term(**cheap, options=[{"definition": "P/E below 15"}, {"definition": "P/E below 25", "recommended": True}])
+    assert [(o.definition, o.recommended) for o in marked_wrong.options] == [("P/E below 15", True), ("P/E below 25", False)]
+    reworded = Term(**cheap, options=[{"definition": "P/E under 15", "recommended": True}, {"definition": "P/E below 25"}])
+    assert [(o.definition, o.recommended) for o in reworded.options] == [("P/E below 15", True), ("P/E below 25", False)]
+    missing = Term(**cheap, options=[{"definition": "P/E below 25"}, {"definition": "P/S below 3"}])
+    assert [o.definition for o in missing.options] == ["P/E below 15", "P/E below 25", "P/S below 3"]
+    assert missing.options[0].recommended and not any(o.recommended for o in missing.options[1:])
+    assert Term(**cheap).options == []  # no options: the page and terminal ask for free text, as before

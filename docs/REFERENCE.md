@@ -67,6 +67,8 @@ Tool lists are enforced (`agents/roles.py`): the loop answers a call to any othe
 
 **From the web page** (Phase 7), "Find companies" starts the same run. The universe is a bundled list (`GET /api/universes`) or the user's own tickers, checked against SEC's ticker list. The screener's draft spec and its questions are written to the trace (a `questions` event) and the run waits until the page sends the answers (an empty answer accepts the proposal); Cancel works while it waits. Its picks are researched by `WEB_DISCOVER_CONDITION` (B) unless Advanced options pick another.
 
+**Answer choices** (5 Nov 2026): each vague term also carries 2-3 `options`, concrete readings the screen can apply (filters, price checks, rankings with thresholds), one marked recommended. The recommended one is always the term's `definition`, the reading the spec applies; if the model marks another or leaves the definition out, the schema fixes that rather than refusing the term. The page shows them as choices with the recommended one picked, plus Other with a text box; the terminal numbers them (Enter accepts the recommended one, a number picks one, text is your own definition). Picking the recommended one, or leaving Other empty, accepts the proposal as before; another option or text sets the term and goes back to the model. A term without options keeps the plain text box. Sector-relative readings ("below the sector median") aren't offered: the screen computes no sector statistics.
+
 ## 5. Finance and data cautions
 
 **SEC fundamentals**
