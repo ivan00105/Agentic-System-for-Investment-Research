@@ -18,6 +18,7 @@ expected:
     - Reports 26,974, which is fiscal 2023.
 gold:
   - name: revenue_fy2024
+    metric: revenue
     ticker: NVDA
     value: 60922
     unit: USD millions

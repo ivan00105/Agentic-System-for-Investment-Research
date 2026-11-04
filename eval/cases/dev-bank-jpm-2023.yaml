@@ -18,6 +18,7 @@ expected:
     - Treats net interest income alone as total net revenue.
 gold:
   - name: total_net_revenue_2023
+    metric: revenue
     ticker: JPM
     value: 158104
     unit: USD millions
@@ -30,6 +31,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/19617/000001961724000225/jpm-20231231.htm
       location: Consolidated statements of income, row "Total net revenue", 2023 column
   - name: net_income_2023
+    metric: net_income
     ticker: JPM
     value: 49552
     unit: USD millions

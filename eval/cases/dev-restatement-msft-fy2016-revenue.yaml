@@ -19,6 +19,7 @@ expected:
     - Treats the 5,834 difference as revenue growth.
 gold:
   - name: revenue_fy2016_as_first_reported
+    metric: revenue
     ticker: MSFT
     value: 85320
     unit: USD millions
@@ -31,6 +32,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/789019/000119312516662209/d187868d10k.htm
       location: Item 8, Income Statements, row "Total revenue", Year Ended June 30, 2016 column
   - name: revenue_fy2016_restated
+    metric: revenue
     ticker: MSFT
     value: 91154
     unit: USD millions

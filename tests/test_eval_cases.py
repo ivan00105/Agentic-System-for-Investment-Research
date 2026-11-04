@@ -47,7 +47,7 @@ def check_gold(case, ciks):
     assert len(names) == len(set(names))
     sourced = {item["name"] for item in case["gold"] if "source" in item}
     for item in case["gold"]:
-        assert text(item["name"]) and item["ticker"] in ciks
+        assert text(item["name"]) and text(item.get("metric")) and item["ticker"] in ciks
         assert number(item["value"]) and text(item["unit"]) and text(item["fiscal_period"])
         assert isinstance(item["period_end"], date) and item["period_end"] <= case["cutoff"]
         assert ("source" in item) != ("derived" in item), f"{item['name']}: give exactly one of source or derived"

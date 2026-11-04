@@ -7,11 +7,15 @@ and a saved batch can be rescored at any time:  python eval/score.py data/eval/<
 The rules, simple on purpose:
 - Shown numbers are the records behind the final report's {fact:ID}/{calc:ID} placeholders (for A, its metrics).
   Typed figures don't count as gold: the checker already flags them, and no record backs them.
-- A gold item is correct when a shown number of the same company equals it within tolerance and has the same period
-  end. Tolerance: the case's `tolerance`, else half a unit in the gold's last digit (1577 -> 0.5). The gold's unit
-  converts to the record's ("USD millions" -> USD x 10^6, "percent" -> ratio / 100).
-- The right size with the other sign, or the right value for another period end, needs review. Anything else is
-  missing: left out or wrong (the case's must_not lines name the wrong figures to look for).
+- A gold item is correct when a shown number measures the gold's `metric`, is of the same company, equals it within
+  tolerance and has the same period end and kind (annual, interim or a balance). Tolerance: the case's `tolerance`,
+  else half a unit in the gold's last digit (1577 -> 0.5). The gold's unit converts to the record's ("USD millions"
+  -> USD x 10^6, "percent" -> ratio / 100). A metric is a get_financials metric (revenue), its growth or CAGR
+  (revenue_growth), a ratio of two (operating_income_to_revenue) or another calculate formula (fcf); a metric no tool
+  measures (cost_of_goods_sold), or a gold item without one, needs review.
+- The right size with the other sign, the right value for another period end or kind, or a match whose company
+  can't be confirmed (no CIK on the record or the case) needs review. Anything else is missing: left out or wrong
+  (the case's must_not lines name the wrong figures to look for).
 - A report answers when it shows at least one number, or a section's claim has a figure the checker flagged as
   typed (limitations say what is missing, so theirs don't count). `answer` must answer, `not_available` must not,
   `answer_or_abstain` may do either, and an allowed abstention needs no gold. A placeholder whose ID no tool returned
@@ -24,7 +28,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -33,6 +37,8 @@ import yaml
 from research_assistant.agents import evidence
 from research_assistant.agents.checker import PLACEHOLDER, lookup
 from research_assistant.agents.draft import SECTIONS
+from research_assistant.data.sec_facts import CONCEPTS
+from research_assistant.tools.calculate import ROLES
 
 import score_tables
 
@@ -45,6 +51,8 @@ AGENTS = ("B", "C", "D")  # conditions whose traces hold a draft and calculate r
 # The checker's flags for a typed figure and for a placeholder whose ID no tool returned (checker.fill).
 TYPED = re.compile(r"'[^']*' is typed, not a \{fact:ID\}/\{calc:ID\} placeholder")
 UNRESOLVED = re.compile(r"(\{(?:fact|calc):[^}]*\}) is not an ID any tool returned")
+CHANGES = {"growth": "current", "cagr": "last", "change_pp": "current"}  # formula -> the input it measures
+ANNUAL_DAYS = 300  # a flow covering at least this many days is a fiscal year's (52/53 weeks), else interim
 
 
 def load_cases(folder: Path = CASES) -> dict[str, dict]:
@@ -85,23 +93,87 @@ def draft_texts(draft: dict) -> list[str]:
     return [c if isinstance(c, str) else c.get("text", "") for c in claims] + list(draft.get("limitations") or [])
 
 
-def judge(item: dict, cik: int | None, numbers: list[dict]) -> dict:
-    """One gold item against the numbers a report shows: correct, needs review or missing (see the module rules)."""
+def measure(record: dict, records: dict[str, dict]) -> str | None:
+    """What a record measures, in the words of a gold item's `metric` (see the module rules)."""
+    if record.get("kind") == "fact":
+        return record.get("metric")
+    formula, inputs = record.get("formula"), record.get("inputs")
+    if not isinstance(inputs, dict):  # A's calculations spell their formula out: "operating_income / revenue"
+        a, _, b = str(formula).partition(" / ")
+        return f"{a}_to_{b}" if b else formula
+
+    def of(role: str) -> str | None:
+        found = records.get(inputs.get(role))
+        return measure(found, records) if found else None
+    if formula in CHANGES:
+        return (base := of(CHANGES[formula])) and f"{base}_{formula}"
+    if formula == "ratio":
+        return (a := of("numerator")) and (b := of("denominator")) and f"{a}_to_{b}"
+    return formula
+
+
+def period_kind(record: dict, records: dict[str, dict]) -> str | None:
+    """instant (a balance), annual or interim; a calculation takes its measured input's kind. None if unknown."""
+    if record.get("kind") == "fact":
+        if not record.get("start"):
+            return "instant"
+        days = (date.fromisoformat(record["end"]) - date.fromisoformat(record["start"])).days
+        return "annual" if days >= ANNUAL_DAYS else "interim"
+    role, inputs = {**CHANGES, "ratio": "numerator"}.get(record.get("formula")), record.get("inputs")
+    found = records.get(inputs.get(role)) if role and isinstance(inputs, dict) else None
+    return period_kind(found, records) if found else None
+
+
+def _base(metric: str) -> list[str]:
+    """The get_financials metrics a gold metric is built from: revenue_growth -> [revenue]."""
+    for suffix in ("_" + formula for formula in CHANGES):
+        metric = metric.removesuffix(suffix)
+    return metric.split("_to_")
+
+
+def judgeable(metric: str) -> bool:
+    parts = _base(metric)
+    return metric in ROLES or (len(parts) <= 2 and all(part in CONCEPTS for part in parts))
+
+
+def gold_kind(item: dict) -> str | None:
+    concept = CONCEPTS.get(_base(item["metric"])[0])
+    if concept and concept.kind in ("instant", "cover"):
+        return "instant"
+    return "annual" if str(item.get("fiscal_period", "")).startswith("FY") else None
+
+
+def judge(item: dict, cik: int | None, numbers: list[dict], records: dict[str, dict]) -> dict:
+    """One gold item against the numbers a report shows: correct, needs review or missing (see the module rules).
+    `records` are the run's frozen records, to see what a calculation's inputs measure."""
     outcome = {"name": item["name"], "outcome": "missing", "record": None, "note": None}
     if item["unit"] not in UNITS:
         return outcome | {"outcome": "needs review", "note": f"No automatic rule for the unit {item['unit']!r}."}
+    if not item.get("metric"):
+        return outcome | {"outcome": "needs review", "note": "The gold item names no metric, so no record can match it."}
+    if not judgeable(item["metric"]):
+        return outcome | {"outcome": "needs review", "note": f"No tool record measures {item['metric']!r}."}
     unit, scale = UNITS[item["unit"]]
     gold, slack = Decimal(str(item["value"])) * scale, tolerance(item) * scale
-    near = None
+    kind, near = gold_kind(item), None
     for record in numbers:
-        if record.get("unit") != unit or (record.get("cik") and cik and int(record["cik"]) != cik):
+        if record.get("unit") != unit or measure(record, records) != item["metric"]:
+            continue  # total assets never count as revenue, whatever the value
+        if record.get("cik") and cik and int(record["cik"]) != cik:
             continue
         value = Decimal(str(record["value"]))
         if abs(value - gold) <= slack:
-            if record.get("end") == str(item["period_end"]):
+            found = period_kind(record, records)
+            if record.get("end") != str(item["period_end"]):
+                near = near or (record["id"], f"{record['id']} has the value but its period ends {record.get('end')}, "
+                                              f"not {item['period_end']}.")
+            elif kind and found and kind != found:
+                near = near or (record["id"], f"{record['id']} has the value but is an {found} figure, not {kind}.")
+            elif not (record.get("cik") and cik):
+                near = near or (record["id"], f"{record['id']} matches, but its company can't be confirmed (no CIK "
+                                              f"on the {'case' if not cik else 'record'}).")
+            else:
                 return outcome | {"outcome": "correct", "record": record["id"]}
-            near = near or (record["id"], f"{record['id']} has the value but its period ends {record.get('end')}, "
-                                          f"not {item['period_end']}.")
         elif abs(value + gold) <= slack:
             near = near or (record["id"], f"{record['id']} has the size but the other sign.")
     if near:
@@ -145,10 +217,10 @@ def score_run(case: dict, entry: dict, batch: Path) -> dict:
                                for item in case["gold"]]}
     end, ciks = run.end, {company["ticker"]: company["cik"] for company in case["companies"]}
     final = numbers(end, run.records)
-    gold = [judge(item, ciks.get(item["ticker"]), final) for item in case["gold"]]
+    gold = [judge(item, ciks.get(item["ticker"]), final, run.records) for item in case["gold"]]
     if (draft := first_draft(run)) is not None:
         before = shown(draft_texts(draft), run.records)
-        row["gold_before"] = [judge(item, ciks.get(item["ticker"]), before) for item in case["gold"]]
+        row["gold_before"] = [judge(item, ciks.get(item["ticker"]), before, run.records) for item in case["gold"]]
     flags = (end.get("report") or {}).get("flags") or []
     typed = [f for f in flags if TYPED.match(f["problem"]) and not f["where"].startswith("limitations")]
     row["review"] += [f"Unresolved placeholder in {f['where']}: {m[1]}" for f in flags

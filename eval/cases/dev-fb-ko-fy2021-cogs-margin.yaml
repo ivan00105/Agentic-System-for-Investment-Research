@@ -15,6 +15,7 @@ expected:
     - Uses the equity method investees' aggregate figures (revenues 79,934, cost of goods sold 47,847).
 gold:
   - name: cost_of_goods_sold_2021
+    metric: cost_of_goods_sold
     ticker: KO
     value: 15357
     unit: USD millions
@@ -27,6 +28,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/21344/000002134422000009/ko-20211231.htm
       location: Consolidated Statements of Income, row "Cost of goods sold", 2021 column
   - name: net_operating_revenues_2021
+    metric: revenue
     ticker: KO
     value: 38655
     unit: USD millions
@@ -39,6 +41,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/21344/000002134422000009/ko-20211231.htm
       location: Consolidated Statements of Income, row "Net Operating Revenues", 2021 column
   - name: cogs_pct_of_revenue_2021
+    metric: cost_of_goods_sold_to_revenue
     ticker: KO
     value: 39.7
     unit: percent

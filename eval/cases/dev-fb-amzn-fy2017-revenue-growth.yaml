@@ -13,6 +13,7 @@ expected:
   behaviour: answer
 gold:
   - name: total_net_sales_2017
+    metric: revenue
     ticker: AMZN
     value: 177866
     unit: USD millions
@@ -25,6 +26,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/1018724/000101872418000005/amzn-20171231x10k.htm
       location: Consolidated Statements of Operations, row "Total net sales", 2017 column
   - name: total_net_sales_2016
+    metric: revenue
     ticker: AMZN
     value: 135987
     unit: USD millions
@@ -37,6 +39,7 @@ gold:
       url: https://www.sec.gov/Archives/edgar/data/1018724/000101872418000005/amzn-20171231x10k.htm
       location: Consolidated Statements of Operations, row "Total net sales", 2016 column
   - name: revenue_growth_2017
+    metric: revenue_growth
     ticker: AMZN
     value: 30.8
     unit: percent

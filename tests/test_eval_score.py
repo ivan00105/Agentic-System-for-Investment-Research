@@ -27,10 +27,11 @@ FINAL = {"summary": [{"text": f"Apple's revenue grew {{calc:{GROWTH['id']}}} in 
 CASE = {"id": "dev-aapl", "question": "How much did Apple's revenue grow in fiscal 2025?", "mode": "check",
         "companies": [{"ticker": "AAPL", "cik": 320193, "name": "Apple Inc."}],
         "expected": {"behaviour": "answer", "must_mention": ["The fiscal year ends 27 September 2025."]},
-        "gold": [{"name": "revenue_fy2025", "ticker": "AAPL", "value": 416161, "unit": "USD millions",
-                  "period_end": date(2025, 9, 27)},
-                 {"name": "growth_fy2025", "ticker": "AAPL", "value": 6.4, "unit": "percent",
-                  "period_end": date(2025, 9, 27), "tolerance": 0.05}]}
+        "gold": [{"name": "revenue_fy2025", "metric": "revenue", "ticker": "AAPL", "value": 416161,
+                  "unit": "USD millions", "fiscal_period": "FY2025", "period_end": date(2025, 9, 27)},
+                 {"name": "growth_fy2025", "metric": "revenue_growth", "ticker": "AAPL", "value": 6.4,
+                  "unit": "percent", "fiscal_period": "FY2025 vs FY2024", "period_end": date(2025, 9, 27),
+                  "tolerance": 0.05}]}
 
 
 def trace(path, condition="B", draft=FINAL, status="finished", first=None, objections=(), cost=0.01,
@@ -80,13 +81,13 @@ def test_tolerance_is_the_cases_or_half_a_unit_in_the_last_digit():
     ({**FY25, "unit": "TWD"}, "missing"),
 ])
 def test_a_gold_item_needs_the_value_company_and_period_end(record, outcome):
-    assert score.judge(CASE["gold"][0], 320193, [record])["outcome"] == outcome
+    assert score.judge(CASE["gold"][0], 320193, [record], RECORDS)["outcome"] == outcome
 
 
 def test_percent_gold_matches_a_ratio_and_an_unknown_unit_needs_review():
-    judged = score.judge(CASE["gold"][1], 320193, [GROWTH])
+    judged = score.judge(CASE["gold"][1], 320193, [GROWTH], RECORDS)
     assert judged == {"name": "growth_fy2025", "outcome": "correct", "record": GROWTH["id"], "note": None}
-    odd = score.judge({**CASE["gold"][0], "unit": "barrels"}, 320193, [FY25])
+    odd = score.judge({**CASE["gold"][0], "unit": "barrels"}, 320193, [FY25], RECORDS)
     assert odd["outcome"] == "needs review" and "barrels" in odd["note"]
 
 
@@ -193,3 +194,29 @@ def test_an_unresolved_placeholder_needs_review(tmp_path):
     draft = {**FINAL, "bull_case": [{"text": "Margins reached {calc:calc-gone}.", "citations": ["fact-rev25"]}]}
     [row] = batch(tmp_path, ("B", {"draft": draft}))
     assert "Unresolved placeholder in bull_case[0]: {calc:calc-gone}" in row["review"]
+
+
+def test_a_value_of_another_metric_never_counts():
+    # Codex review: only value and period end were compared, so total assets equal to revenue counted as revenue.
+    assets = {**FY25, "id": "fact-assets", "metric": "total_assets", "start": None}
+    assert score.judge(CASE["gold"][0], 320193, [assets], RECORDS)["outcome"] == "missing"
+    income = {"fact-rev25": {**FY25, "metric": "net_income"}, "fact-rev24": {**FY24, "metric": "net_income"}}
+    assert score.judge(CASE["gold"][1], 320193, [GROWTH], income)["outcome"] == "missing"
+
+
+def test_an_interim_value_is_not_the_annual_gold():
+    judged = score.judge(CASE["gold"][0], 320193, [{**FY25, "start": "2025-06-29"}], RECORDS)
+    assert judged["outcome"] == "needs review" and "interim" in judged["note"]
+
+
+def test_a_missing_cik_needs_review_not_correct():
+    for cik, record in ((None, FY25), (320193, {**FY25, "cik": None})):
+        judged = score.judge(CASE["gold"][0], cik, [record], RECORDS)
+        assert judged["outcome"] == "needs review" and "CIK" in judged["note"]
+
+
+def test_a_metric_no_tool_measures_or_no_metric_needs_review():
+    cogs = score.judge({**CASE["gold"][0], "metric": "cost_of_goods_sold"}, 320193, [FY25], RECORDS)
+    assert cogs["outcome"] == "needs review" and "cost_of_goods_sold" in cogs["note"]
+    unnamed = {k: v for k, v in CASE["gold"][0].items() if k != "metric"}
+    assert score.judge(unnamed, 320193, [FY25], RECORDS)["outcome"] == "needs review"

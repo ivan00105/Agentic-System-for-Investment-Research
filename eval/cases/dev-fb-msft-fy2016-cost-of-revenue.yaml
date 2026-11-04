@@ -15,6 +15,7 @@ expected:
     - The period is the fiscal year ended 30 June 2016.
 gold:
   - name: total_cost_of_revenue_fy2016
+    metric: cost_of_revenue
     ticker: MSFT
     value: 32780
     unit: USD millions

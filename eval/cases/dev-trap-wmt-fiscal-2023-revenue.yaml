@@ -17,6 +17,7 @@ expected:
     - Reports 648,125, which is fiscal 2024 (ended 31 January 2024, mostly calendar 2023).
 gold:
   - name: total_revenues_fy2023
+    metric: revenue
     ticker: WMT
     value: 611289
     unit: USD millions

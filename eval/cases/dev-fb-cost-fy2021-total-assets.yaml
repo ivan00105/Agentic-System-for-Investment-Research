@@ -13,6 +13,7 @@ expected:
   behaviour: answer
 gold:
   - name: total_assets_fy2021
+    metric: total_assets
     ticker: COST
     value: 59268
     unit: USD millions
