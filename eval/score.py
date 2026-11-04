@@ -6,20 +6,23 @@ and a saved batch can be rescored at any time:  python eval/score.py data/eval/<
 
 The rules, simple on purpose:
 - Shown numbers are the records behind the final report's {fact:ID}/{calc:ID} placeholders (for A, its metrics).
-  Typed figures don't count: the checker already flags them, and no record backs them.
+  Typed figures don't count as gold: the checker already flags them, and no record backs them.
 - A gold item is correct when a shown number of the same company equals it within tolerance and has the same period
   end. Tolerance: the case's `tolerance`, else half a unit in the gold's last digit (1577 -> 0.5). The gold's unit
   converts to the record's ("USD millions" -> USD x 10^6, "percent" -> ratio / 100).
 - The right size with the other sign, or the right value for another period end, needs review. Anything else is
   missing: left out or wrong (the case's must_not lines name the wrong figures to look for).
-- A report answers when it shows at least one number. `answer` must answer, `not_available` must not,
-  `answer_or_abstain` may do either, and an allowed abstention needs no gold.
+- A report answers when it shows at least one number, or a section's claim has a figure the checker flagged as
+  typed (limitations say what is missing, so theirs don't count). `answer` must answer, `not_available` must not,
+  `answer_or_abstain` may do either, and an allowed abstention needs no gold. A placeholder whose ID no tool returned
+  needs review.
 - A run passes when it ended with a report (finished or stopped at limit), its behaviour is right and every gold item
   is correct. must_mention and must_not lines, claim support and whether an objection was valid need a person: they
   are listed as "needs review", never guessed.
 """
 import argparse
 import json
+import re
 import sys
 from datetime import datetime
 from decimal import Decimal
@@ -39,6 +42,9 @@ UNITS = {"USD millions": ("USD", Decimal(10) ** 6), "TWD millions": ("TWD", Deci
          "USD": ("USD", Decimal(1)), "percent": ("ratio", Decimal("0.01"))}
 ENDED = ("finished", "stopped_at_limit")  # run statuses that hand in a report
 AGENTS = ("B", "C", "D")  # conditions whose traces hold a draft and calculate records to recheck
+# The checker's flags for a typed figure and for a placeholder whose ID no tool returned (checker.fill).
+TYPED = re.compile(r"'[^']*' is typed, not a \{fact:ID\}/\{calc:ID\} placeholder")
+UNRESOLVED = re.compile(r"(\{(?:fact|calc):[^}]*\}) is not an ID any tool returned")
 
 
 def load_cases(folder: Path = CASES) -> dict[str, dict]:
@@ -143,7 +149,11 @@ def score_run(case: dict, entry: dict, batch: Path) -> dict:
     if (draft := first_draft(run)) is not None:
         before = shown(draft_texts(draft), run.records)
         row["gold_before"] = [judge(item, ciks.get(item["ticker"]), before) for item in case["gold"]]
-    behaviour, answered = case["expected"]["behaviour"], bool(final)
+    flags = (end.get("report") or {}).get("flags") or []
+    typed = [f for f in flags if TYPED.match(f["problem"]) and not f["where"].startswith("limitations")]
+    row["review"] += [f"Unresolved placeholder in {f['where']}: {m[1]}" for f in flags
+                      if (m := UNRESOLVED.match(f["problem"]))]
+    behaviour, answered = case["expected"]["behaviour"], bool(final or typed)
     behaviour_ok = {"answer": answered, "not_available": not answered}.get(behaviour, True)
     abstained = behaviour == "answer_or_abstain" and not answered
     row["review"] += [f"Gold {g['name']}: {g['note']}" for g in gold if g["outcome"] == "needs review"]

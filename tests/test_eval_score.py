@@ -169,3 +169,27 @@ def test_write_saves_the_tables_rows_and_each_report(tmp_path):
 def test_score_main_needs_a_batch_folder(tmp_path, capsys):
     assert score.main([str(tmp_path)]) == 2
     assert "no runs.jsonl" in capsys.readouterr().err
+
+
+def test_typed_numbers_count_as_answering_so_they_fail_not_available(tmp_path, monkeypatch):
+    # Codex review: a report that typed its figures instead of using placeholders counted as not answering.
+    monkeypatch.setitem(CASE, "expected", {"behaviour": "not_available"})
+    monkeypatch.setitem(CASE, "gold", [])
+    draft = {"summary": [{"text": "QZXV made $12 billion last year.", "citations": ["fact-rev25"]}]}
+    [row] = batch(tmp_path, ("B", {"draft": draft}))
+    assert row["answered"] and not row["behaviour_ok"] and not row["passed"]
+
+
+def test_a_typed_count_in_the_limitations_is_no_answer(tmp_path, monkeypatch):
+    monkeypatch.setitem(CASE, "expected", {"behaviour": "not_available"})
+    monkeypatch.setitem(CASE, "gold", [])
+    draft = {"summary": [{"text": "No SEC filer has that ticker.", "citations": ["fact-rev25"]}],
+             "limitations": ["Searched 2 lists of tickers."]}
+    [row] = batch(tmp_path, ("B", {"draft": draft}))
+    assert not row["answered"] and row["passed"]
+
+
+def test_an_unresolved_placeholder_needs_review(tmp_path):
+    draft = {**FINAL, "bull_case": [{"text": "Margins reached {calc:calc-gone}.", "citations": ["fact-rev25"]}]}
+    [row] = batch(tmp_path, ("B", {"draft": draft}))
+    assert "Unresolved placeholder in bull_case[0]: {calc:calc-gone}" in row["review"]
