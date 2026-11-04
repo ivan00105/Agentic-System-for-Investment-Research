@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { View } from './api'
+import { LevelPicker, LevelProvider } from './level'
 import { BaselinePage } from './pages/BaselinePage'
 import { HistoryPage } from './pages/HistoryPage'
 import { ResearchPage } from './pages/ResearchPage'
@@ -46,10 +47,10 @@ export default function App() {
   const current = view === 'discovery' ? 'baseline' : view
   const [title, lead] = view === 'discovery' && ticker ? ['Inside the candidate.', HEADINGS.discovery[1]] : HEADINGS[view]
   const openBaseline = (runId: string, kind: View) => navigate(kind === 'research' ? 'baseline' : kind, runId)
-  return <div className="app-shell">
+  return <LevelProvider><div className="app-shell">
     <a className="skip-link" href="#main">{view === 'setup' ? 'Skip to setup' : 'Skip to research'}</a>
     <aside className="sidebar"><a className="brand" href="?view=research"><span className="brand-mark" aria-hidden="true">f.</span><span>fieldnote<small>RESEARCH WORKSPACE</small></span></a><div className="nav-label">WORKSPACE</div><nav aria-label="Main navigation">{NAV.map(item => <button key={item.view} aria-current={current === item.view ? 'page' : undefined} onClick={() => navigate(item.view)}><span aria-hidden="true">{item.icon}</span>{item.label}</button>)}</nav><div className="sidebar-footer"><span className="local-dot" /> Research workspace<p>Evidence first.<br />Every revision in view.</p><small>Any SEC filer, with cited sources<br />No trade execution</small></div></aside>
-    <div className="workspace"><header className="topbar"><span>WORKSPACE <span className="separator">/</span> {(NAV.find(n => n.view === current)?.label ?? view).toUpperCase()}</span><span className="local-status">SOURCES · FIGURES · REVIEW</span></header><main id="main">
+    <div className="workspace"><header className="topbar"><span>WORKSPACE <span className="separator">/</span> {(NAV.find(n => n.view === current)?.label ?? view).toUpperCase()}</span><LevelPicker /></header><main id="main">
       <div className="page-heading"><div><div className="eyebrow">EVIDENCE-GROUNDED RESEARCH</div><h1>{title}</h1><p>{lead}</p></div><span className="edition">FIELDNOTES / 01</span></div>
       {view === 'setup' ? <SetupPage />
         : view === 'history' ? <HistoryPage onOpenAgent={openAgent} onOpen={openBaseline} />
@@ -60,5 +61,5 @@ export default function App() {
         </>}
       <footer className="page-footer"><span>FIELDNOTE</span><p>Research support, with provenance and limitations kept visible.</p></footer>
     </main></div>
-  </div>
+  </div></LevelProvider>
 }

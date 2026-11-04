@@ -17,7 +17,7 @@ from ..model_access import ModelSettings
 from ..tools.result import ToolContext
 from .acceptance import Acceptance, Verdict, threshold
 from .discover_report import render, spec_lines
-from .discover_spec import Interpretation, Term, interpret
+from .discover_spec import Interpretation, ScreenSpec, Term, interpret
 from .runner import AgentRun
 from .trace import Trace, _zero
 
@@ -55,18 +55,22 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
         research: Research, condition: str, ask: Callable[[Term], str | None] | None = None,
         defined: dict[str, str] | None = None, replacements: int = config.DISCOVER_MAX_REPLACEMENTS,
         trace_dir: Path | None = None, echo: Callable[[dict], None] | None = None,
-        trace: Trace | None = None) -> DiscoverRun:
-    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app)."""
+        trace: Trace | None = None, edit: Callable[[ScreenSpec], ScreenSpec | None] | None = None,
+        review: bool = False) -> DiscoverRun:
+    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app). `edit`
+    lets the user edit the drafted spec directly before the screen, and `review` shows it even with no vague term
+    (discover_spec.interpret)."""
     trace = trace or Trace.new(trace_dir, echo)
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=f"Discover ({condition})",
                 lead="screener", provider=settings.provider, model=settings.model, universe=universe.name,
                 replacements=replacements)
     with trace.acting_as("screener"):
         found = interpret(question, universe, client, settings, context, trace, ask=ask, defined=defined,
-                          on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
+                          edit=edit, review=review, on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
                               "questions", terms=[t.model_dump() for t in terms], shown=spec_lines(
                                   draft, dict.fromkeys((t.term for t in terms), "proposed"), universe,
-                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition)))
+                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition),
+                              spec=draft.model_dump(mode="json")))
     if found.spec is None or context.stop.is_set():  # cancelled, perhaps while the user was asked: nothing is screened
         return _close(trace, question, settings, context, universe, found, condition, [], {}, [],
                       None if context.stop.is_set() else found.error)

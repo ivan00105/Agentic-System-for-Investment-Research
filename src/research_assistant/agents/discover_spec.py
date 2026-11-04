@@ -67,10 +67,13 @@ class Interpretation:
 def interpret(question: str, universe: Universe, client, settings: ModelSettings, context: ToolContext,
               trace: Trace, *, ask: Callable[[Term], str | None] | None = None,
               defined: dict[str, str] | None = None,
-              on_questions: Callable[[ScreenSpec, list[Term]], None] | None = None) -> Interpretation:
+              on_questions: Callable[[ScreenSpec, list[Term]], None] | None = None,
+              edit: Callable[[ScreenSpec], ScreenSpec | None] | None = None, review: bool = False) -> Interpretation:
     """`ask` returns the user's answer to a term's question: text to set it, "" to accept the proposal, None when
     nobody can be asked. `defined` holds terms the user defined up front (term -> meaning). `on_questions` gets
-    the draft spec and the terms about to be asked, so the user sees the whole spec before answering."""
+    the draft spec and the terms about to be asked, so the user sees the whole spec before answering. `edit`
+    returns the spec as the user edited it directly (the page's spec editor), or None to keep the draft; an edited
+    spec is used as it is, with no model call. `review` shows the spec for checking even when no term is asked."""
     defined = defined or {}
     kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
     given = "".join(f"\n- {term}: {meaning}" for term, meaning in defined.items())
@@ -83,7 +86,7 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
         return Interpretation(None, status=result.status, error=result.error or "No screen spec was handed in.")
     spec, sources, answers = result.output, {}, {}
     asked = [term for term in spec.terms if not _match(term.term, defined)]
-    if ask and asked and on_questions:
+    if on_questions and ((ask and asked) or review):
         on_questions(spec, asked)
     for term in spec.terms:
         if _match(term.term, defined):
@@ -97,6 +100,14 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
             sources[term.term] = "accepted"
         else:
             answers[term.term] = answer.strip()
+    edited = edit(spec) if edit else None
+    if edited is not None:
+        trace.write("spec_edit", spec=edited.model_dump(mode="json"))
+        draft = {t.term: t.definition for t in spec.terms}
+        # A term the user left as drafted was seen and accepted; a changed or new one is theirs.
+        sources = {t.term: "user" if draft.get(t.term) != t.definition or sources.get(t.term) == "user"
+                   else "accepted" for t in edited.terms}
+        return Interpretation(edited, sources, result.status)
     if answers:
         messages.append({"role": "user", "content": "The user answered your questions:" + "".join(
             f"\n- {term}: {answer}" for term, answer in answers.items()) + "\n\nRevise the spec so it uses these "

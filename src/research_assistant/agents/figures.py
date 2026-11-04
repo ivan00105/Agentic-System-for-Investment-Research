@@ -65,6 +65,30 @@ def chart(cik: str, company: str, records: dict[str, dict], cited: set[str]) -> 
                                             if r.get("adj_close") is not None]}}
 
 
+def raw(cited: list[str], records: dict[str, dict]) -> list[dict]:
+    """Every reported figure and calculation the report cites, and every input behind them, unformatted: the
+    Professional view's table and the CSV/JSON export."""
+    names = {r["cik"]: r.get("name") for r in records.values() if r.get("kind") == "company"}
+    rows, seen, queue = [], set(), list(cited)
+    while queue:
+        record = records.get(queue.pop(0))
+        if not record or record["id"] in seen or record.get("kind") not in ("fact", "calc"):
+            continue
+        seen.add(record["id"])
+        inputs = {role: i for role, i in (record.get("inputs") or {}).items() if isinstance(i, str)}
+        queue += list(inputs.values())
+        shown = _row(record, records, names)
+        rows.append({"id": record["id"], "kind": record["kind"], "cik": record.get("cik"), "company": shown["company"],
+                     "label": shown["metric"], "period": shown["period"], "value": record.get("value"),
+                     "unit": record.get("unit"), "shown": shown["value"],
+                     "start": record.get("start"), "end": record.get("end"), "formula": record.get("formula"),
+                     "inputs": inputs, "tag": record.get("tag"), "form": record.get("form"),
+                     "accession": record.get("accession"), "filed": record.get("filed"),
+                     "url": record.get("filing_url"), "notes": record.get("notes") or [],
+                     "reason": record.get("reason")})
+    return rows
+
+
 def _annual(cik: str, metric: str, records: dict[str, dict]) -> dict[str, dict]:
     """A company's fiscal-year values of one metric by period end; a period filed twice keeps the later filing."""
     found: dict[str, dict] = {}

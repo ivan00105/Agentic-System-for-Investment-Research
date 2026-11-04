@@ -2,9 +2,11 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { agentApi } from '../../api'
-import type { CompanyMatch, Condition, StartAgentRun, UniverseInfo } from '../../api'
+import type { CompanyMatch, StartAgentRun, UniverseInfo } from '../../api'
+import { useLevel } from '../../level'
+import { AdvancedOptions } from './AdvancedOptions'
+import type { Options } from './AdvancedOptions'
 import { CompanyPicker } from './CompanyPicker'
-import { CONDITIONS } from './labels'
 import { buildQuestion, TOPICS } from './templates'
 import type { Kind, Topic } from './templates'
 
@@ -31,8 +33,9 @@ export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
   const [count, setCount] = useState('')
   const [question, setQuestion] = useState('')
   const [edited, setEdited] = useState(false)
-  const [condition, setCondition] = useState<Condition | ''>('')
-  const [cutoff, setCutoff] = useState('')
+  const {level} = useLevel()
+  const [options, setOptions] = useState<Options>({condition: '', model: '', editSpec: level === 'professional', cutoff: ''})
+  useEffect(() => setOptions(o => ({...o, editSpec: level === 'professional'})), [level])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { agentApi.universes().then(r => { setUniverses(r.items); if (r.items.length) setAmong(r.items[0].id) }).catch(() => setUniverses([])) }, [])
@@ -59,8 +62,9 @@ export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
     event.preventDefault()
     if (busy || !question.trim()) return
     if (find && among === 'mine' && !companies.length) { setError('Pick at least one company for your own list, or choose a bundled list.'); return }
-    const body: StartAgentRun = {question, ...(condition && {condition}),
-      ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}} : cutoff ? {cutoff} : {})}
+    const {condition, model, editSpec, cutoff} = options
+    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}),
+      ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
     setBusy(true); setError('')
     try { onStarted((await agentApi.start(body)).run_id) }
     catch (e) { setError((e as Error).message) }
@@ -79,11 +83,7 @@ export function QuestionBox({onStarted}: {onStarted: (id: string) => void}) {
       <div className="topic-chips" role="group" aria-label="Topics to cover">{TOPICS.filter(t => !find || t !== 'recent events').map(t => <button type="button" key={t} className="topic" aria-pressed={topics.includes(t)} onClick={() => setTopics(ts => ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t])}>{t}</button>)}</div>
       <label>Your question<textarea rows={3} required value={question} onChange={e => { setQuestion(e.target.value); setEdited(true) }} placeholder="Pick a starter or a company above, or type any question about US-listed companies." /></label>
       {edited && built && built !== question && <button type="button" className="text-button" onClick={() => { setQuestion(built); setEdited(false) }}>Use the question built from your choices</button>}
-      <details className="agent-options"><summary>Advanced options</summary>
-        <label>Agents<select value={condition} onChange={e => setCondition(e.target.value as Condition | '')}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{c} · {CONDITIONS[c]}</option>)}</select></label>
-        <p className="form-note">{find ? "Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour." : 'The default is D: three analysts write the report and a critic checks it.'}</p>
-        {find ? <p className="form-note">Find uses current data only, so it has no cutoff.</p> : <label>Research as of (end of day, UTC)<input type="date" value={cutoff} max={new Date().toISOString().slice(0, 10)} onChange={e => setCutoff(e.target.value)} /></label>}
-      </details>
+      <AdvancedOptions find={find} options={options} onChange={next => setOptions(o => ({...o, ...next}))} />
       <button className="primary" disabled={busy || !question.trim()}>{busy ? 'Starting…' : find ? 'Find companies →' : 'Research this question →'}</button>
     </form>
     <div className="examples"><span className="section-label">OR TRY AN EXAMPLE</span><ul>{EXAMPLES.map(ex => <li key={ex.text}><button type="button" className="text-button" onClick={() => example(ex)}>{ex.text}</button></li>)}</ul></div>

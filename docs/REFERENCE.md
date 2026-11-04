@@ -159,6 +159,7 @@ Tool lists are enforced (`agents/roles.py`): the loop answers a call to any othe
 - Clickable citations open the source excerpt; focus returns when it closes.
 - States: loading, empty, error, partial, success. Status is never shown by colour alone. Works at laptop and phone widths. Diagnostics go behind a disclosure.
 - Export as Markdown or JSON. History lets you reopen saved runs; replay never calls a model.
+- **Detail level** (decided 5 Nov 2026), a preference kept in the browser: the same engine and runs, shown three ways. **Beginner**: plain headings, a "Words used in this report" list that explains each finance term once, and the guided start. **Standard**: today's page. **Professional**: Advanced options open (agents, another model ID of the configured provider, and a Discover run that waits so the user can edit the spec as JSON, used as written with no model call), plus a raw figure table (every cited fact and calculation with its formula and inputs, unformatted) and CSV/JSON/Markdown exports. The other levels have the same options and table, folded away.
 
 ## 10. Resource catalogue
 

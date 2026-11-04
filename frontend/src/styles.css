@@ -443,3 +443,20 @@ h2{font-size:19px}
 .agent-answer>li{font-size:18px}
 .activity .timeline details li{grid-template-columns:1fr;gap:2px}
 .baseline-switch{flex-wrap:wrap}}
+/* Detail level, glossary, raw figures, exports and the spec editor */
+.level-picker{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.level-picker select{min-height:34px;padding:4px 8px;font-size:12px;letter-spacing:0;text-transform:none;border:1px solid #c9d2c6;border-radius:4px;background:#fffefa;color:var(--ink)}
+.glossary dl{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0}
+.glossary dt{font-weight:650;font-size:13px;color:var(--ink)}
+.glossary dd{margin:2px 0 0;font-size:13px;line-height:1.7;color:#47594c}
+@media(min-width:900px){.glossary dl{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}}
+.raw-details>summary h2,.limitations summary h2{display:inline}
+.raw-figures table{font-size:12px}
+.raw-figures td,.raw-figures th{padding:7px 10px;vertical-align:top;text-align:left;white-space:nowrap}
+.raw-figures th small{display:block;font-weight:400}
+.raw-figures .text-button{min-height:24px;padding:0}
+.raw-figures code{font-size:11px}
+.export-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.spec-editor{width:100%;font-size:12px}
+.spec-editor textarea{width:100%;min-height:220px;padding:10px;border:1px solid #c9d2c6;border-radius:4px;background:#fffefa;color:var(--ink);resize:vertical}
+.agent-options input:not([type]),.agent-options input[type=date]{width:100%}

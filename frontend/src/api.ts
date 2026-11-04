@@ -78,7 +78,8 @@ export interface AgentTotals { model_calls: number; tool_calls: number; total_to
 export interface AgentRunSummary { run_id: string; status: string; question?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
 export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string }
 export interface DiscoverTerm { term: string; definition: string; question: string }
-export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: {terms: DiscoverTerm[]; shown: string[]} | null }
+export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
+export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
@@ -88,9 +89,10 @@ export interface ChartPoint { end: string; value: number; label: string; ids: st
 export interface CompanyChart { cik: string; company: string; revenue: ChartPoint[]; margin: {label: string | null; points: ChartPoint[]}; price: {id: string; ticker: string | null; source: string | null; points: [string, number][]} | null }
 export interface DiscoverCandidate { rank: number; cik: string; name: string | null; outcome: string; verdict: string | null; run_id: string | null; lines: {state: string; text: string; ids: string[]}[]; answer: string | null }
 export interface DiscoverResult { spec: string[] | null; counts: Record<string, number>; candidates: DiscoverCandidate[] }
-export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; discover?: DiscoverResult | null; markdown: string }
+export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
+export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]} }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; model?: string; edit_spec?: boolean }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number; as_of: string; note: string }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
@@ -100,7 +102,7 @@ export const agentApi = {
   list: () => request<{items: AgentRunSummary[]}>('/agent-runs'),
   get: (id: string) => request<AgentProgress>(run(id)),
   cancel: (id: string) => request<AgentRunSummary>(`${run(id)}/cancel`, post({})),
-  answer: (id: string, answers: Record<string, string>) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers})),
+  answer: (id: string, answers: Record<string, string>, spec?: unknown) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers, ...(spec !== undefined && {spec})})),
   report: (id: string) => request<AgentReport>(`${run(id)}/report`),
   record: (id: string, record: string) => request<AgentRecord>(`${run(id)}/records/${encodeURIComponent(record)}`),
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),

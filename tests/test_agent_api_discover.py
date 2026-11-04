@@ -72,3 +72,38 @@ def test_a_question_can_research_as_of_a_past_day(web, monkeypatch):
     monkeypatch.setitem(cli.CONDITIONS, "B", single)
     wait(web, start(web, condition="B", cutoff="2025-06-30"))
     assert seen == ["2025-06-30T23:59:59.999999+00:00"]
+
+
+def test_an_edit_sent_with_the_answers_is_used_even_without_the_review_option(web):
+    web.model = FakeClient(SPEC)
+    run_id = start(web, "Find large companies.", discover={"tickers": ["AAPL"]})
+    waiting(web, run_id)
+    edited = {"rank_by": "revenue", "top_k": 2, "terms": [LARGE]}
+    assert web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": edited}).status_code == 200
+    wait(web, run_id)
+    events = [json.loads(line) for line in (web.traces / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
+    [spec] = [e for e in events if e["kind"] == "screen_spec"]
+    assert (spec["top_k"], spec["spec"]["rank_by"], spec["terms"]) == (2, "revenue", {"large": "accepted"})
+
+
+def test_without_the_review_option_a_spec_with_no_vague_terms_runs_at_once(web):
+    web.model = FakeClient(reply(tool_calls=[("submit_screen_spec", {"rank_by": "revenue", "top_k": 1,
+                                                                     "filters": [{"metric": "revenue", "op": ">", "value": 1e15}]})]))
+    run = wait(web, start(web, "Find companies.", discover={"tickers": ["AAPL"]}))
+    assert run["status"] == "finished" and not any(line["kind"] == "questions" for line in run["progress"])
+
+
+def test_a_professional_run_waits_to_review_the_spec_and_takes_an_edit(web):
+    web.model = FakeClient(reply(tool_calls=[("submit_screen_spec", {"rank_by": "operating_margin"})]))
+    run_id = start(web, "Find companies.", discover={"tickers": ["AAPL"]}, edit_spec=True, model="other/model")
+    run = waiting(web, run_id)
+    assert run["questions"]["terms"] == [] and run["questions"]["spec"]["rank_by"] == "operating_margin"
+    bad = web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": {"rank_by": "pe"}})
+    assert bad.status_code == 422 and "rank_by" in bad.json()["error"]["message"]
+    edited = {"rank_by": "revenue", "filters": [{"metric": "revenue", "op": ">", "value": 1e15}]}
+    assert web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": edited}).status_code == 200
+    wait(web, run_id)
+    events = [json.loads(line) for line in (web.traces / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert events[0]["model"] == "other/model" and web.model.requests[0]["model"] == "other/model"
+    [spec] = [e for e in events if e["kind"] == "screen_spec"]
+    assert spec["spec"]["rank_by"] == "revenue" and spec["spec"]["filters"][0]["value"] == 1e15

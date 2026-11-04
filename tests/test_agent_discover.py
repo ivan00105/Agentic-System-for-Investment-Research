@@ -220,3 +220,32 @@ def test_research_runs_with_no_claims_count_as_failed(tmp_path, declared):
     assert result.counts["failed"] == 2 and result.counts["returned"] == 0
     events = [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
     assert [e["error"] for e in events if e["kind"] == "research_end"] == [apple.error, jpm.error]
+
+
+def test_a_spec_edited_directly_is_used_as_it_is_without_a_model_call(tmp_path, declared):
+    cheap = {"term": "cheap", "definition": "P/E below 20", "question": "What P/E is cheap?"}
+    draft = {"rank_by": "operating_margin", "terms": [cheap, LARGE]}
+    seen = []
+
+    def edit(spec):
+        seen.append(spec.model_dump(mode="json"))
+        return discover.ScreenSpec.model_validate({
+            "rank_by": "revenue", "filters": [{"metric": "revenue", "op": ">", "value": 0}], "top_k": 1,
+            "terms": [cheap | {"definition": "P/E below 12"}, LARGE]})
+    result, client, events = find(tmp_path, declared, spec(**draft), *research("AAPL", "0000320193"),
+                                  ask=lambda term: "", edit=edit)
+    assert seen[0]["terms"][0]["definition"] == "P/E below 20" and len(client.requests) == 5  # spec, then research
+    assert result.interpretation.spec.rank_by == "revenue"
+    assert result.interpretation.sources == {"cheap": "user", "large": "accepted"}
+    questions = next(e for e in events if e["kind"] == "questions")
+    assert questions["spec"]["terms"][0]["term"] == "cheap"
+    assert next(e for e in events if e["kind"] == "spec_edit")["spec"]["rank_by"] == "revenue"
+
+
+def test_a_spec_with_no_vague_terms_still_waits_for_review_when_asked(tmp_path, declared):
+    shown = []
+    result, _, events = find(tmp_path, declared, spec(top_k=1), *research("AAPL", "0000320193"),
+                             ask=lambda term: pytest.fail("no terms"), edit=lambda s: shown.append(s) or None,
+                             review=True)
+    assert len(shown) == 1 and [e["terms"] for e in events if e["kind"] == "questions"] == [[]]
+    assert not [e for e in events if e["kind"] == "spec_edit"] and result.interpretation.spec.top_k == 1

@@ -4,6 +4,7 @@ import { agentApi, agentRunning, stamp } from '../../api'
 import type { AgentProgress, AgentReport as Report } from '../../api'
 import { AgentReport } from './AgentReport'
 import { DiscoverQuestions, DiscoverReport } from './Discover'
+import { useLevel } from '../../level'
 import { STATUS } from './labels'
 import { RunTimeline } from './RunTimeline'
 
@@ -12,6 +13,7 @@ export function RunView({id, onOpenRun, onNew}: {id: string; onOpenRun: (id: str
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const {level} = useLevel()
   useEffect(() => {
     let alive = true; let timer: ReturnType<typeof setTimeout> | undefined
     setRun(null); setReport(null); setError('')
@@ -45,7 +47,7 @@ export function RunView({id, onOpenRun, onNew}: {id: string; onOpenRun: (id: str
         {running && <div className="run-actions"><button className="secondary" disabled={run.status === 'stopping'} onClick={() => void cancel()}>{run.status === 'stopping' ? 'Stopping…' : 'Cancel run'}</button>
           <p className="muted">Cancelling keeps what the agents found so far as a partial report. It takes effect after the current model or tool call. The run keeps going if you leave this page.</p></div>}
         {run.status === 'waiting' && run.questions && <DiscoverQuestions runId={id} questions={run.questions} onAnswered={() => setAttempt(a => a + 1)} />}
-        <details className="activity agent-progress" open={running}><summary>How the agents worked <span>{run.progress.length} steps</span></summary>
+        <details className="activity agent-progress" open={running || level === 'professional'}><summary>How the agents worked <span>{run.progress.length} steps</span></summary>
           <RunTimeline lines={run.progress} running={running} />
         </details>
       </div>

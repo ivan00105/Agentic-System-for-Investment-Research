@@ -8,7 +8,7 @@ from pathlib import Path
 from .checker import PLACEHOLDER, lookup
 from .draft import SECTIONS
 from .evidence import load
-from .figures import figures
+from .figures import figures, raw
 from .objections import ISSUES
 from .progress import describe as progress_line
 from .report import RUN_STATUS, describe
@@ -79,6 +79,7 @@ def report(path: Path) -> dict | None:
             "objections": [_objection(o) for o in end.get("objections") or []],
             "sources": [_source(n, i, run.records) for i, n in number.items()],
             "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
+            "raw": raw(checked["sources"], run.records) if checked else [],
             "discover": _discover(run, path.parent) if "candidates" in end else None,
             "markdown": end.get("markdown") or ""}
 
@@ -86,7 +87,7 @@ def report(path: Path) -> dict | None:
 def questions(path: Path) -> dict | None:
     """What a Discover run waiting for the user asks: its draft spec as shown, and each vague term's question."""
     found = next((e for e in reversed(read_events(path)) if e.get("kind") == "questions"), None)
-    return found and {"terms": found["terms"], "shown": found["shown"]}
+    return found and {"terms": found["terms"], "shown": found["shown"], "spec": found.get("spec")}
 
 
 def _discover(run, folder: Path) -> dict:
