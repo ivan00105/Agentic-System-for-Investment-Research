@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, StringConstraints, ValidationError, model_validator
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
 from . import cli, config
 from .agents import discover, preferences, saved
-from .agents.discover_spec import ScreenSpec
+from .agents.discover_spec import ScreenSpec, unknown_fields
 from .agents.trace import Trace
 from .contracts import DomainError
 from .data import universe as universes
@@ -46,6 +46,8 @@ class StartRun(BaseModel):
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     # Discover: wait for the user to check or edit the drafted spec, even when it has no vague terms.
     edit_spec: bool = False
+    # Discover: how many to return, from the page's count box; sent apart so a hand-edited question can't lose it.
+    top_k: int | None = Field(None, ge=1)
     # "Help me start": what matters most, horizon, comfort with price swings, sectors. Added to the question.
     preferences: str | None = None
 
@@ -74,16 +76,16 @@ class AgentRuns:
         self.lock = threading.Lock()
 
     def start(self, question: str, condition: str, settings, cutoff: datetime | None = None,
-              universe: universes.Universe | None = None, edit_spec: bool = False) -> str:
+              universe: universes.Universe | None = None, edit_spec: bool = False, top_k: int | None = None) -> str:
         trace, stop = Trace.new(self.folder), threading.Event()
         with self.lock:
             self.active[trace.run_id] = stop
         threading.Thread(target=self._run, args=(question, condition, settings, trace, stop, cutoff, universe,
-                                                 edit_spec), daemon=True).start()
+                                                 edit_spec, top_k), daemon=True).start()
         return trace.run_id
 
     def _run(self, question: str, condition: str, settings, trace: Trace, stop: threading.Event,
-             cutoff: datetime | None, universe: universes.Universe | None, edit_spec: bool):
+             cutoff: datetime | None, universe: universes.Universe | None, edit_spec: bool, top_k: int | None):
         try:
             with cli.sec_client() as sec, cli.model_client(settings) as client:
                 context = ToolContext(cutoff=cutoff or datetime.now(timezone.utc), sec=sec, stop=stop,
@@ -92,7 +94,7 @@ class AgentRuns:
                     waiter = Waiter(self, trace.run_id, stop, edit_spec)
                     discover.run(question, client, settings, context, universe, research=cli.CONDITIONS[condition],
                                  condition=cli.LABELS[condition], ask=waiter.ask, trace=trace, edit=waiter.edit,
-                                 review=edit_spec)
+                                 review=edit_spec, top_k=top_k)
                 else:
                     cli.CONDITIONS[condition](question, client, settings, context, trace=trace)
         except Exception as exc:  # a bug must still end the trace, or the page would show the run going forever
@@ -210,7 +212,7 @@ def start(body: StartRun, request: Request):
     settings = replace(settings, model=body.model) if body.model else settings
     question = preferences.attach(body.question, body.preferences)
     return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
-                                                  body.edit_spec and declared is not None))
+                                                  body.edit_spec and declared is not None, body.top_k))
 
 
 @router.get("")
@@ -228,7 +230,10 @@ def progress(run_id: str, request: Request):
 @router.post("/{run_id}/answers")
 def answer(run_id: str, body: Answers, request: Request):
     """Discover's answers to its vague-term questions: text sets a term, "" accepts its proposal. An edited spec
-    replaces the draft as it is."""
+    replaces the draft as it is, so a field it doesn't know is an error, not dropped."""
+    if body.spec is not None and (unknown := unknown_fields(body.spec)):
+        raise DomainError(f"The edited spec has fields the screen doesn't know, so they would be ignored: "
+                          f"{', '.join(unknown)}. Spec fields: {', '.join(ScreenSpec.model_fields)}.", "bad_spec", 422)
     try:
         spec = ScreenSpec.model_validate(body.spec) if body.spec is not None else None
     except ValidationError as exc:

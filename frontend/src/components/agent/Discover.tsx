@@ -54,7 +54,7 @@ export function DiscoverQuestions({runId, questions, onAnswered}: {runId: string
         </>}
       </fieldset>)}
       {drafted && <details className="spec-editor" open={level === 'professional'}><summary>Edit the screen spec directly</summary>
-        <p className="muted">The spec as JSON: filters and price checks (metric, op, value), sic_prefixes, rank_by, descending, top_k, terms and not_covered. An edited spec is used exactly as written, with no model call{questions.terms.length ? ', and the boxes above are ignored' : ''}.</p>
+        <p className="muted">The spec as JSON: filters and price checks (metric, op, value), sic_prefixes, rank_by, descending, top_k, terms and not_covered. An edited spec is used exactly as written, with no model call, and a field it doesn't know is refused rather than ignored{questions.terms.length ? ', and the boxes above are ignored' : ''}.</p>
         <label htmlFor="spec-json">Screen spec (JSON)</label>
         <textarea id="spec-json" className="mono" rows={14} spellCheck={false} value={specText} onChange={e => setSpecText(e.target.value)} />
         {editing && <button type="button" className="text-button" onClick={() => setSpecText(drafted)}>Undo my edits</button>}
@@ -79,6 +79,8 @@ export function DiscoverReport({result, onOpenRun, onCompare}: {result: Discover
       {picks.length === 0 ? <p className="empty-inline">No candidate made the shortlist. The candidates below say why.</p> : <ol className="shortlist">{picks.map(c => <li key={c.cik}>
         <div className="section-heading"><h3>{c.name ?? c.cik}</h3><span className="muted">screen rank {c.rank}</span></div>
         {c.answer && <p>{c.answer}</p>}
+        <Warnings items={c.warnings} />
+        {c.citations?.length ? <p className="muted pick-citations">Its answer cites {c.citations.map((id, i) => <span key={id}>{i ? ', ' : ''}<code>{id}</code></span>)}.</p> : null}
         <Checks lines={c.lines} />
         {c.run_id && <button className="secondary" onClick={() => onOpenRun(c.run_id!)}>Open its full report →</button>}
       </li>)}</ol>}
@@ -89,10 +91,17 @@ export function DiscoverReport({result, onOpenRun, onCompare}: {result: Discover
     </section>
     {others.length > 0 && <section className="report-section"><h2>Checked but not picked</h2><ul className="shortlist">{others.map(c => <li key={c.cik}>
       <div className="section-heading"><h3>{c.name ?? c.cik}</h3><Badge tone="amber">{c.outcome}</Badge></div>
+      <Warnings items={c.warnings} />
       <Checks lines={c.lines} />
       {c.run_id && <button className="text-button" onClick={() => onOpenRun(c.run_id!)}>Open its research run ↗</button>}
     </li>)}</ul></section>}
+    {result.notes?.length ? <section className="report-section"><h2>How the search ended</h2><ul>{result.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section> : null}
   </div>
+}
+
+function Warnings({items}: {items?: string[]}) {
+  if (!items?.length) return null
+  return <div className="notice warning" role="note"><strong>Check before relying on this:</strong><ul>{items.map((w, i) => <li key={i}>{w}</li>)}</ul></div>
 }
 
 function Checks({lines}: {lines: DiscoverResult['candidates'][number]['lines']}) {

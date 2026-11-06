@@ -46,3 +46,39 @@ test('Find offers the full S&P 500 and every SEC filer, which says why when SEC 
   await expect(everyone).toBeDisabled() // the test server has no SEC_USER_AGENT
   await expect(where).toContainText('SEC_USER_AGENT')
 })
+
+test('an edited Find question shows the list and count that will run, and the count is sent', async ({page}) => {
+  let body: Record<string, unknown> = {}
+  await page.route('**/api/agent-runs', route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    body = route.request().postDataJSON()
+    return route.fulfill({status: 202, json: {run_id: RUN, status: 'running'}})
+  })
+  await mockRun(page, {status: 'running', question: 'Find cheap companies.'}, null)
+  await page.goto('/')
+  await page.locator('.starter', {hasText: 'Find companies'}).click()
+  await page.getByLabel('How many to return (optional)').fill('7')
+  const question = page.getByLabel('Your question')
+  await expect(question).toHaveValue('Find 7 companies among S&P 500.')
+  await expect(page.locator('.will-screen')).toHaveCount(0) // the built question already says it
+  await question.fill('Find cheap companies.')
+  await expect(page.locator('.will-screen')).toHaveText('Will screen: S&P 500, return 7.')
+  await page.getByRole('button', {name: 'Find companies →'}).click()
+  await expect.poll(() => body.top_k).toBe(7)
+  expect(body.discover).toEqual({name: 'sp500'})
+  expect(body.question).toBe('Find cheap companies.')
+})
+
+test('a shortlist shows a pick\'s warnings and citations, and why the search ended', async ({page}) => {
+  const flagged = {...pick(1, '0000789019', 'MICROSOFT CORP', ['MSFT']), answer: 'Microsoft made 280 billion dollars.', citations: ['fact-rev'],
+    warnings: ["'280' is typed, not a {fact:ID}/{calc:ID} placeholder"], run_status: 'finished'}
+  const discover = {...SHORTLIST.discover, candidates: [flagged], notes: ['Stopped at the research limit: 3 research runs.']}
+  await mockRun(page, {question: 'Find profitable tech companies.'}, {...SHORTLIST, discover})
+  await page.goto(`/?view=research&agent=${RUN}`)
+  const shortlist = page.locator('.shortlist').first()
+  await expect(shortlist.getByRole('note')).toContainText("'280' is typed")
+  await expect(shortlist).toContainText('Its answer cites fact-rev.')
+  await expect(page.getByRole('heading', {name: 'How the search ended'})).toBeVisible()
+  await expect(page.getByText('Stopped at the research limit: 3 research runs.')).toBeVisible()
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+})

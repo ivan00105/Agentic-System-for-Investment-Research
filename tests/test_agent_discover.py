@@ -314,3 +314,45 @@ def test_every_sec_filer_with_a_ticker_is_a_universe_described_without_its_membe
     assert "- AAPL: Apple Inc." in describe(universe.load("sp500"))
     with pytest.raises(universe.UniverseError, match="needs SEC access"):
         universe.load(universe.ALL_FILERS)
+
+
+def test_the_saved_shortlist_keeps_a_picks_flags_citations_and_status(tmp_path, declared):
+    # Second review: the web summary kept only a pick's first sentence, so a flagged answer looked clean.
+    from research_assistant.agents import saved
+    report = {"summary": [{"text": "AAPL made 391 billion dollars.", "citations": ["company-0000320193"]}]}
+    script = [reply("1. find_company"), reply(tool_calls=[("find_company", {"query": "AAPL"})]),
+              reply(tool_calls=[("submit_report", report)]), resubmit]
+    result, _, _ = find(tmp_path, declared, spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}],
+                                                top_k=1), *script)
+    apple = next(c for c in saved.report(result.trace_path)["discover"]["candidates"] if c["outcome"] == "picked")
+    assert apple["answer"] == "AAPL made 391 billion dollars." and apple["run_status"] == "finished"
+    assert apple["citations"] == ["company-0000320193"]
+    assert any("is typed" in w for w in apple["warnings"])
+
+
+def test_the_saved_shortlist_says_why_the_search_stopped(tmp_path, declared):
+    from research_assistant.agents import saved
+    result, _, _ = find(tmp_path, declared,
+                        spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}], top_k=1),
+                        ERROR, replacements=0)
+    found = saved.report(result.trace_path)["discover"]
+    assert any(n.startswith("Stopped at the research limit: 1 research runs") for n in found["notes"])
+    [failed] = [c for c in found["candidates"] if c["outcome"] == "research failed"]
+    assert failed["run_status"] == "failed" and failed["warnings"]
+
+
+def test_a_check_on_translated_dollars_says_its_currency_basis(tmp_path):
+    # Second review: get_financials warned that the USD figures are convenience translations; the check dropped it.
+    filing = {"accn": "0001577552-25-000010", "form": "20-F", "filed": "2025-05-20"}
+    revenue = [filing | {"start": start, "end": end, "val": val} for start, end, val in (
+        ("2023-04-01", "2024-03-31", 130000000000), ("2024-04-01", "2025-03-31", 137000000000))]
+    facts = {"cik": 1577552, "entityName": "Translated filer", "facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {
+            "USD": revenue, "CNY": [row | {"val": row["val"] * 7} for row in revenue]}}}}}
+    files = SecFiles({"/api/xbrl/companyfacts/CIK0001577552.json": httpx.Response(200, json=facts)})
+    context = make_context(tmp_path, files=files)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [Filter(metric="revenue_growth", op=">", value=0)]).lines
+    assert line.state == "pass" and line.text.endswith(
+        " Basis: USD as filed (revenue is also reported in CNY: the USD figures are probably convenience translations "
+        "at one exchange rate per filing, so changes across years mix exchange rates).")

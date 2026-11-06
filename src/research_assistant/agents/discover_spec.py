@@ -6,7 +6,7 @@ then the definition stands labelled "assumed". Nothing is defined silently.
 """
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Literal
+from typing import Callable, Literal, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -71,6 +71,21 @@ class ScreenSpec(BaseModel):
     not_covered: list[str] = Field(default_factory=list, description="What the screen and checks can't express.")
 
 
+def unknown_fields(data, model: type[BaseModel] = ScreenSpec, at: str = "") -> list[str]:
+    """Keys in a hand-edited spec that validation would silently drop (e.g. "filter" for "filters")."""
+    if not isinstance(data, dict):
+        return []
+    found = []
+    for key, value in data.items():
+        if key not in model.model_fields:
+            found.append(at + key)
+            continue
+        inner = [t for t in get_args(model.model_fields[key].annotation) if isinstance(t, type) and issubclass(t, BaseModel)]
+        if inner and isinstance(value, list):
+            found += [f for i, item in enumerate(value) for f in unknown_fields(item, inner[0], f"{at}{key}.{i}.")]
+    return found
+
+
 SUBMIT_SPEC = Finish("submit_screen_spec", "Hand in the screen spec: filters, ranking, price checks, how many "
                      "companies, every vague term with its definition and question, and what isn't covered.",
                      ScreenSpec)
@@ -92,7 +107,8 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
               trace: Trace, *, ask: Callable[[Term], str | None] | None = None,
               defined: dict[str, str] | None = None,
               on_questions: Callable[[ScreenSpec, list[Term]], None] | None = None,
-              edit: Callable[[ScreenSpec], ScreenSpec | None] | None = None, review: bool = False) -> Interpretation:
+              edit: Callable[[ScreenSpec], ScreenSpec | None] | None = None, review: bool = False,
+              top_k: int | None = None) -> Interpretation:
     """`ask` returns the user's answer to a term's question: text to set it, "" to accept the proposal, None when
     nobody can be asked. `defined` holds terms the user defined up front (term -> meaning). `on_questions` gets
     the draft spec and the terms about to be asked, so the user sees the whole spec before answering. `edit`
@@ -109,6 +125,7 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
     if result.output is None:
         return Interpretation(None, status=result.status, error=result.error or "No screen spec was handed in.")
     spec, sources, answers = result.output, {}, {}
+    spec.top_k = top_k or spec.top_k  # a count the user set beats the model's reading of the question
     asked = [term for term in spec.terms if not _match(term.term, defined)]
     if on_questions and ((ask and asked) or review):
         on_questions(spec, asked)
@@ -141,6 +158,7 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
         if again.output is None:
             return Interpretation(None, status=again.status, error=again.error or "The revised spec wasn't handed in.")
         spec = again.output
+        spec.top_k = top_k or spec.top_k
         earlier = sources | dict.fromkeys(answers, "user") | dict.fromkeys(defined, "user")
         sources = {t.term: next((s for key, s in earlier.items() if _match(t.term, {key: s})), "assumed")
                    for t in spec.terms}

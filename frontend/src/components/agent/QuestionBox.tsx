@@ -46,6 +46,9 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
   const universe = universes.find(u => u.id === among)
   const built = buildQuestion(kind, companies, topics, {count, among: universe ? `among ${universe.name}` : 'from my list'})
   useEffect(() => { if (!edited && built) setQuestion(built) }, [built, edited])
+  const topK = Number.isInteger(Number(count)) && Number(count) >= 1 ? Number(count) : null // sent, not only written
+  // A question not built from the choices may not name the list or count, so say what will actually run.
+  const willScreen = find && question.trim() !== built.trim() ? `Will screen: ${among === 'mine' ? `your ${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}` : universe?.name ?? among}, return ${topK ?? 'as many as the question asks'}.` : ''
 
   // Help me start searches the biggest bundled list, never every SEC filer (thousands of small companies and shells).
   const widest = universes.filter(u => !u.dynamic).sort((a, b) => (b.companies ?? 0) - (a.companies ?? 0))[0]
@@ -73,7 +76,7 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
     if (find && among === 'mine' && !companies.length) { setError('Pick at least one company for your own list, or choose a bundled list.'); return }
     const {condition, model, editSpec, cutoff} = options
     const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(note.trim() && {preferences: note.trim()}),
-      ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
+      ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(topK && {top_k: topK}), ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
     setBusy(true); setError('')
     try { onStarted((await agentApi.start(body)).run_id) }
     catch (e) { setError((e as Error).message) }
@@ -98,7 +101,8 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
         <button type="button" className="text-button" onClick={() => setNote('')}>Remove the note</button></div>}
       {edited && built && built !== question && !note && <button type="button" className="text-button" onClick={() => { setQuestion(built); setEdited(false) }}>Use the question built from your choices</button>}
       <AdvancedOptions find={find} options={options} onChange={next => setOptions(o => ({...o, ...next}))} />
-      <button className="primary" disabled={busy || !question.trim()}>{busy ? 'Starting…' : find ? 'Find companies →' : 'Research this question →'}</button>
+      <div className="submit-row"><button className="primary" disabled={busy || !question.trim()}>{busy ? 'Starting…' : find ? 'Find companies →' : 'Research this question →'}</button>
+        {willScreen && <span className="will-screen" role="status">{willScreen}</span>}</div>
     </form>
     <div className="examples"><span className="section-label">OR TRY AN EXAMPLE</span><ul>{EXAMPLES.map(ex => <li key={ex.text}><button type="button" className="text-button" onClick={() => example(ex)}>{ex.text}</button></li>)}</ul></div>
     <p className="form-note">The agents read SEC filings, reported figures and prices, then write a report in which every statement cites its evidence. A run takes several minutes and keeps going if you leave this page.</p>

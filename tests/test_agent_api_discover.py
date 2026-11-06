@@ -100,6 +100,11 @@ def test_a_professional_run_waits_to_review_the_spec_and_takes_an_edit(web):
     assert run["questions"]["terms"] == [] and run["questions"]["spec"]["rank_by"] == "operating_margin"
     bad = web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": {"rank_by": "pe"}})
     assert bad.status_code == 422 and "rank_by" in bad.json()["error"]["message"]
+    # Second review: "filter" for "filters" was dropped without a word, so the run had no filters at all.
+    typo = web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": {
+        "rank_by": "revenue", "filter": [], "price_checks": [{"metric": "pe", "op": "<", "value": 30, "max": 1}]}})
+    assert typo.status_code == 422 and typo.json()["error"]["message"].startswith(
+        "The edited spec has fields the screen doesn't know, so they would be ignored: filter, price_checks.0.max.")
     edited = {"rank_by": "revenue", "filters": [{"metric": "revenue", "op": ">", "value": 1e15}]}
     assert web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {}, "spec": edited}).status_code == 200
     wait(web, run_id)
@@ -147,3 +152,16 @@ def test_a_find_over_every_sec_filer_tells_the_screener_the_size_not_the_names(w
     assert "aren't listed here" in prompt and "- AAPL:" not in prompt
     web.post(f"/api/agent-runs/{run_id}/cancel", json={})
     wait(web, run_id)
+
+
+def test_the_pages_count_sets_how_many_to_return(web):
+    # Second review: the count box reached a run only through the question's words, so an edited question lost it.
+    web.model = FakeClient(SPEC)
+    run_id = start(web, "Find a few large companies.", discover={"tickers": ["AAPL"]}, top_k=7)
+    run = waiting(web, run_id)
+    assert run["questions"]["spec"]["top_k"] == 7
+    assert web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {"large": ""}}).status_code == 200
+    wait(web, run_id)
+    events = [json.loads(line) for line in (web.traces / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
+    [spec] = [e for e in events if e["kind"] == "screen_spec"]
+    assert (spec["top_k"], spec["spec"]["top_k"]) == (7, 7)
