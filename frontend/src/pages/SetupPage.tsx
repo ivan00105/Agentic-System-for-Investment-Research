@@ -11,6 +11,7 @@ const STATUS: Record<ProviderStatus['status'], {text: string; tone: string}> = {
   check_failed: {text: 'Last check failed', tone: 'amber'},
 }
 const TIERS = ['Tier 0 · free, no key', 'Tier 1 · free with a key', 'Tier 2 · paid']
+const CATALOGUE = 'https://github.com/ivan00105/Agentic-System-for-Investment-Research/blob/main/docs/REFERENCE.md#data-providers-by-kind-options-and-order'
 
 export function SetupPage() {
   const [kinds, setKinds] = useState<DataKind[] | null>(null)
@@ -44,6 +45,7 @@ export function SetupPage() {
         {testError && <div className="notice error" role="alert">{testError}</div>}
         <div className="connection-grid">{kinds.map(kind => <KindCard key={kind.kind} kind={kind} testing={testing} onTest={name => void test(name)} />)}</div>
       </>}
+    <details className="technical-details connection-setup"><summary>Other sources we know about (not built)</summary><p>The cards above are every source the code can use. Other kinds of data we surveyed, such as earnings calendars, news and short interest, aren't built yet, so no run uses them. They are listed with their limits and keys in <a href={CATALOGUE} target="_blank" rel="noreferrer">REFERENCE §10, Data providers by kind</a>.</p></details>
     <details className="technical-details connection-setup"><summary>How to set a key</summary><p>Copy <code>.env.example</code> to <code>.env</code> in the project folder, then fill in the settings a card asks for. Each setting in <code>.env.example</code> says its tier and where to get a key. Restart the server after changes. Existing environment variables take precedence over <code>.env</code>.</p><p>The only required settings are <code>SEC_USER_AGENT</code> (a name and an email) and one model service. Everything else is an optional upgrade.</p></details>
   </div>
 }

@@ -52,6 +52,13 @@ test('with no keys, every kind of data has a card that names the variables to se
   await expect(row(prices, 'Tiingo').locator('.provider-missing')).toContainText('TIINGO_API_KEY')
   await expect(row(card(page, 'Model'), 'OpenRouter').locator('.provider-missing')).toContainText('RESEARCH_MODEL_PROVIDER=openrouter')
 
+  // Sources that aren't built are only named behind one collapsed line, with a link to the catalogue.
+  const others = page.locator('details').filter({hasText: 'Other sources we know about (not built)'})
+  await expect(others).not.toHaveAttribute('open', '')
+  await others.locator('summary').click()
+  await expect(others.getByRole('link', {name: 'REFERENCE §10, Data providers by kind'})).toHaveAttribute('href', /REFERENCE\.md#data-providers-by-kind/)
+  await others.locator('summary').click()
+
   // Keys are never typed into the browser, and there is no consent step.
   await expect(page.locator('input, textarea')).toHaveCount(0)
   expect(posts).toBe(0)
