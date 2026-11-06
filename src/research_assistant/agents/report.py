@@ -83,6 +83,10 @@ def describe(record: dict) -> str:
         return f"`{rid}` {record.get('name')} (CIK {record.get('cik')}, {', '.join(record.get('tickers') or [])})"
     if kind == "prices":
         return f"`{rid}` {record.get('ticker')} daily prices from {record.get('source')}, {record.get('start')} to {record.get('end')}"
+    if kind == "peers":
+        names = ", ".join(f"{p['name']} ({', '.join(p['tickers'])})" for p in record.get("peers") or []) or "none"
+        etf = (record.get("sector") or {}).get("ticker") or "none"
+        return f"`{rid}` Peers of {record.get('name')}: {names}. Sector ETF {etf}. {record.get('method')} {record.get('url', '')}"
     if kind == "insider":
         plan = ", under a 10b5-1 plan" if record.get("plan_10b5_1") else ""
         return (f"`{rid}` {record.get('owner')} ({record.get('role')}): {record.get('meaning')} of {record.get('shares')} "

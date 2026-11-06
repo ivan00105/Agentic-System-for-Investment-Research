@@ -124,6 +124,60 @@ MACRO_RELEASES = (10, 50, 53, 54, 101)
 # FRED's terms set no published number; 120 a minute per key is the commonly cited limit, and a 429 is retried.
 FRED_MAX_REQUESTS_PER_MINUTE = 120
 
+# --- Peers and sector benchmark -----------------------------------------------------------
+
+# Peers returned when the agent doesn't ask: enough to set margins and returns side by side. The agent can ask for more.
+PEERS_DEFAULT_COUNT = 5
+# SIC code ranges -> the SPDR sector ETF used as the sector benchmark; the first range that holds the code wins, so
+# narrow ranges come first. SIC isn't GICS, so this is approximate: Alphabet and Meta are SIC 7370 (computer
+# services) but GICS communication services. Codes: https://www.sec.gov/search-filings/standard-industrial-classification-sic-code-list
+SECTOR_ETFS = (
+    (2830, 2836, "XLV", "Health care"),  # drugs
+    (2840, 2844, "XLP", "Consumer staples"),  # soaps and cosmetics
+    (2900, 2999, "XLE", "Energy"),  # petroleum refining
+    (3570, 3579, "XLK", "Technology"),  # computers
+    (3630, 3639, "XLY", "Consumer discretionary"),  # household appliances
+    (3600, 3699, "XLK", "Technology"),  # electronic equipment and semiconductors
+    (3710, 3716, "XLY", "Consumer discretionary"),  # motor vehicles
+    (3750, 3751, "XLY", "Consumer discretionary"),  # motorcycles and bicycles
+    (3840, 3851, "XLV", "Health care"),  # medical instruments and supplies
+    (3800, 3899, "XLK", "Technology"),  # other instruments
+    (4950, 4959, "XLI", "Industrials"),  # waste management
+    (4900, 4999, "XLU", "Utilities"),
+    (4800, 4899, "XLC", "Communication services"),
+    (5122, 5122, "XLV", "Health care"),  # drug wholesale
+    (5140, 5149, "XLP", "Consumer staples"),  # grocery wholesale
+    (5300, 5499, "XLP", "Consumer staples"),  # general merchandise (Walmart, Costco, Target) and food stores
+    (5912, 5912, "XLP", "Consumer staples"),  # drug stores
+    (6500, 6553, "XLRE", "Real estate"),
+    (6798, 6798, "XLRE", "Real estate"),  # REITs
+    (7311, 7311, "XLC", "Communication services"),  # advertising
+    (7370, 7379, "XLK", "Technology"),  # software and computer services
+    (7810, 7829, "XLC", "Communication services"),  # motion pictures
+    (8000, 8099, "XLV", "Health care"),  # health services
+    (100, 999, "XLP", "Consumer staples"),  # agriculture
+    (1000, 1099, "XLB", "Materials"),  # metal mining
+    (1200, 1399, "XLE", "Energy"),  # coal, oil and gas
+    (1400, 1499, "XLB", "Materials"),
+    (1500, 1799, "XLI", "Industrials"),  # construction
+    (2000, 2199, "XLP", "Consumer staples"),  # food and tobacco
+    (2200, 2399, "XLY", "Consumer discretionary"),  # textiles and apparel
+    (2500, 2599, "XLY", "Consumer discretionary"),  # furniture
+    (2700, 2799, "XLC", "Communication services"),  # publishing
+    (2400, 2899, "XLB", "Materials"),  # lumber, paper, chemicals
+    (3100, 3199, "XLY", "Consumer discretionary"),  # leather
+    (3000, 3399, "XLB", "Materials"),  # rubber, glass, metals
+    (3400, 3799, "XLI", "Industrials"),  # machinery, aircraft, ships, rail
+    (3900, 3999, "XLY", "Consumer discretionary"),
+    (4000, 4799, "XLI", "Industrials"),  # transportation
+    (5000, 5199, "XLI", "Industrials"),  # wholesale
+    (5200, 5999, "XLY", "Consumer discretionary"),  # retail and restaurants
+    (6000, 6799, "XLF", "Financials"),  # banks, insurers, brokers, holding companies
+    (7300, 7399, "XLI", "Industrials"),  # business services
+    (7000, 7999, "XLY", "Consumer discretionary"),  # hotels, personal services, amusement
+    (8000, 8999, "XLI", "Industrials"),  # engineering and management services
+)
+
 # --- Insider trades (SEC Form 4) ----------------------------------------------------------
 
 # Window read when the agent gives no start date: a year of Form 4s, the span insider-trading studies usually use

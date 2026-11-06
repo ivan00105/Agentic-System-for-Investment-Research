@@ -36,8 +36,8 @@ test('with no keys, every kind of data has a card that names the variables to se
   await page.getByRole('button', {name: 'Setup & status', exact: true}).click()
   await expect(page).toHaveURL(/view=setup/)
   await expect(page.getByRole('heading', {name: 'Setup & status', exact: true})).toBeVisible()
-  for (const name of ['SEC filings', 'Fundamentals', 'Company lookup', 'Daily prices', 'Rates, inflation and release dates', 'Insider trades', 'Model']) await expect(card(page, name)).toBeVisible()
-  await expect(page.locator('.setup-summary')).toContainText('Not ready yet: SEC filings, Fundamentals, Company lookup, Insider trades, Model.')
+  for (const name of ['SEC filings', 'Fundamentals', 'Company lookup', 'Daily prices', 'Rates, inflation and release dates', 'Insider trades', 'Peers and sector', 'Model']) await expect(card(page, name)).toBeVisible()
+  await expect(page.locator('.setup-summary')).toContainText('Not ready yet: SEC filings, Fundamentals, Company lookup, Insider trades, Peers and sector, Model.')
 
   const filings = card(page, 'SEC filings')
   await expect(filings.getByText('Nothing active', {exact: true})).toBeVisible()

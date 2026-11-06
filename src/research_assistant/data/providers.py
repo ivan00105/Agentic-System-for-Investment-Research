@@ -24,6 +24,8 @@ KINDS = {
     "macro": ("Rates, inflation and release dates", "The risk-free rate for Sharpe ratios, Treasury yields, inflation "
               "and unemployment as context, and the dates of major US data releases."),
     "insiders": ("Insider trades", "Insiders' open-market purchases and sales from their SEC Form 4 filings."),
+    "peers": ("Peers and sector", "Peers by SIC industry code and size, and the sector ETF to compare against (its "
+              "prices come from the daily prices card)."),
     "llm": ("Model", "The language model that plans the research, calls the tools and writes the report."),
 }
 
@@ -89,6 +91,7 @@ def all_providers() -> list[Provider]:
         Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
         Provider("sec_tickers", "identity", "SEC company tickers", **sec),
         Provider("sec_form4", "insiders", "SEC Form 4 filings", **sec),
+        Provider("sec_sic", "peers", "SEC company list by SIC code", **sec),
         *[Provider(a.NAME, "prices", a.LABEL, a.TIER, a.ENV, a.configured, a.check) for a in price_adapters],
         *[Provider(a.NAME, "macro", a.LABEL, a.TIER, a.ENV, a.configured, a.check, note=a.NOTE) for a in macro_adapters],
         _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),

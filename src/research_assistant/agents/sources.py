@@ -8,7 +8,8 @@ from .checker import format_value
 
 GROUPS = {"fact": "Reported figures", "calc": "Calculations", "chunk": "Filing text", "filing": "Filings",
           "prices": "Prices", "check": "Checks against the filing", "company": "Companies",
-          "claim": "Analyst findings", "calendar": "Release dates", "insider": "Insider trades"}
+          "claim": "Analyst findings", "calendar": "Release dates", "insider": "Insider trades",
+          "peers": "Peers and sector"}
 METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_income": "Operating income",
            "net_income": "Net income", "research_and_development": "R&D spending",
            "operating_cash_flow": "Operating cash flow", "capex": "Capital spending", "eps_diluted": "Diluted EPS",
@@ -17,7 +18,8 @@ METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_inco
            "shares_outstanding": "Shares outstanding"}
 FORMULAS = {"fcf": "Free cash flow", "market_cap": "Market cap", "pe": "P/E", "ps": "P/S", "pb": "P/B",
             "fcf_yield": "FCF yield", "ev": "Enterprise value", "total_return": "Total return",
-            "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta"}
+            "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta",
+            "sharpe": "Sharpe ratio", "relative_return": "Return against the benchmark"}
 MARGINS = {"gross_profit": "Gross margin", "operating_income": "Operating margin", "net_income": "Net margin",
            "fcf": "FCF margin", "operating_cash_flow": "Operating cash flow margin"}
 
@@ -87,6 +89,8 @@ def chip(record: dict | None, records: dict[str, dict]) -> str:
         return f"Filing check: {record.get('verdict')}"
     if kind == "calendar":
         return f"Release dates from {record.get('start')}"
+    if kind == "peers":
+        return f"Peers of {record.get('name')}"
     if kind == "insider":
         return f"Form 4 {record.get('meaning')} {record.get('date')}"
     if kind == "company":
@@ -134,6 +138,11 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
                    "(as traded).") if closes else "No closing prices."
         rows = [("Source", record.get("source")),
                 ("Adjusted prices", "Include dividends, so nobody could have traded at them")]
+    elif kind == "peers":
+        title = f"Peers of {record.get('name')} (SIC {record.get('sic')}, {record.get('sic_description')})"
+        excerpt = "; ".join(f"{p['name']} ({', '.join(p['tickers'])})" for p in record.get("peers") or []) or "None chosen."
+        rows = [("How they were chosen", record.get("method")),
+                ("Sector benchmark", (record.get("sector") or {}).get("rule"))]
     elif kind == "insider":
         title = f"Insider {record.get('meaning')} by {record.get('owner')}, {record.get('date')}"
         value = f" (${Decimal(record['value']):,.0f})" if record.get("value") else ""

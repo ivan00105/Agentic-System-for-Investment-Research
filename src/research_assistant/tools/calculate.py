@@ -30,11 +30,12 @@ ROLES = {
     "max_drawdown": ("prices",),
     "beta": ("prices", "benchmark"),
     "sharpe": ("prices", "risk_free"),
+    "relative_return": ("prices", "benchmark"),  # e.g. against the sector ETF from get_peers
 }
 UNITS = {"ratio": "ratio", "growth": "ratio", "change_pp": "pp", "cagr": "ratio", "fcf": "USD", "market_cap": "USD",
          "pe": "x", "ps": "x", "pb": "x", "fcf_yield": "ratio", "ev": "USD", "total_return": "ratio",
-         "volatility": "ratio", "max_drawdown": "ratio", "beta": "x", "sharpe": "x"}
-PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta", "sharpe"}
+         "volatility": "ratio", "max_drawdown": "ratio", "beta": "x", "sharpe": "x", "relative_return": "pp"}
+PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta", "sharpe", "relative_return"}
 # A Sharpe ratio's risk-free rate: get_macro's average 3-month T-bill rate over the price series' dates.
 RISK_FREE_METRIC = "tbill_3m_avg"
 # A 10-K/10-Q cover count is the listed common stock; a 20-F/40-F filer's US quote is usually an ADS of N shares.
@@ -174,7 +175,9 @@ def _compute(formula: str, r: dict[str, dict]):
             rate = float(_number(r["risk_free"]))
             return risk.sharpe(values, rate, config.TRADING_DAYS_PER_YEAR), start, end, notes
         if r["prices"]["source"] != r["benchmark"]["source"]:
-            raise Rejected("Beta needs both series from the same provider; fetch them again with one provider.")
+            raise Rejected(f"{formula} needs both series from the same provider; fetch them again with one provider.")
+        if formula == "relative_return":
+            return risk.relative_return(closes, _closes(r["benchmark"])), start, end, notes
         return risk.beta(closes, _closes(r["benchmark"])), start, end, notes
     if formula == "market_cap":
         raw = _closes(r["prices"], "close")
@@ -270,4 +273,4 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("calculate", "Compute a finance formula from IDs returned by other tools (never from typed numbers): "
             "ratio (margins), growth, change_pp, cagr, fcf, market_cap, pe, ps, pb, fcf_yield, ev, total_return, "
-            "volatility, max_drawdown, beta, sharpe. Returns a calc ID to cite.", CalculateInput, run, "calculate")
+            "volatility, max_drawdown, beta, sharpe, relative_return. Returns a calc ID to cite.", CalculateInput, run, "calculate")
