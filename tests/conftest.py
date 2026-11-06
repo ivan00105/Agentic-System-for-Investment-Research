@@ -15,6 +15,7 @@ def isolate_configuration(monkeypatch):
         "SEC_USER_AGENT", "RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL",
         "OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL",
         "OPENAI_ORG_ID", "OPENAI_PROJECT_ID", "RESEARCH_DATA_DIR", "TIINGO_API_KEY", "PRICE_PROVIDERS",
+        "FRED_API_KEY", "MACRO_PROVIDERS",
     ):
         # Track absent keys too: load_dotenv writes directly into os.environ.
         monkeypatch.setenv(name, "")

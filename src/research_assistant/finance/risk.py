@@ -33,6 +33,20 @@ def max_drawdown(closes: list[float]) -> Outcome:
     return Outcome(worst)
 
 
+def sharpe(closes: list[float], risk_free: float, periods_per_year: int) -> Outcome:
+    """(Annualised mean daily return - the risk-free rate) / annualised volatility, as in Sharpe (1994)."""
+    daily = returns(closes)
+    if len(daily) < 2:
+        return Outcome(None, "A Sharpe ratio needs at least three prices.")
+    spread = statistics.stdev(daily)
+    if spread == 0:
+        return Outcome(None, "A Sharpe ratio is undefined when the price never moves.")
+    excess = statistics.fmean(daily) * periods_per_year - risk_free
+    return Outcome(excess / (spread * math.sqrt(periods_per_year)),
+                   note=f"Mean daily return x {periods_per_year} minus the risk-free rate {risk_free:.4%}, over "
+                        f"volatility; {len(daily)} daily returns.")
+
+
 def beta(stock: dict[str, float], benchmark: dict[str, float]) -> Outcome:
     """Slope of the stock's daily returns on the benchmark's, over the dates both have prices."""
     dates = sorted(stock.keys() & benchmark.keys())

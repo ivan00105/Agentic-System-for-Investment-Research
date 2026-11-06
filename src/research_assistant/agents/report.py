@@ -60,6 +60,11 @@ def review_line(o: dict, number: dict[str, int]) -> str:
 def describe(record: dict) -> str:
     """One line saying where a cited record comes from."""
     kind, rid = record.get("kind"), record["id"]
+    if kind == "fact" and not record.get("accession"):  # a value from another provider, e.g. get_macro's rates
+        period = f"{record['start']} to {record['end']}" if record.get("start") else f"at {record['end']}"
+        vintage = f", as published on {record['vintage']}" if record.get("vintage") else ""
+        return (f"`{rid}` {record.get('metric')} = {format_value(record)}, {period} ({record.get('source')} "
+                f"{record.get('series_id')}{vintage}) {record.get('url', '')}")
     if kind == "fact":
         period = f"{record['start']} to {record['end']}" if record.get("start") else f"at {record['end']}"
         return (f"`{rid}` {record.get('metric')} = {format_value(record)}, {period} ({record.get('tag')}; "
@@ -78,6 +83,9 @@ def describe(record: dict) -> str:
         return f"`{rid}` {record.get('name')} (CIK {record.get('cik')}, {', '.join(record.get('tickers') or [])})"
     if kind == "prices":
         return f"`{rid}` {record.get('ticker')} daily prices from {record.get('source')}, {record.get('start')} to {record.get('end')}"
+    if kind == "calendar":
+        dates = "; ".join(f"{r['date']} {r['name']}" for r in record.get("releases") or []) or "none"
+        return f"`{rid}` Release dates {record.get('start')} to {record.get('end')} ({record.get('source')}): {dates} {record.get('url', '')}"
     if kind == "check":
         return f"`{rid}` {record.get('fact_id')} checked against the filing: {record.get('verdict')} {record.get('filing_url', '')}"
     if kind == "claim":

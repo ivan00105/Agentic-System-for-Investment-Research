@@ -67,6 +67,7 @@ function ProviderRow({provider, active, testing, onTest, testNote}: {provider: P
   return <li className="provider-row">
     <div className="provider-head"><strong>{provider.label}</strong>{active && <span className="active-tag">Active</span>}<Badge tone={status.tone}>{status.text}</Badge></div>
     <p className="provider-meta">{TIERS[provider.tier] ?? `Tier ${provider.tier}`}{provider.env.length ? <> · uses {provider.env.map((name, i) => <span key={name}>{i ? ', ' : ''}<code>{name}</code></span>)}</> : ''}</p>
+    {provider.note && <p className="provider-meta">{provider.note}</p>}
     {provider.missing_env.length > 0 && <p className="provider-missing">To use it, set in <code>.env</code>: {provider.missing_env.map((name, i) => <span key={name}>{i ? ', ' : ''}<code>{name}</code></span>)}</p>}
     {provider.problem && <p className="configuration-note">{provider.problem}</p>}
     {check && <p className="provider-check">{check.ok ? 'Check passed' : 'Check failed'} · <time dateTime={check.checked_at}>{stamp(check.checked_at)}</time><br />{check.message}</p>}

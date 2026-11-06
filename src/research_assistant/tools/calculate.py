@@ -29,11 +29,14 @@ ROLES = {
     "volatility": ("prices",),
     "max_drawdown": ("prices",),
     "beta": ("prices", "benchmark"),
+    "sharpe": ("prices", "risk_free"),
 }
 UNITS = {"ratio": "ratio", "growth": "ratio", "change_pp": "pp", "cagr": "ratio", "fcf": "USD", "market_cap": "USD",
          "pe": "x", "ps": "x", "pb": "x", "fcf_yield": "ratio", "ev": "USD", "total_return": "ratio",
-         "volatility": "ratio", "max_drawdown": "ratio", "beta": "x"}
-PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta"}
+         "volatility": "ratio", "max_drawdown": "ratio", "beta": "x", "sharpe": "x"}
+PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta", "sharpe"}
+# A Sharpe ratio's risk-free rate: get_macro's average 3-month T-bill rate over the price series' dates.
+RISK_FREE_METRIC = "tbill_3m_avg"
 # A 10-K/10-Q cover count is the listed common stock; a 20-F/40-F filer's US quote is usually an ADS of N shares.
 DOMESTIC_SHARE_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A"}
 # What each named USD input must measure: a get_financials metric, or calculate's fcf. Ratio's roles stay open.
@@ -103,13 +106,16 @@ def _check_roles(r: dict[str, dict]) -> None:
             raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a USD amount ({role}).")
         if role in USD_ROLES and _label(record) != USD_ROLES[role]:
             raise Rejected(f"{record['id']} is {_label(record)}, not {USD_ROLES[role]} ({role}).")
+        if role == "risk_free" and (record["kind"] != "fact" or record.get("metric") != RISK_FREE_METRIC):
+            raise Rejected(f"{record['id']} is {_label(record)}, not get_macro's tbill_3m average over the price "
+                           "series' dates (risk_free).")
         if role == "market_cap" and (record["kind"] != "calc" or record.get("formula") != "market_cap"):
             raise Rejected(f"{record['id']} is {_label(record)}, not a market_cap result from calculate (market_cap).")
 
 
 def _company(formula: str, r: dict[str, dict]) -> tuple[str | None, list[str]]:
-    """The one company every input describes. A beta's benchmark is the only input allowed to differ."""
-    ciks = {r[role].get("cik") for role in ROLES[formula] if not (formula == "beta" and role == "benchmark")}
+    """The one company every input describes. A beta's benchmark and the risk-free rate describe no company."""
+    ciks = {r[role].get("cik") for role in ROLES[formula] if role not in ("benchmark", "risk_free")}
     known = sorted(ciks - {None})
     if len(known) > 1:
         raise Rejected(f"The inputs belong to different companies (CIK {', '.join(known)}); calculate each company "
@@ -139,6 +145,16 @@ def _split_factor(series: dict, shares_day: date, price_day: date) -> tuple[Deci
     return factor, notes
 
 
+def _same_window(rate: dict, start: str | None, end: str | None) -> None:
+    """The risk-free average must cover the price series' dates, give or take a few holidays."""
+    slack = config.RISK_FREE_WINDOW_SLACK_DAYS
+    if not start or not rate.get("start") or any(
+            abs((date.fromisoformat(a) - date.fromisoformat(b)).days) > slack
+            for a, b in ((rate["start"], start), (rate["end"], end))):
+        raise Rejected(f"{rate['id']} averages {rate.get('start')} to {rate.get('end')}, but the prices run {start} to "
+                       f"{end}; call get_macro with series tbill_3m, start {start} and end {end}.")
+
+
 def _compute(formula: str, r: dict[str, dict]):
     """Returns (outcome, start, end, notes)."""
     notes: list[str] = []
@@ -153,6 +169,10 @@ def _compute(formula: str, r: dict[str, dict]):
             return risk.volatility(values, config.TRADING_DAYS_PER_YEAR), start, end, notes
         if formula == "max_drawdown":
             return risk.max_drawdown(values), start, end, notes
+        if formula == "sharpe":
+            _same_window(r["risk_free"], start, end)
+            rate = float(_number(r["risk_free"]))
+            return risk.sharpe(values, rate, config.TRADING_DAYS_PER_YEAR), start, end, notes
         if r["prices"]["source"] != r["benchmark"]["source"]:
             raise Rejected("Beta needs both series from the same provider; fetch them again with one provider.")
         return risk.beta(closes, _closes(r["benchmark"])), start, end, notes
@@ -250,4 +270,4 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("calculate", "Compute a finance formula from IDs returned by other tools (never from typed numbers): "
             "ratio (margins), growth, change_pp, cagr, fcf, market_cap, pe, ps, pb, fcf_yield, ev, total_return, "
-            "volatility, max_drawdown, beta. Returns a calc ID to cite.", CalculateInput, run, "calculate")
+            "volatility, max_drawdown, beta, sharpe. Returns a calc ID to cite.", CalculateInput, run, "calculate")

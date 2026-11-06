@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockRun, RUN, summary } from './agent-fixtures'
+import { mockRun, REPORT, RUN, summary } from './agent-fixtures'
 import AxeBuilder from '@axe-core/playwright'
 import fs from 'node:fs'
 
@@ -100,4 +100,20 @@ test('help me start turns four choices into a Find question and a note the run k
   await expect(page.getByRole('form', {name: 'Help me start'}).getByRole('radio', {name: /^Dividends/})).toBeChecked()
   await page.getByRole('button', {name: /Help me start/}).click()
   await expect(page.getByRole('form', {name: 'Help me start'})).toHaveCount(0)
+})
+
+test('sources from the newer data tools get their own groups, and only known sites are linked', async ({page}) => {
+  const sources = [...REPORT.sources,
+    {n: 3, id: 'insider-1', text: 'Doe Jane (director): purchase of 1000 shares', url: 'https://www.sec.gov/Archives/edgar/data/1/1/form4.xml', kind: 'insider', group: 'Insider trades', label: 'Form 4 purchase 2026-09-30'},
+    {n: 4, id: 'fact-rate', text: 'tbill_3m = 4.0%', url: 'https://fred.stlouisfed.org/series/DTB3', kind: 'fact', group: 'Reported figures', label: '3-month T-bill rate 2026'},
+    {n: 5, id: 'mystery-1', text: 'A kind this page has never seen', url: 'https://example.com/x', kind: 'mystery', group: 'Something new', label: 'Mystery record'}]
+  await mockRun(page, {}, {...REPORT, sources})
+  await page.goto(`/?view=research&agent=${RUN}`)
+  const group = (name: string) => page.locator('.source-group').filter({has: page.locator('summary', {hasText: name})})
+  for (const name of ['Reported figures', 'Insider trades', 'Other']) await group(name).locator('summary').click()
+  await expect(group('Insider trades').getByRole('link', {name: 'SEC.gov ↗'})).toBeVisible()
+  await expect(group('Reported figures').getByRole('link', {name: 'FRED ↗'})).toHaveAttribute('href', 'https://fred.stlouisfed.org/series/DTB3')
+  // An unknown group is listed under Other, never dropped, and a link to an unknown site stays text.
+  await expect(group('Other')).toContainText('Mystery record')
+  await expect(group('Other').getByRole('link')).toHaveCount(0)
 })

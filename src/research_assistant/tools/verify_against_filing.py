@@ -17,7 +17,7 @@ class VerifyInput(BaseModel):
 def run(args: VerifyInput, context: ToolContext) -> ToolResult:
     source = "SEC filing (inline XBRL)"
     fact = context.records.get(args.fact_id)
-    if fact is None or fact.get("kind") != "fact":
+    if fact is None or fact.get("kind") != "fact" or not fact.get("accession"):
         return ToolResult(status="invalid", source=source, warnings=[f"{args.fact_id} is not a fact ID from get_financials."])
     filing = sec_filings.find(context.sec, fact["cik"], fact["accession"])
     if filing is None:

@@ -110,7 +110,7 @@ export const agentApi = {
 }
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
-export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean }
+export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null }
 export interface DataKind { kind: string; label: string; purpose: string; active: string | null; providers: ProviderStatus[] }
 export const setupApi = {
   status: () => request<{kinds: DataKind[]}>('/status'),
@@ -119,4 +119,6 @@ export const setupApi = {
 }
 export const agentRunning = (status: string) => status === 'running' || status === 'stopping' || status === 'waiting'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.
-export const secUrl = (url: string | null) => url && /^https:\/\/(www|data)\.sec\.gov\//.test(url) ? url : null
+// A record's link opens only on a host our data providers use; any other URL stays unlinked.
+const SITES: [RegExp, string][] = [[/^https:\/\/(www|data)\.sec\.gov\//, 'SEC.gov'], [/^https:\/\/fred\.stlouisfed\.org\//, 'FRED'], [/^https:\/\/home\.treasury\.gov\//, 'Treasury.gov']]
+export const sourceLink = (url: string | null) => { const site = url ? SITES.find(([pattern]) => pattern.test(url)) : undefined; return url && site ? {href: url, site: site[1]} : null }

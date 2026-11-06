@@ -14,7 +14,7 @@ MARGIN_TOPS = ("operating_income", "net_income")  # banks report no operating in
 def figures(cited: list[str], key_numbers: list[str], records: dict[str, dict]) -> dict:
     """`cited`: every record the report cites, in order; `key_numbers`: those the key-numbers section cites."""
     names = {r["cik"]: r.get("name") for r in records.values() if r.get("kind") == "company"}
-    ciks = list(dict.fromkeys(r["cik"] for i in cited if (r := records.get(i)) and r.get("kind") == "fact"))
+    ciks = list(dict.fromkeys(r["cik"] for i in cited if (r := records.get(i)) and r.get("kind") == "fact" and r.get("cik")))
     return {"table": table(key_numbers, records, names),
             "charts": [chart(cik, names.get(cik) or cik, records, set(cited)) for cik in ciks]}
 

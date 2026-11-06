@@ -2,13 +2,13 @@
 from pydantic import ValidationError
 
 from ..data.errors import DataError
-from . import (calculate, find_company, get_financials, get_prices, list_filings, read_filing_section, screen,
+from . import (calculate, find_company, get_financials, get_macro, get_prices, list_filings, read_filing_section, screen,
                verify_against_filing)
 from .result import Tool, ToolContext, ToolResult
 
 TOOLS: dict[str, Tool] = {tool.name: tool for tool in (
     find_company.TOOL, get_financials.TOOL, calculate.TOOL, list_filings.TOOL, read_filing_section.TOOL,
-    get_prices.TOOL, screen.TOOL, verify_against_filing.TOOL)}
+    get_prices.TOOL, screen.TOOL, verify_against_filing.TOOL, get_macro.TOOL)}
 
 
 def schemas(names: list[str] | None = None) -> list[dict]:

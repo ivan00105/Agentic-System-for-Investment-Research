@@ -99,6 +99,30 @@ PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
 PRICE_CLOSE_AVAILABLE_HOUR = 18
 # Annualisation for volatility: US exchanges trade about 252 days a year.
 TRADING_DAYS_PER_YEAR = 252
+# A Sharpe ratio's risk-free average must cover the price series' dates to within this many days on each end: the
+# bond and stock markets close on different holidays, so their first and last days can differ a little.
+RISK_FREE_WINDOW_SLACK_DAYS = 7
+
+# --- Macro: risk-free rate, rates, inflation, release dates (REFERENCE §10) -----------------
+
+# Provider order, best first; MACRO_PROVIDERS in .env overrides it. FRED (free key) has every series, ALFRED
+# vintages and the release calendar; Treasury (no key) has the bill and Treasury yields only.
+MACRO_PROVIDERS = ("fred", "treasury")
+# Today's observations can still arrive later in the day, so data as of the latest known day refreshes after this.
+# Data as of an earlier day never changes (a FRED vintage is frozen; Treasury doesn't revise past rates).
+MACRO_CACHE_MAX_AGE_HOURS = 12
+# History read to find each series' latest value: monthly series (CPI, unemployment) are published weeks after
+# the month, so about 13 months always holds the latest one and a year-earlier value.
+MACRO_LATEST_LOOKBACK_DAYS = 400
+# Release dates listed after the cutoff when the agent doesn't ask: about a month covers the next CPI, jobs report
+# and FOMC decision. The agent can ask for up to MACRO_MAX_HORIZON_DAYS (a year of calendar is plenty).
+MACRO_RELEASE_HORIZON_DAYS = 30
+MACRO_MAX_HORIZON_DAYS = 366
+# The FRED releases counted as major (https://fred.stlouisfed.org/releases): CPI (10), Employment Situation (50),
+# GDP (53), Personal Income and Outlays incl. PCE inflation (54), FOMC press release (101).
+MACRO_RELEASES = (10, 50, 53, 54, 101)
+# FRED's terms set no published number; 120 a minute per key is the commonly cited limit, and a 429 is retried.
+FRED_MAX_REQUESTS_PER_MINUTE = 120
 
 # --- Agents -------------------------------------------------------------------------------
 
