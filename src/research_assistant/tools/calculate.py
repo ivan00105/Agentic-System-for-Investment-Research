@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .. import config
-from ..finance import fundamentals, risk
+from ..finance import Outcome, fundamentals, risk
 from .result import Tool, ToolContext, ToolResult, make_id
 
 ROLES = {
@@ -34,7 +34,11 @@ UNITS = {"ratio": "ratio", "growth": "ratio", "change_pp": "pp", "cagr": "ratio"
          "pe": "x", "ps": "x", "pb": "x", "fcf_yield": "ratio", "ev": "USD", "total_return": "ratio",
          "volatility": "ratio", "max_drawdown": "ratio", "beta": "x"}
 PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta"}
-USD_ROLES = {"net_income", "revenue", "equity", "debt", "cash", "operating_cash_flow", "capex", "fcf"}
+# A 10-K/10-Q cover count is the listed common stock; a 20-F/40-F filer's US quote is usually an ADS of N shares.
+DOMESTIC_SHARE_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A"}
+# What each named USD input must measure: a get_financials metric, or calculate's fcf. Ratio's roles stay open.
+USD_ROLES = {"net_income": "net_income", "revenue": "revenue", "equity": "stockholders_equity", "debt": "long_term_debt",
+             "cash": "cash", "operating_cash_flow": "operating_cash_flow", "capex": "capex", "fcf": "fcf"}
 
 
 class CalculateInput(BaseModel):
@@ -97,6 +101,8 @@ def _check_roles(r: dict[str, dict]) -> None:
             raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a share count (shares).")
         if role in USD_ROLES and (record["kind"] not in ("fact", "calc") or record.get("unit") != "USD"):
             raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a USD amount ({role}).")
+        if role in USD_ROLES and _label(record) != USD_ROLES[role]:
+            raise Rejected(f"{record['id']} is {_label(record)}, not {USD_ROLES[role]} ({role}).")
         if role == "market_cap" and (record["kind"] != "calc" or record.get("formula") != "market_cap"):
             raise Rejected(f"{record['id']} is {_label(record)}, not a market_cap result from calculate (market_cap).")
 
@@ -155,6 +161,12 @@ def _compute(formula: str, r: dict[str, dict]):
         if not raw:
             raise Rejected(f"{r['prices']['id']} has no as-traded close.")
         last = max(raw)
+        form = r["shares"].get("form")
+        if form not in DOMESTIC_SHARE_FORMS:
+            why = (f"the share count comes from a {form}, and a foreign filer's US quote is often a depositary share "
+                   "(ADS) of several ordinary shares" if form else "the share count's filing form is unknown")
+            return Outcome(None, f"Market cap unsupported: {why}, so the share basis of the price can't be confirmed."), \
+                None, date.fromisoformat(last), notes
         shares_end = _period(r["shares"])[1]
         notes.append(f"As-traded close on {last} x shares outstanding on {shares_end}.")
         if abs((date.fromisoformat(last) - shares_end).days) > 120:
@@ -163,6 +175,8 @@ def _compute(formula: str, r: dict[str, dict]):
         notes += split_notes
         outcome = fundamentals.market_cap(Decimal(str(raw[last])), _number(r["shares"]) * factor)
         return outcome, None, date.fromisoformat(last), notes
+    if "market_cap" in r and r["market_cap"].get("value") is None:
+        return Outcome(None, f"No market cap ({r['market_cap'].get('reason')})"), None, _period(r["market_cap"])[1], notes
     if formula in ("ratio", "fcf", "pe", "ps", "pb", "fcf_yield"):
         a, b = (r[role] for role in ROLES[formula])
         a_value, b_value = _number(a), _number(b)

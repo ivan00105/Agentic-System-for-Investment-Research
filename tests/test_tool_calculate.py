@@ -222,3 +222,50 @@ def test_market_cap_needs_a_price_series(apple):
     context, ids = apple
     result = calc(context, "market_cap", prices=ids["2025-09-27", "revenue"], shares=ids["2026-07-17", "shares_outstanding"])
     assert result.status == "invalid" and "price series" in result.warnings[0]
+
+
+def test_market_cap_is_unsupported_for_a_foreign_filer(apple):
+    # Second review: BABA's ADS is 8 ordinary shares, so ADS price x ordinary shares gave 8 times the market cap.
+    context, ids = apple
+    context.remember({**context.records[ids["2026-07-17", "shares_outstanding"]], "id": "fact-ordinary", "form": "20-F"})
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares="fact-ordinary")
+    assert cap.status == "unsupported" and cap.data["value"] is None and "20-F" in cap.data["reason"]
+    pe = calc(context, "pe", market_cap=cap.ids[0], net_income=ids["2025-09-27", "net_income"])
+    assert pe.status == "unsupported" and "20-F" in pe.data["reason"]
+
+
+def test_market_cap_is_unsupported_when_the_share_basis_is_unknown(apple):
+    context, ids = apple
+    shares = {k: v for k, v in context.records[ids["2026-07-17", "shares_outstanding"]].items() if k != "form"}
+    context.remember({**shares, "id": "fact-no-form"})
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares="fact-no-form")
+    assert cap.status == "unsupported" and "share basis" in cap.data["reason"]
+
+
+def test_pe_rejects_revenue_as_net_income(apple):
+    # Second review: a USD revenue fact passed the unit check as net income and gave a clean P/E.
+    context, ids = apple
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    result = calc(context, "pe", market_cap=cap.ids[0], net_income=ids["2025-09-27", "revenue"])
+    assert result.status == "invalid" and "not net_income" in result.warnings[0]
+    pb = calc(context, "pb", market_cap=cap.ids[0], equity=ids["2025-09-27", "net_income"])
+    assert pb.status == "invalid" and "not stockholders_equity" in pb.warnings[0]
+
+
+def test_fcf_yield_needs_an_fcf_result(apple):
+    context, ids = apple
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    result = calc(context, "fcf_yield", fcf=ids["2025-09-27", "operating_cash_flow"], market_cap=cap.ids[0])
+    assert result.status == "invalid" and "not fcf" in result.warnings[0]
+    swapped = calc(context, "fcf", operating_cash_flow=ids["2025-09-27", "capex"], capex=ids["2025-09-27", "operating_cash_flow"])
+    assert swapped.status == "invalid"
+
+
+def test_ratio_still_takes_any_two_amounts(apple):
+    context, ids = apple
+    result = calc(context, "ratio", numerator=ids["2025-09-27", "operating_cash_flow"], denominator=ids["2025-09-27", "revenue"])
+    assert result.status == "ok"

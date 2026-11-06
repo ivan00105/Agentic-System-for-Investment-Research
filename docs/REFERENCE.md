@@ -91,6 +91,7 @@ Tool lists are enforced (`agents/roles.py`): the loop answers a call to any othe
 **Prices and valuation**
 - Choose the price adjustment (splits, dividends) explicitly and never double-adjust. Adjusted historical prices are not prices you could have traded at.
 - Per-share numbers must use the same split basis as the price. Shares outstanding: `dei:EntityCommonStockSharesOutstanding` (cover-page date).
+- A 20-F or 40-F filer's US quote is often a depositary share (BABA's ADS is 8 ordinary shares), so ADS price × ordinary shares overstates the market cap. `calculate` returns market cap, and the P/E, P/S, P/B, FCF yield and EV built on it, as unsupported unless the share count comes from a 10-K or 10-Q. ADS ratios are not parsed.
 - Historical market cap = **as-traded (raw) close** × cover-page shares. yfinance's Close is already split-adjusted, so use it for current-price valuation only. Tiingo provides both raw and adjusted prices.
 - 20 trading sessions ≠ 20 calendar days. Use an exchange calendar (holidays, DST).
 - Survivorship: SEC ticker lists hold today's companies only. Never drop delisted losers or forward-fill their prices. Thirty current large caps make a case study, not a market result.
