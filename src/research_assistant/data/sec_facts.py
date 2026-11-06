@@ -137,6 +137,11 @@ def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[dat
                             f"{accession}; withheld until checked by hand.")
             continue
         fact = same[0]
+        if fact.tag in CONTRACT_REVENUE_TAGS and (older := [f for _, t, f in candidates if t not in CONTRACT_REVENUE_TAGS
+                                                            and f.accession != accession and f.value > fact.value]):
+            o = max(older, key=lambda f: f.filed)
+            warnings.append(f"{concept.metric} for the period ending {end}: a larger {o.tag} total ({o.value}) is in "
+                            f"filing {o.accession}, not the latest {accession}; the latest filing's value is kept.")
         earlier = sorted((f for _, t, f in candidates if t == fact.tag and f.filed < fact.filed), key=lambda f: f.filed)
         if earlier and earlier[0].value != fact.value:
             fact = replace(fact, original_value=earlier[0].value, original_accession=earlier[0].accession)
@@ -179,9 +184,16 @@ def frame(sec, concept: Concept, year: int) -> dict[str, dict]:
 
 
 def _broadest(found: list[dict]) -> dict:
+    """A larger total replaces contract revenue only from the same filing; one from another filing is noted."""
     best = found[0]
     if best["tag"] not in CONTRACT_REVENUE_TAGS:
         return best
     totals = [f for f in found if f["tag"] not in CONTRACT_REVENUE_TAGS and f["end"] == best["end"]
               and f["value"] > best["value"]]
-    return max(totals, key=lambda f: f["value"], default=best)
+    if same := [f for f in totals if f["accession"] == best["accession"]]:
+        return max(same, key=lambda f: f["value"])
+    if totals:
+        o = max(totals, key=lambda f: f["value"])
+        return best | {"note": f"a larger {o['tag']} total ({o['value']}) is in filing {o['accession']}, not "
+                               f"{best['accession']}; the {best['tag']} value is kept."}
+    return best

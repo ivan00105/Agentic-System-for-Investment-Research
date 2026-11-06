@@ -121,8 +121,10 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
                 passed = OPERATORS[f.op](value, Decimal(str(f.value)))
                 checks.append(("pass" if passed else "fail", f"{f.metric} {f.op} {f.value}"))
         name = next((frames[n][cik]["name"] for n in frames if cik in frames[n]), None) or getattr(listed.get(cik), "name", None)
+        notes = list(dict.fromkeys(f"{need[0]}{' (year before)' if need[1] else ''}: {e['note']}"
+                                   for need, e in sorted(entries.items()) if e and e.get("note")))
         rows.append({"cik": cik, "name": name, "tickers": list(getattr(listed.get(cik), "tickers", ())),
-                     "values": values, "doubts": doubts, "checks": checks})
+                     "values": values, "doubts": doubts, "checks": checks, "notes": notes})
     for row in rows:
         if args.sic_prefixes and all(c[0] == "pass" for c in row["checks"]):
             try:
@@ -149,6 +151,9 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
     if doubted:
         warnings.append(f"{doubted} eligible companies were not ranked because their {args.rank_by} can't be compared "
                         "with the others; each one's flag in the screen record says why.")
+    if noted := sum(bool(r["notes"]) for r in rows):
+        warnings.append(f"{noted} companies have a larger revenue total in another filing than the value used; each "
+                        "one's notes in the screen record say which.")
     if not args.universe:
         warnings.append(f"The universe is every company in SEC's {year} frames, today's filers only (survivorship bias).")
 
@@ -156,7 +161,7 @@ def run(args: ScreenInput, context: ToolContext) -> ToolResult:
         return {"rank": rank, "cik": row["cik"], "name": row["name"], "tickers": row["tickers"], "sic": row.get("sic"),
                 "values": {m: (None if v is None else str(round(v, 6))) for m, v in row["values"].items()},
                 "eligibility": row["eligibility"], "checks": [f"{state}: {why}" for state, why in row["checks"]],
-                "flags": [f"{m} {why}" for m, why in row["doubts"].items()]}
+                "flags": [f"{m} {why}" for m, why in row["doubts"].items()], "notes": row["notes"]}
     spec = args.model_dump(mode="json") | {"year": year, "top_k": top_k}
     record = {"id": make_id("screen", spec, year), "kind": "screen", "spec": spec, "counts": counts,
               "rows": [shown(r) for r in rows]}

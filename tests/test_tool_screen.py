@@ -121,3 +121,17 @@ def test_a_historical_run_refuses_to_screen(tmp_path):
     context.historical = True
     result = run(ScreenInput(universe=UNIVERSE, year=2024, rank_by="revenue"), context)
     assert result.status == "invalid" and "cutoff" in result.warnings[0] and result.data is None
+
+
+def test_a_larger_total_from_another_filing_does_not_replace_contract_revenue(tmp_path):
+    # Second review: a total from an older filing must not override a later corrected figure.
+    files = SecFiles({f"/api/xbrl/frames/us-gaap/{tag}/USD/CY2025.json": httpx.Response(200, json={"data": [
+        {"cik": UDR[0], "entityName": UDR[1], "val": val, "accn": accn, "end": "2025-12-31"}]})
+        for tag, val, accn in (("RevenueFromContractWithCustomerExcludingAssessedTax", 11361000, "accn-new"),
+                               ("Revenues", 1712317000, "accn-old"))})
+    result, context = screen(tmp_path, files, universe=["74208"], year=2025, rank_by="revenue")
+    assert Decimal(result.data["candidates"][0]["values"]["revenue"]) == 11361000
+    [row] = context.records[result.ids[0]]["rows"]
+    assert row["notes"] == ["revenue: a larger us-gaap:Revenues total (1712317000) is in filing accn-old, not accn-new; "
+                            "the us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax value is kept."]
+    assert any(w.startswith("1 companies have a larger revenue total in another filing") for w in result.warnings)

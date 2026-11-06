@@ -176,3 +176,14 @@ def test_quarter_and_off_year_end_rows_inside_a_10k_are_ignored(tmp_path):
     result, _ = financials(tmp_path, metrics=["revenue", "stockholders_equity"], files=files, years=10)
     assert "102466000000" not in [v for _, v in values(result, "revenue")]
     assert "2025-06-28" not in [end for end, _ in values(result, "stockholders_equity")]
+
+
+def test_a_total_from_an_older_filing_does_not_override_the_latest_one(tmp_path):
+    # Second review: the latest filing tags only contract revenue for FY2024; the older total is not swapped in.
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (10964000, "2024-01-01", "2024-12-31", *UDR_2026)], Revenues=[
+        (1670000000, "2024-01-01", "2024-12-31", *UDR_2025)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert values(result, "revenue") == [("2024-12-31", "10964000")]
+    assert ("revenue for the period ending 2024-12-31: a larger us-gaap:Revenues total (1670000000) is in filing "
+            f"{UDR_2025[0]}, not the latest {UDR_2026[0]}; the latest filing's value is kept.") in result.warnings
