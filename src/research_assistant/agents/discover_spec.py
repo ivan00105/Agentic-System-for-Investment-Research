@@ -19,15 +19,16 @@ from . import prompts
 from .loop import Finish, run_loop
 from .trace import Trace
 
-# Need prices, so they are checked per candidate after the screen (REFERENCE §4 rule 9).
+# Need prices or Form 4 filings, so they are checked per candidate after the screen (REFERENCE §4 rule 9).
 PRICE_METRICS = ("market_cap", "pe", "ps", "pb", "fcf_yield", "volatility", "max_drawdown")
+INSIDER_METRICS = ("insider_purchases", "insider_sales", "insider_net_purchases", "insider_buyers")
 
 
 class PriceCheck(BaseModel):
-    metric: Literal[PRICE_METRICS]
+    metric: Literal[PRICE_METRICS + INSIDER_METRICS]
     op: Literal[">", ">=", "<", "<="]
     value: float = Field(description="Multiples as numbers (30 for 30x), yields and drawdowns as fractions, "
-                                     "market cap in US dollars.")
+                                     "market cap and insider amounts in US dollars, insider_buyers as a count.")
 
 
 class Option(BaseModel):

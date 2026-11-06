@@ -2,12 +2,13 @@
 under, and what the evidence panel shows when the chip is opened. Read from the frozen records, never fetched."""
 import re
 from datetime import date
+from decimal import Decimal
 
 from .checker import format_value
 
 GROUPS = {"fact": "Reported figures", "calc": "Calculations", "chunk": "Filing text", "filing": "Filings",
           "prices": "Prices", "check": "Checks against the filing", "company": "Companies",
-          "claim": "Analyst findings", "calendar": "Release dates"}
+          "claim": "Analyst findings", "calendar": "Release dates", "insider": "Insider trades"}
 METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_income": "Operating income",
            "net_income": "Net income", "research_and_development": "R&D spending",
            "operating_cash_flow": "Operating cash flow", "capex": "Capital spending", "eps_diluted": "Diluted EPS",
@@ -86,6 +87,8 @@ def chip(record: dict | None, records: dict[str, dict]) -> str:
         return f"Filing check: {record.get('verdict')}"
     if kind == "calendar":
         return f"Release dates from {record.get('start')}"
+    if kind == "insider":
+        return f"Form 4 {record.get('meaning')} {record.get('date')}"
     if kind == "company":
         return str(record.get("name"))
     if kind == "claim":
@@ -103,6 +106,7 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
         rows = [("Source", record.get("source")), ("Series", record.get("series_id")),
                 ("Definition", record.get("definition")), ("As published on", record.get("vintage"))]
         rows += [("Note", note) for note in record.get("notes") or []]
+        links = list(record.get("trades") or [])
     elif kind == "fact":
         title = f"{label(record, records)}, {period(record, records)}"
         excerpt = format_value(record)
@@ -130,6 +134,16 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
                    "(as traded).") if closes else "No closing prices."
         rows = [("Source", record.get("source")),
                 ("Adjusted prices", "Include dividends, so nobody could have traded at them")]
+    elif kind == "insider":
+        title = f"Insider {record.get('meaning')} by {record.get('owner')}, {record.get('date')}"
+        value = f" (${Decimal(record['value']):,.0f})" if record.get("value") else ""
+        excerpt = f"{record.get('shares')} shares of {record.get('security')} at ${record.get('price')}{value}"
+        rows = [("Role", record.get("role")), ("Code", f"{record.get('code')} ({record.get('meaning')})"),
+                ("10b5-1 plan", f"yes ({record.get('plan_basis')})" if record.get("plan_10b5_1") else "no"),
+                ("Shares owned after", record.get("owned_after")),
+                ("Held", "directly" if record.get("direct") else "indirectly"),
+                ("Filing", f"Form {record.get('form')} {record.get('accession')}, filed {record.get('filed')}")]
+        rows += [("Footnote", note) for note in record.get("footnotes") or []]
     elif kind == "calendar":
         title = f"Release dates, {record.get('start')} to {record.get('end')}"
         excerpt = "; ".join(f"{r['date']}: {r['name']}" for r in record.get("releases") or []) or "No major releases."

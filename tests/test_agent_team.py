@@ -91,7 +91,7 @@ def test_the_coordinator_asks_analysts_and_merges_their_findings(tmp_path):
     assert tools(1) == {"find_company", "calculate", "screen", "ask_fundamentals", "ask_filings", "ask_market",
                         "submit_report"}
     assert tools(3) == {"find_company", "get_financials", "calculate", "verify_against_filing", "submit_findings"}
-    assert tools(6) == {"find_company", "read_filing_section", "list_filings", "submit_findings"}
+    assert tools(6) == {"find_company", "read_filing_section", "list_filings", "get_insider_trades", "submit_findings"}
     assert client.requests[3]["messages"][1]["content"] == (f"The user's question: {QUESTION}\n\n"
                                                             f"Your task from the coordinator:\n{FUNDAMENTALS_TASK}")
 

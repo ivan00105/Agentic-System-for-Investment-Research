@@ -30,7 +30,7 @@ def scripted_model(monkeypatch, *script):
 
 def test_zero_configuration_degrades_to_not_configured_and_tier_zero_prices():
     kinds = by_kind(providers.status({}))
-    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "macro", "llm"]
+    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "macro", "insiders", "llm"]
     assert kinds["prices"]["label"] == "Daily prices" and kinds["prices"]["purpose"]
     sec = provider(kinds["fundamentals"], "sec_companyfacts")
     assert (sec["status"], sec["missing_env"], sec["tier"], sec["problem"]) == ("not_configured", ["SEC_USER_AGENT"], 0, None)

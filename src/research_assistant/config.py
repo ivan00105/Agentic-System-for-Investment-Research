@@ -124,6 +124,15 @@ MACRO_RELEASES = (10, 50, 53, 54, 101)
 # FRED's terms set no published number; 120 a minute per key is the commonly cited limit, and a 429 is retried.
 FRED_MAX_REQUESTS_PER_MINUTE = 120
 
+# --- Insider trades (SEC Form 4) ----------------------------------------------------------
+
+# Window read when the agent gives no start date: a year of Form 4s, the span insider-trading studies usually use
+# (Lakonishok and Lee 2001 look 6-12 months ahead). The agent can ask for any other start.
+INSIDER_LOOKBACK_DAYS = 365
+# Form 4 XMLs downloaded at once. A large company files a few hundred a year; SEC's shared 10-per-second limiter
+# still applies, so this only hides each request's latency.
+INSIDER_FETCH_WORKERS = 8
+
 # --- Agents -------------------------------------------------------------------------------
 
 # Model calls per agent loop: a guard against infinite loops, not a quality cap (§5). It applies to the

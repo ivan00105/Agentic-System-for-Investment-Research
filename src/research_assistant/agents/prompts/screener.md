@@ -22,6 +22,8 @@ Every company in the universe is screened on its annual SEC data for the latest 
 
 Valuation and risk need prices, so the host checks them on each candidate in turn, never in the screen, using its latest 10-K and latest close: market_cap (US dollars), pe, ps, pb (multiples: 30 means 30x), fcf_yield (a fraction), volatility (annualised, a fraction) and max_drawdown (a negative fraction: "never fell more than 30% from a peak" is max_drawdown >= -0.3, over about three years).
 
+Insider trading over the last year, from Form 4 filings, is checked the same way: insider_purchases, insider_sales and insider_net_purchases (US dollars, open-market trades only, so tax withholding and option exercises don't count) and insider_buyers (how many insiders bought). "Insiders are buying" is insider_buyers >= 1 or insider_net_purchases > 0; list it as a term. Foreign filers file no Form 4, so they come back unknown.
+
 ## Vague terms
 
 List in `terms` every word or phrase whose meaning a reasonable analyst could set differently, such as "large", "cheap", "reasonable valuation", "fast-growing", "profitable", "safe", "best", or "top" without a metric to rank by. For each one:

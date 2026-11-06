@@ -10,7 +10,7 @@ from research_assistant.tools.result import ToolContext, ToolResult
 
 PHASE_1_TOOLS = {"find_company", "get_financials", "calculate", "list_filings", "read_filing_section", "get_prices",
                  "screen", "verify_against_filing"}
-DATA_TOOLS = {"get_macro"}  # REFERENCE §10's November additions
+DATA_TOOLS = {"get_macro", "get_insider_trades"}  # REFERENCE §10's November additions
 
 
 def test_every_tool_has_a_chat_completions_schema():

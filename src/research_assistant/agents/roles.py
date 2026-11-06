@@ -25,9 +25,9 @@ COORDINATOR = Role("coordinator", ("find_company", "calculate", "screen"), plan_
 FUNDAMENTALS = Role("fundamentals", ("find_company", "get_financials", "calculate", "verify_against_filing"),
                     "fundamentals", "Reported figures from SEC filings, margins, growth, free cash flow, and whether "
                     "fiscal periods compare; can check a figure against the filing.")
-FILINGS = Role("filings", ("find_company", "read_filing_section", "list_filings"), "filings and events",
-               "Reads 10-K sections (Item 1A risks, Item 7 management's discussion) and recent 8-K events, and "
-               "attributes management's claims.")
+FILINGS = Role("filings", ("find_company", "read_filing_section", "list_filings", "get_insider_trades"),
+               "filings and events", "Reads 10-K sections (Item 1A risks, Item 7 management's discussion), recent 8-K "
+               "events and insiders' Form 4 purchases and sales, and attributes management's claims.")
 MARKET = Role("market", ("find_company", "get_prices", "get_financials", "calculate", "get_macro"),
               "market and valuation",
               "Price history, returns, volatility, drawdown, beta and Sharpe ratio, valuation (market cap, P/E, P/S, FCF "
@@ -37,4 +37,4 @@ ANALYSTS = (FUNDAMENTALS, FILINGS, MARKET)
 # Condition D. The critic reads; every tool it has only looks data up or recomputes it (REFERENCE §2: read-only tools
 # plus verify_against_filing). screen is left out: it ranks companies, which a review of one report never needs.
 CRITIC = Role("critic", ("find_company", "get_financials", "calculate", "verify_against_filing", "read_filing_section",
-                         "list_filings", "get_prices", "get_macro"), "critic")
+                         "list_filings", "get_prices", "get_macro", "get_insider_trades"), "critic")

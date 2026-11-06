@@ -9,6 +9,7 @@ from ..tools import registry
 from ..tools.result import ToolContext, ToolResult
 from ..tools.screen import OPERATORS, implausible
 from .checker import format_value
+from .discover_spec import INSIDER_METRICS as INSIDER  # get_insider_trades' totals over its default window
 from .trace import Trace
 
 # How each metric is computed: a calculate formula and the input behind each role. An input is another metric here,
@@ -28,7 +29,8 @@ PLANS = {
     "max_drawdown": ("max_drawdown", {"prices": "prices"}),
 }
 UNITS = {"revenue": "USD", "operating_income": "USD", "net_income": "USD", "operating_cash_flow": "USD", "fcf": "USD",
-         "market_cap": "USD", "pe": "x", "ps": "x", "pb": "x"}  # every other metric is a ratio
+         "market_cap": "USD", "pe": "x", "ps": "x", "pb": "x", "insider_purchases": "USD", "insider_sales": "USD",
+         "insider_net_purchases": "USD", "insider_buyers": "insiders"}  # every other metric is a ratio
 
 
 def threshold(metric: str, op: str, value: float) -> str:
@@ -68,7 +70,7 @@ class Acceptance:
         """`criteria` are the spec's filters and price checks (metric, op, value)."""
         self.cik, self.tickers, self.done = cik, tickers, {}
         self.facts, self.reasons, self.ends, self.missing, self.currency = {}, {}, [], None, {}
-        needed = sorted({leaf for c in criteria for leaf in _leaves(c.metric)} - {"prices"})
+        needed = sorted({leaf for c in criteria for leaf in _leaves(c.metric)} - {"prices", *INSIDER})
         if needed:
             result = self.call("get_financials", {"cik": cik, "metrics": needed, "years": 2})
             if result.status in ("ok", "partial"):
@@ -117,6 +119,11 @@ class Acceptance:
             if result.status != "ok":
                 raise Unknown(f"get_prices came back {result.status}: {' '.join(result.warnings)}")
             found = result.ids[0]
+        elif name in INSIDER:
+            result = self.call("get_insider_trades", {"cik": self.cik})
+            if result.status != "ok":
+                raise Unknown(f"get_insider_trades came back {result.status}: {' '.join(result.warnings)}")
+            found = result.data["totals"][name]["id"]
         elif name in PLANS:
             formula, roles = PLANS[name]
             inputs = {role: self._resolve(source) for role, source in roles.items()}
