@@ -69,6 +69,9 @@ FISCAL_YEAR_METRICS = ("revenue", "net_income", "operating_cash_flow")
 CONTRACT_REVENUE_TAGS = ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
                          "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax",
                          "ifrs-full:RevenueFromContractsWithCustomers")
+# IFRS ProfitLoss includes non-controlling interests, so net income is it less their share from the same filing.
+PROFIT_LOSS_TAG = "ifrs-full:ProfitLoss"
+NCI = Concept("net_income", ("ifrs-full:ProfitLossAttributableToNoncontrollingInterests",), "USD", "duration")
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,8 @@ class Fact:
     original_accession: str | None = None
     document: str | None = None  # set when read from the filing's own inline XBRL, not companyfacts
     locator: str | None = None
+    tagged_value: Decimal | None = None  # set when `value` is derived from the tag's number
+    note: str | None = None
 
 
 def available_at(filed: date) -> datetime:
@@ -120,28 +125,34 @@ def _rows(payload: dict, concept: Concept, cutoff: datetime, unit: str | None = 
                                       document=row.get("document"), locator=row.get("locator"))
 
 
-def other_units(payload: dict, concept: Concept) -> list[str]:
-    """Units the concept is reported in besides the one we support, e.g. ["CNY"] for a Chinese ADR."""
+def other_units(payload: dict, concept: Concept, cutoff: datetime) -> list[str]:
+    """Units the concept's annual rows public at the cutoff are in besides the one we support, e.g. ["CNY"] for a
+    Chinese ADR."""
     found = set()
     for tag in concept.tags:
         taxonomy, name = tag.split(":")
         found |= set(payload.get("facts", {}).get(taxonomy, {}).get(name, {}).get("units", {}))
-    return sorted(found - {concept.unit})
+    return sorted(u for u in found - {concept.unit} if next(_rows(payload, concept, cutoff, u), None))
 
 
-def reporting_unit(payload: dict, concept: Concept) -> str:
-    """The currency most of a money concept's annual rows are in. A foreign filer reporting in CNY tags three years
-    in CNY per 20-F and only the latest in USD (a convenience translation), so CNY wins; ties keep USD."""
+def reporting_unit(payload: dict, concept: Concept, cutoff: datetime) -> str:
+    """The currency of most of a money concept's annual rows in the newest annual filing public at the cutoff. A
+    foreign filer reporting in CNY tags three years in CNY per 20-F and only the latest in USD (a convenience
+    translation), so CNY wins; ties keep USD. Older filings don't count, so a change of currency keeps the newest year."""
     if concept.unit not in ("USD", "USD/shares"):
         return concept.unit
     shape = re.compile(r"[A-Z]{3}" + concept.unit[3:])  # "CNY" or "CNY/shares"
+    units = {unit for tag in concept.tags for unit in payload.get("facts", {}).get(tag.split(":")[0], {})
+             .get(tag.split(":")[1], {}).get("units", {}) if shape.fullmatch(unit)}
+    rows = [(unit, fact) for unit in units for _, _, fact in _rows(payload, concept, cutoff, unit)]
+    if not rows:
+        return concept.unit
+    newest = max((fact.filed, fact.accession) for _, fact in rows)
     counts: dict[str, int] = {}
-    for tag in concept.tags:
-        taxonomy, name = tag.split(":")
-        for unit, rows in payload.get("facts", {}).get(taxonomy, {}).get(name, {}).get("units", {}).items():
-            if shape.fullmatch(unit):
-                counts[unit] = counts.get(unit, 0) + sum(1 for r in rows if r.get("form") in ANNUAL_FORMS)
-    return max(counts, key=lambda u: (counts[u], u == concept.unit)) if counts else concept.unit
+    for unit, fact in rows:
+        if (fact.filed, fact.accession) == newest:
+            counts[unit] = counts.get(unit, 0) + 1
+    return max(counts, key=lambda u: (counts[u], u == concept.unit))
 
 
 def unread_annual_filing(payload: dict, cutoff: datetime) -> Fact | None:
@@ -160,7 +171,7 @@ def unread_annual_filing(payload: dict, cutoff: datetime) -> Fact | None:
 
 def fiscal_year_ends(payload: dict, cutoff: datetime) -> set[date]:
     return {f.end for metric in FISCAL_YEAR_METRICS
-            for _, _, f in _rows(payload, CONCEPTS[metric], cutoff, reporting_unit(payload, CONCEPTS[metric]))}
+            for _, _, f in _rows(payload, CONCEPTS[metric], cutoff, reporting_unit(payload, CONCEPTS[metric], cutoff))}
 
 
 def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[date],
@@ -187,16 +198,35 @@ def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[dat
                             f"{accession}; withheld until checked by hand.")
             continue
         fact = same[0]
+        if fact.tag == PROFIT_LOSS_TAG and (fact := _owners_share(payload, cutoff, fact)) is None:
+            warnings.append(f"{concept.metric} for the period ending {end}: filing {accession} tags only "
+                            f"{PROFIT_LOSS_TAG}, which includes non-controlling interests, and not their share "
+                            f"({NCI.tags[0]}), so the owners' profit can't be told; withheld.")
+            continue
         if fact.tag in CONTRACT_REVENUE_TAGS and (older := [f for _, t, f in candidates if t not in CONTRACT_REVENUE_TAGS
                                                             and f.accession != accession and f.value > fact.value]):
             o = max(older, key=lambda f: f.filed)
             warnings.append(f"{concept.metric} for the period ending {end}: a larger {o.tag} total ({o.value}) is in "
                             f"filing {o.accession}, not the latest {accession}; the latest filing's value is kept.")
         earlier = sorted((f for _, t, f in candidates if t == fact.tag and f.filed < fact.filed), key=lambda f: f.filed)
+        if earlier and fact.tag == PROFIT_LOSS_TAG:  # compare owners' profit with owners' profit
+            earlier = [f for f in [_owners_share(payload, cutoff, earlier[0])] if f]
         if earlier and earlier[0].value != fact.value:
             fact = replace(fact, original_value=earlier[0].value, original_accession=earlier[0].accession)
         chosen.append(fact)
     return chosen, warnings
+
+
+def _owners_share(payload: dict, cutoff: datetime, fact: Fact) -> Fact | None:
+    """IFRS ProfitLoss less the non-controlling share the same filing tags for the same period, else None."""
+    shares = {f.value for _, _, f in _rows(payload, NCI, cutoff, fact.unit)
+              if (f.accession, f.start, f.end) == (fact.accession, fact.start, fact.end)}
+    if len(shares) != 1:
+        return None
+    (other,) = shares
+    return replace(fact, value=fact.value - other, tagged_value=fact.value, note=(
+        f"Owners' profit: {PROFIT_LOSS_TAG} ({fact.value}) includes non-controlling interests, so their share in the "
+        f"same filing ({other}, {NCI.tags[0]}) is subtracted."))
 
 
 def _total_tag(facts: list[Fact], tag: str) -> str:

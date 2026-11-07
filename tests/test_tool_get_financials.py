@@ -220,6 +220,33 @@ def test_tsmc_share_count_comes_with_five_from_its_filings_text(tmp_path):
     assert context.records[ratio["id"]]["unit"] == "shares/ADS"
 
 
+def tsm_profit_only(nci: bool) -> SecFiles:
+    """TSMC's companyfacts with only ifrs-full:ProfitLoss (owners plus non-controlling interests), and with `nci` the
+    non-controlling share for each of its periods."""
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    ifrs = payload["facts"]["ifrs-full"]
+    owners = {(r["accn"], r["end"]): r["val"] for r in ifrs.pop("ProfitLossAttributableToOwnersOfParent")["units"]["TWD"]}
+    if nci:
+        ifrs["ProfitLossAttributableToNoncontrollingInterests"] = {"units": {"TWD": [
+            {**r, "val": r["val"] - owners[r["accn"], r["end"]]} for r in ifrs["ProfitLoss"]["units"]["TWD"]]}}
+    return SecFiles({TSM_FACTS: httpx.Response(200, json=payload), TSM_20F: httpx.Response(404)})
+
+
+def test_ifrs_profit_with_other_shareholders_share_has_it_subtracted(tmp_path, fred):
+    result, context = financials(tmp_path, cik=TSM, metrics=["net_income"], years=1, files=tsm_profit_only(nci=True))
+    (income,) = result.data["metrics"]["net_income"]["values"]
+    assert (income["tag"], income["end"], income["tagged_value"]) == ("ifrs-full:ProfitLoss", "2024-12-31", "1157523900000")
+    assert income["reported_value"] == "1158380200000"  # TSMC's owners' line: ProfitLoss less -856,300,000
+    assert "non-controlling interests" in income["notes"][0] and context.records[income["id"]]["unit"] == "USD"
+
+
+def test_ifrs_profit_without_the_other_shareholders_share_is_withheld(tmp_path, fred):
+    result, _ = financials(tmp_path, cik=TSM, metrics=["net_income"], years=1, files=tsm_profit_only(nci=False))
+    assert result.data["metrics"]["net_income"]["status"] != "ok"
+    assert any(w.startswith("net_income for the period ending 2024-12-31: filing 0001193125-25-083423 tags only "
+                            "ifrs-full:ProfitLoss") and "non-controlling" in w for w in result.warnings)
+
+
 def test_a_filer_with_neither_us_gaap_nor_ifrs_is_unsupported(tmp_path):
     payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
     del payload["facts"]["ifrs-full"]

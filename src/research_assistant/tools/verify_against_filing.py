@@ -33,7 +33,8 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
     unit = fact.get("reported_unit") or fact["unit"]  # a converted figure is checked in the currency it was filed in
     same = [f for f in tagged if f["unit"] == unit]  # USD only ever checks against USD
     readable = [f for f in same if f["value"] is not None]
-    # A count the page prints in full is checked against its tag; a converted figure against the filed value.
+    # A count the page prints in full, or a profit less non-controlling interests, is checked against its tag's own
+    # number; a converted figure against the filed value.
     expected = fact.get("tagged_value") or fact.get("reported_value") or fact["value"]
     matches = [f for f in readable if Decimal(f["value"]) == Decimal(expected)]
     # A number we can't read is "unverified", never a mismatch.
@@ -45,7 +46,8 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
     context.remember(record)
     warnings = []
     if fact.get("tagged_value") and matches:
-        warnings.append(f"The fact uses the number the page prints, {fact['value']}; the tag holds {expected}.")
+        warnings.append(f"The fact uses {fact.get('reported_value') or fact['value']}, not the tag's {expected}; its "
+                        "notes say why.")
     if verdict == "mismatch":
         warnings.append(f"The filing tags {fact['tag']} for this period as {', '.join(f['raw'] for f in shown)}, "
                         f"not {expected}.")

@@ -4,6 +4,7 @@ A foreign company's US quote is often an American depositary share (ADS) that st
 (BABA: eight), so its market cap needs that ratio. The cover's inline XBRL names each listed class
 (`dei:Security12bTitle`); without the tag, the Section 12(b) table in the cover text is read instead. A cover that
 lists the shares and only says they trade as ADSs (TSMC) leaves the ratio to the filing's text, if it gives one value.
+The text counts only when the cover names ADSs: a plain-share filer's note on another company's ADSs never sets its ratio.
 """
 import html
 import json
@@ -36,6 +37,8 @@ RATIO = re.compile(
     r"(?:ordinary|common|equity|underlying)?\s*shares?\b", re.I)
 COVER_START = re.compile(r"Section\s+12\s*\(\s*b\s*\)\s+of\s+the\s+Act", re.I)
 COVER_END = re.compile(r"Section\s+12\s*\(\s*g\s*\)\s+of\s+the\s+Act|Indicate\s+the\s+number\s+of\s+outstanding", re.I)
+# The cover page, footnotes included, ends where the filing's contents begin: PART I or ITEM 1, its first entries.
+PAGE_END = re.compile(r"\bPART\s+I\b|\bITEM\s+1\b", re.I)
 NUMBERS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
            "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
            "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
@@ -102,6 +105,13 @@ def _shown(doc: Document) -> list[dict]:
     return found
 
 
+def _cover_page(plain: str) -> str:
+    """The cover page with its footnotes (TSMC's "* ... American Depositary Shares representing such Common Shares")."""
+    start = COVER_START.search(plain)
+    end = PAGE_END.search(plain, start.end() if start else 0)
+    return plain[:end.start() if end else len(plain)]
+
+
 def _stated(plain: str) -> dict[Fraction, str]:
     """Each ratio the filing's text gives for its depositary shares, with the first words that give it."""
     found: dict[Fraction, str] = {}
@@ -142,12 +152,12 @@ def _read(doc: Document) -> dict:
             found["problem"] = f"How many ordinary shares one depositary share stands for can't be read from " \
                                f"\"{listed[0][:200]}\"."
         found["ratio"] = None if value is None else f"{value.numerator}/{value.denominator}"
-    elif (stated := _stated(plain)) or MENTIONS_ADS.search(plain):
-        if len(stated) == 1:
+    elif DEPOSITARY.search(_cover_page(plain)):  # the filer's own shares trade as ADSs, so the text's ratio is theirs
+        if len(stated := _stated(plain)) == 1:
             ((value, words),) = stated.items()
             found.update(ratio=f"{value.numerator}/{value.denominator}", how=FILING_TEXT, basis=words)
         else:
-            found["problem"] = (f"The filing mentions American depositary shares, but the cover's listed classes "
+            found["problem"] = (f"The cover mentions American depositary shares, but the cover's listed classes "
                                 f"({'; '.join(titles) or 'none tagged'}) give no ratio, and the filing's text states "
                                 + (f"more than one: {'; '.join(stated.values())}." if stated else "none."))
     elif titles and any(SHARES.search(t) for t in titles):
@@ -162,7 +172,7 @@ def _read(doc: Document) -> dict:
 def read(sec: SecClient, filing: Filing, cache: DiskCache) -> dict:
     """The cover's listed classes, ordinary shares per depositary share ("8/1"; "1/1" for a direct listing) and how
     it was read, or the problem; plus each tagged share count. Cached for good, since filings never change."""
-    key = f"cover|v2|{filing.url}"  # v2: the filing's text can give the ratio
+    key = f"cover|v3|{filing.url}"  # v3: the filing's text gives the ratio only when the cover names ADSs
     cached = cache.get(key, None)
     if cached is not None:
         return json.loads(cached[0])

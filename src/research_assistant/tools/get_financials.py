@@ -45,6 +45,8 @@ def _record(cik: str, name: str, fact, url: str) -> dict:
     if fact.document:
         record.update(source_url=fact.document, locator=fact.locator, notes=[
             "Read from the filing's own inline XBRL: SEC companyfacts has only this filing's cover."])
+    if fact.tagged_value is not None:  # verify_against_filing checks the tag's own number
+        record.update(tagged_value=str(fact.tagged_value), notes=[*record.get("notes", []), fact.note])
     return record
 
 
@@ -92,7 +94,7 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
     pick = partial(_pick, payload, context, cik, response.url, year_ends, oldest, years)
     for name in args.metrics or list(sec_facts.CONCEPTS):
         concept = sec_facts.CONCEPTS[name]
-        used = sec_facts.reporting_unit(payload, concept)
+        used = sec_facts.reporting_unit(payload, concept, context.cutoff)
         facts, records, problems = pick(concept, used)
         if used != concept.unit and records:
             try:
@@ -132,7 +134,7 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
             ids.append(context.remember(record))
             values.append({k: v for k, v in record.items() if k not in ("kind", "cik", "metric", "unit", "source_url")})
         metrics[name] = {"status": "ok", "unit": concept.unit, "values": values}
-        if (units := sec_facts.other_units(payload, concept)) and used == concept.unit == "USD":
+        if (units := sec_facts.other_units(payload, concept, context.cutoff)) and used == concept.unit == "USD":
             warnings.append(f"{name} is also reported in {', '.join(units)}: the USD figures are probably convenience "
                             "translations at one exchange rate per filing, so changes across years mix exchange rates.")
     if converted:

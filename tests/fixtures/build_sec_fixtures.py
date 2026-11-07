@@ -36,13 +36,16 @@ FILING = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl
 KEEP_FACTS = ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:OperatingIncomeLoss")
 XHTML, IX = "http://www.w3.org/1999/xhtml", "http://www.xbrl.org/2013/inlineXBRL"
 # 20-F covers: BABA's ADS of eight ordinary shares (and its cut-off share-count tag), Check Point's direct listing,
-# TSMC's "Common Shares" with the passages that say they trade as ADSs of five (its footnote and Item 6), and the
-# statement rows of a few FY2025 facts companyfacts lacks (its NET REVENUE row uses the IFRS 15 tag).
+# TSMC's "Common Shares" with the passages that say they trade as ADSs of five (its cover footnote and Item 6), and the
+# statement rows of a few FY2025 facts companyfacts lacks (its NET REVENUE row uses the IFRS 15 tag). Each passage is
+# (headings written before it, phrase).
 COVERS = {"https://www.sec.gov/Archives/edgar/data/1577552/000119312526231755/baba-20260331.htm": ((), ()),
           "https://www.sec.gov/Archives/edgar/data/1015922/000117891326001932/zk2634942.htm": ((), ()),
           "https://www.sec.gov/Archives/edgar/data/1046179/000162828026025362/tsm-20251231.htm": ((
-              "Not for trading, but only in connection with the listing on the New York Stock Exchange, Inc. of American "
-              "Depositary Shares", "shares held in the form of ADSs (each ADS represents five (5) common shares)"), (
+              ((), "Not for trading, but only in connection with the listing on the New York Stock Exchange, Inc. of "
+                   "American Depositary Shares"),
+              (("PART I", "ITEM 6. DIRECTORS, SENIOR MANAGEMENT AND EMPLOYEES"),
+               "shares held in the form of ADSs (each ADS represents five (5) common shares)")), (
               "ifrs-full:RevenueFromContractsWithCustomers", "ifrs-full:ProfitLossAttributableToOwnersOfParent",
               "ifrs-full:DilutedEarningsLossPerShare", "ifrs-full:Assets"))}
 XBRLI = "http://www.xbrl.org/2003/instance"
@@ -112,11 +115,12 @@ def trim_filing(raw: bytes) -> str:
     return etree.tostring(root, encoding="unicode")
 
 
-def trim_cover(raw: bytes, keep: tuple[str, ...] = (), facts: tuple[str, ...] = ()) -> str:
+def trim_cover(raw: bytes, keep: tuple = (), facts: tuple[str, ...] = ()) -> str:
     """A 20-F cut to its cover: everything up to the shell-company question that ends it, and the XBRL contexts and
     units the cover's tags use. Hidden facts, scripts and styles are dropped; the cover's tags and text stay as filed.
-    The innermost paragraph, div or cell holding each `keep` phrase is copied after the cover, and so is the first
-    table row tagging each of `facts` for the whole company (no dimensions), inside one table."""
+    The innermost paragraph, div or cell holding each `keep` phrase is copied after the cover, after its headings
+    (so the cover ends where the filing's does), and so is the first table row tagging each of `facts` for the whole
+    company (no dimensions), inside one table."""
     import copy
 
     from lxml import etree
@@ -126,8 +130,13 @@ def trim_cover(raw: bytes, keep: tuple[str, ...] = (), facts: tuple[str, ...] = 
     for element in [*header.iter(f"{{{IX}}}hidden"), *root.iter(f"{{{XHTML}}}script")]:
         element.getparent().remove(element)
     blocks = {f"{{{XHTML}}}{tag}" for tag in ("p", "div", "td")}
-    extra = [copy.deepcopy([e for e in root.iter(*blocks) if phrase in " ".join("".join(e.itertext()).split())][-1])
-             for phrase in keep]
+    extra = []
+    for headings, phrase in keep:
+        for text in headings:
+            heading = etree.SubElement(etree.Element(f"{{{XHTML}}}div"), f"{{{XHTML}}}span")
+            heading.text = text
+            extra.append(heading.getparent())
+        extra.append(copy.deepcopy([e for e in root.iter(*blocks) if phrase in " ".join("".join(e.itertext()).split())][-1]))
     whole = {c.get("id") for c in header.iter(f"{{{XBRLI}}}context") if c.find(f".//{{{XBRLI}}}segment") is None}
     if facts:
         table = etree.Element(f"{{{XHTML}}}table")

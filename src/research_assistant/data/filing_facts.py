@@ -18,7 +18,7 @@ def merged(payload: dict, sec: SecClient, filing: Filing, cache: DiskCache) -> t
     rows were added. `payload` itself is not changed."""
     if not filing.primary_document.lower().endswith((".htm", ".html")):
         raise DataError("The filing's main document is not HTML, so its inline XBRL can't be read.", "bad_data")
-    tags = {tag for concept in sec_facts.CONCEPTS.values() for tag in concept.tags}
+    tags = {tag for concept in (*sec_facts.CONCEPTS.values(), sec_facts.NCI) for tag in concept.tags}
     known = {tag for tag in tags if any(row.get("accn") == filing.accession
                                         for rows in _units(payload, tag).values() for row in rows)}
     facts = {taxonomy: dict(names) for taxonomy, names in payload.get("facts", {}).items()}

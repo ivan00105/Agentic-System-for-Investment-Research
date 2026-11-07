@@ -32,10 +32,11 @@ def test_ordinary_shares_per_ads_from_the_title(title, expected):
     assert sec_cover.ratio(title) == expected
 
 
-def cover(body: str) -> dict:
+def cover(body: str, after: str = "") -> dict:
+    """A cover whose Section 12(b) table holds `body`; `after` is the rest of the filing."""
     page = (f'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body>Securities registered or to be registered '
             f'pursuant to Section 12(b) of the Act: {body} Securities registered or to be registered pursuant to '
-            'Section 12(g) of the Act: None</body></html>')
+            f'Section 12(g) of the Act: None {after}</body></html>')
     return sec_cover._read(Document(page.encode()))
 
 
@@ -76,11 +77,27 @@ def test_a_listed_class_that_trades_as_ads_without_a_ratio_is_a_problem():
 
 
 def test_tsmc_cover_leaves_the_ratio_to_the_filings_text():
-    # TSMC's FY2025 20-F gives the ratio once, in an Item 6 footnote.
+    # TSMC's FY2025 20-F gives the ratio once, in an Item 6 footnote; its cover footnote names the ADSs.
     found = sec_cover._read(Document((FIXTURES / "tsm-20251231.htm").read_bytes()))
     assert found["ratio"] == "5/1" and found["how"] == "filing text" and found["problem"] is None
     assert found["basis"] == "each ADS represents five (5) common shares"
     assert found["shares"] == [{"tagged": "25,932,524,521", "shown": None}]
+
+
+ITEM_6 = " PART I ITEM 6. DIRECTORS shares held in the form of ADSs (each ADS represents five (5) common shares)."
+NOTE = " ITEM 18. FINANCIAL STATEMENTS Note 9. We hold Alibaba ADSs, each representing 8 ordinary shares."
+
+
+def test_another_companys_ads_never_make_a_plain_share_filer_an_ads():
+    # Codex review: an investments note's "Alibaba ADSs, each representing 8 ordinary shares" became the filer's ratio.
+    found = cover(title("Ordinary shares"), after=" PART I" + NOTE)
+    assert found["ratio"] == "1/1" and found["how"] == "no depositary shares"
+
+
+def test_an_ads_filers_text_with_two_ratios_is_a_problem():
+    found = cover(title("Common Shares") + FOOTNOTE, after=ITEM_6 + NOTE)
+    assert found["ratio"] is None and "states more than one" in found["problem"]
+    assert cover(title("Common Shares") + FOOTNOTE, after=ITEM_6)["ratio"] == "5/1"
 
 
 def test_a_ratio_in_the_text_counts_only_next_to_an_ads():

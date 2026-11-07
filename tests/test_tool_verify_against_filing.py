@@ -104,7 +104,7 @@ def test_a_cover_count_the_tag_cuts_off_is_checked_against_the_tag(tmp_path):
     shares = result.data["metrics"]["shares_outstanding"]["values"][0]
     check = verify(context, shares["id"])
     assert check.data["verdict"] == "match" and check.data["expected"] == "1858037427"
-    assert any("the page prints, 18580374278" in w for w in check.warnings)
+    assert "The fact uses 18580374278, not the tag's 1858037427; its notes say why." in check.warnings
 
 
 def test_a_converted_figure_is_checked_in_the_currency_it_was_filed_in(tmp_path, monkeypatch):

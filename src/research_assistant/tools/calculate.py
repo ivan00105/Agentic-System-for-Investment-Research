@@ -106,8 +106,10 @@ def _check_roles(r: dict[str, dict]) -> None:
     for role, record in r.items():
         if role in ("prices", "benchmark") and record["kind"] != "prices":
             raise Rejected(f"{record['id']} is not a price series from get_prices ({role}).")
-        if role == "shares" and (record["kind"] != "fact" or record.get("unit") != "shares"):
-            raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a share count (shares).")
+        # A weighted-average count (diluted_shares) is a year's average, not the shares outstanding on a day.
+        if role == "shares" and (record["kind"] != "fact" or record.get("metric") != "shares_outstanding"):
+            raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a share count from "
+                           "shares_outstanding (shares).")
         if role in USD_ROLES and (record["kind"] not in ("fact", "calc") or record.get("unit") != "USD"):
             raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a USD amount ({role}).")
         if role in USD_ROLES and _label(record) != USD_ROLES[role]:

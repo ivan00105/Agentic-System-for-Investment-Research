@@ -197,6 +197,17 @@ def test_market_cap_rejects_revenue_as_the_share_count(apple):
     assert result.status == "invalid" and "share count" in result.warnings[0]
 
 
+def test_market_cap_rejects_a_weighted_average_share_count(apple):
+    # Codex review: diluted_shares (a yearly average) passed the unit check and fed market cap.
+    context, ids = apple
+    cover = context.records[next(i for (_, metric), i in ids.items() if metric == "shares_outstanding")]
+    diluted = context.remember({**cover, "id": "fact-diluted", "metric": "diluted_shares", "start": "2024-09-29",
+                                "end": "2025-09-27", "tag": "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding"})
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    result = calc(context, "market_cap", prices=series, shares=diluted)
+    assert result.status == "invalid" and "diluted_shares" in result.warnings[0] and "shares_outstanding" in result.warnings[0]
+
+
 def test_pe_rejects_eps_as_net_income(apple):
     context, ids = apple
     eps = {**context.records[ids["2025-09-27", "net_income"]], "id": "fact-eps", "metric": "eps_diluted",
