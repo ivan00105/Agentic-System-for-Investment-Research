@@ -56,6 +56,8 @@ def parse(body: bytes) -> dict:
         root = ET.fromstring(body)
     except ET.ParseError as exc:
         raise DataError(f"Not an ownership XML: {exc}", "bad_data") from exc
+    if root.tag != "ownershipDocument":  # e.g. an error page, which would read as a filing with no trades
+        raise DataError(f"Not an ownership XML: its root is <{root.tag}>.", "bad_data")
     owners = [{"cik": _text(o, "reportingOwnerId/rptOwnerCik"), "name": _text(o, "reportingOwnerId/rptOwnerName"),
                "role": _role(o.find("reportingOwnerRelationship"))} for o in root.findall("reportingOwner")]
     footnotes = {f.get("id"): " ".join((f.text or "").split()) for f in root.findall("footnotes/footnote")}
@@ -83,9 +85,11 @@ def xml_url(filing: sec_filings.Filing) -> str | None:
     return filing.folder_url + name if name.lower().endswith(".xml") else None
 
 
-def read(sec: SecClient, cik: str, cutoff: datetime, since: date) -> tuple[list[tuple[sec_filings.Filing, dict]], list[str]]:
-    """Every Form 4 filed from `since` and public at the cutoff, parsed; and notes on filings that couldn't be read.
-    Archived filings never change, so each XML is cached for good after its first download."""
+def read(sec: SecClient, cik: str, cutoff: datetime,
+         since: date) -> tuple[list[tuple[sec_filings.Filing, dict]], list[str], int]:
+    """Every Form 4 filed from `since` and public at the cutoff, parsed; notes on filings that weren't read; and how
+    many Form 4s couldn't be read (amendments are skipped on purpose, so they don't count). Archived filings never
+    change, so each XML is cached for good after its first download."""
     filings = sec_filings.search(sec, cik, cutoff, forms=FORMS, since=since)
     amended = [f for f in filings if f.form == "4/A"]
     readable = [f for f in filings if f.form == "4" and xml_url(f)]
@@ -103,4 +107,5 @@ def read(sec: SecClient, cik: str, cutoff: datetime, since: date) -> tuple[list[
     with ThreadPoolExecutor(max_workers=config.INSIDER_FETCH_WORKERS) as pool:
         results = list(pool.map(one, readable))
     notes += [note for _, _, note in results if note]
-    return [(f, parsed) for f, parsed, _ in results if parsed is not None], notes
+    parsed = [(f, found) for f, found, _ in results if found is not None]
+    return parsed, notes, len([f for f in filings if f.form == "4"]) - len(parsed)

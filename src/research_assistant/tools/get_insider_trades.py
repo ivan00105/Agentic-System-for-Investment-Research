@@ -56,16 +56,19 @@ def _trade(cik: str, filing, parsed: dict, index: int, trade: dict) -> dict:
             "available_at": filing.accepted_at.isoformat() if filing.accepted_at else None, "url": filing.url}
 
 
-def _total(cik: str, metric: str, value: Decimal, trades: list[dict], start: date, end: date, note: str) -> dict:
+def _total(cik: str, metric: str, value: Decimal, trades: list[dict], start: date, end: date, note: str,
+           unread: int) -> dict:
     label, unit = TOTALS[metric]
     ids = [t["id"] for t in trades]
-    return {"id": make_id("fact", "insider", cik, metric, start, end, value, *ids), "kind": "fact", "cik": cik,
-            "metric": metric, "label": label, "value": str(value), "unit": unit, "start": start.isoformat(),
-            "end": end.isoformat(), "source": SOURCE, "trades": ids, "notes": [note],
+    notes = [note] + ([f"{unread} Form 4 filing(s) could not be read, so this total may be "
+                       f"{'off either way' if metric == 'insider_net_purchases' else 'low'}."] if unread else [])
+    return {"id": make_id("fact", "insider", cik, metric, start, end, value, *ids, *(["unread", unread] if unread else [])),
+            "kind": "fact", "cik": cik, "metric": metric, "label": label, "value": str(value), "unit": unit,
+            "start": start.isoformat(), "end": end.isoformat(), "source": SOURCE, "trades": ids, "notes": notes,
             "url": f"https://www.sec.gov/cgi-bin/own-disp?action=getissuer&CIK={cik}"}
 
 
-def _totals(cik: str, trades: list[dict], start: date, end: date) -> list[dict]:
+def _totals(cik: str, trades: list[dict], start: date, end: date, unread: int) -> list[dict]:
     buys = [t for t in trades if t["code"] == "P" and t["value"]]
     sales = [t for t in trades if t["code"] == "S" and t["value"]]
     planned = [t for t in sales if t["plan_10b5_1"]]
@@ -73,14 +76,14 @@ def _totals(cik: str, trades: list[dict], start: date, end: date) -> list[dict]:
     def total(rows):
         return sum((Decimal(t["value"]) for t in rows), Decimal(0))
     return [
-        _total(cik, "insider_purchases", total(buys), buys, start, end, f"{len(buys)} purchase(s) (code P)."),
-        _total(cik, "insider_sales", total(sales), sales, start, end, f"{len(sales)} sale(s) (code S)."),
+        _total(cik, "insider_purchases", total(buys), buys, start, end, f"{len(buys)} purchase(s) (code P).", unread),
+        _total(cik, "insider_sales", total(sales), sales, start, end, f"{len(sales)} sale(s) (code S).", unread),
         _total(cik, "insider_sales_planned", total(planned), planned, start, end,
-               f"{len(planned)} of the sales were under a 10b5-1 plan, set up in advance."),
+               f"{len(planned)} of the sales were under a 10b5-1 plan, set up in advance.", unread),
         _total(cik, "insider_net_purchases", total(buys) - total(sales), buys + sales, start, end,
-               "Purchases minus sales, at the prices reported."),
+               "Purchases minus sales, at the prices reported.", unread),
         _total(cik, "insider_buyers", Decimal(len({t["owner"] for t in buys})), buys, start, end,
-               "Different reporting owners with at least one purchase."),
+               "Different reporting owners with at least one purchase.", unread),
     ]
 
 
@@ -96,7 +99,7 @@ def run(args: GetInsiderTradesInput, context: ToolContext) -> ToolResult:
         return ToolResult(status="unsupported", source=SOURCE, warnings=[
             "Foreign private issuers (20-F/40-F filers) are exempt from Section 16, so their insiders file no Form 4: "
             "no trades here doesn't mean nobody traded."])
-    filings, notes = sec_insiders.read(context.sec, cik, context.cutoff, start)
+    filings, notes, unread = sec_insiders.read(context.sec, cik, context.cutoff, start)
     trades, other, unpriced = [], Counter(), 0
     for filing, parsed in filings:
         other.update(f"{c} (derivative)" for c in parsed["derivative_codes"])
@@ -111,7 +114,7 @@ def run(args: GetInsiderTradesInput, context: ToolContext) -> ToolResult:
             context.remember(trade)
             trades.append(trade)
     trades.sort(key=lambda t: (t["date"], t["id"]), reverse=True)
-    totals = _totals(cik, trades, start, end)
+    totals = _totals(cik, trades, start, end, unread)
     for record in totals:
         context.remember(record)
     warnings = notes + ([f"{unpriced} trade(s) report no price or share count and are left out of the totals; each "
@@ -126,8 +129,9 @@ def run(args: GetInsiderTradesInput, context: ToolContext) -> ToolResult:
             "how_to_read": "Only P (purchase) and S (sale) are an insider's own decision to buy or sell. Codes in "
                            "not_counted (tax withholding, option exercises, grants, gifts) are not signals. A sale under "
                            "a 10b5-1 plan was scheduled months ahead, so it says little about the insider's view now."}
-    return ToolResult(status="ok", data=data, ids=[t["id"] for t in trades] + [r["id"] for r in totals],
-                      source=SOURCE, warnings=warnings)
+    # A Form 4 that couldn't be read may hold trades, so the totals aren't exact: partial.
+    return ToolResult(status="partial" if unread else "ok", data=data,
+                      ids=[t["id"] for t in trades] + [r["id"] for r in totals], source=SOURCE, warnings=warnings)
 
 
 TOOL = Tool("get_insider_trades", "Insiders' open-market purchases (code P) and sales (code S) from their SEC Form 4 "

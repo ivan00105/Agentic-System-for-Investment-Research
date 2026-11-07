@@ -158,11 +158,20 @@ def _split_factor(series: dict, shares_day: date, price_day: date) -> tuple[Deci
 def _same_window(rate: dict, start: str | None, end: str | None) -> None:
     """The risk-free average must cover the price series' dates, give or take a few holidays."""
     slack = config.RISK_FREE_WINDOW_SLACK_DAYS
-    if not start or not rate.get("start") or any(
-            abs((date.fromisoformat(a) - date.fromisoformat(b)).days) > slack
-            for a, b in ((rate["start"], start), (rate["end"], end))):
-        raise Rejected(f"{rate['id']} averages {rate.get('start')} to {rate.get('end')}, but the prices run {start} to "
-                       f"{end}; call get_macro with series tbill_3m, start {start} and end {end}.")
+
+    def later(a: str, b: str) -> int:  # days a is after b
+        return (date.fromisoformat(a) - date.fromisoformat(b)).days
+    if start and rate.get("start") and all(abs(later(a, b)) <= slack for a, b in ((rate["start"], start), (rate["end"], end))):
+        return
+    covers = f"{rate['id']} covers {rate.get('start')} to {rate.get('end')}"
+    if start and rate.get("start") and later(rate["start"], start) >= -slack and later(end, rate["end"]) >= -slack:
+        # Inside the price window but shorter: asking get_macro again for the same dates gives the same days.
+        raise Rejected(f"{covers}, fewer days than the prices ({start} to {end}). If get_macro was asked for the price "
+                       f"dates, it has no rate for the rest: shorten the price series to {rate['start']} to "
+                       f"{rate['end']}, or say the Sharpe ratio is unavailable; if not, call get_macro with series "
+                       f"tbill_3m, start {start} and end {end}.")
+    raise Rejected(f"{covers}, but the prices cover {start} to {end}; call get_macro with series tbill_3m, start {start} "
+                   f"and end {end}.")
 
 
 def _market_cap(r: dict[str, dict], warnings: list[str]):

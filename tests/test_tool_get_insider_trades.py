@@ -159,6 +159,19 @@ def test_discover_can_check_insider_buying(tmp_path):
     assert context.records[net.ids[0]]["metric"] == "insider_net_purchases"
 
 
+def test_a_form_4_that_could_not_be_read_makes_the_totals_partial(tmp_path):
+    # Codex review: a failed download left "no insider sales" as an exact total, so `insider_sales <= 0` passed.
+    unreadable = (*FILINGS[2][:4], b"<html>Service unavailable</html>")
+    files = sec_files(filings=[FILINGS[0], unreadable])
+    result, context, _ = get(tmp_path, files=files)
+    assert result.status == "partial" and any("could not be read" in w for w in result.warnings)
+    sales = context.records[result.data["totals"]["insider_sales"]["id"]]
+    assert sales["value"] == "0" and sales["notes"][-1] == "1 Form 4 filing(s) could not be read, so this total may be low."
+    verdict = Acceptance(make_context(tmp_path / "check", cutoff=CUTOFF, files=files), Trace.new(tmp_path / "traces")).check(
+        "0000320193", ["AAPL"], [PriceCheck(metric="insider_sales", op="<=", value=0)])
+    assert verdict.state == "unknown" and verdict.lines[0].text.startswith("insider sales <= $0: unknown (get_insider_trades came back partial")
+
+
 def test_status_page_lists_form_4_under_insider_trades():
     insiders = {k["kind"]: k for k in providers.status({})}["insiders"]
     (form4_provider,) = insiders["providers"]

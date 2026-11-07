@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+from fx_rates import weekdays
 from sec_files import make_context
 
 from research_assistant import config
@@ -105,14 +106,28 @@ def test_average_over_the_price_dates_feeds_a_sharpe_ratio(tmp_path, treasury):
 
 
 def test_sharpe_refuses_a_rate_from_other_dates_or_a_latest_value(tmp_path, treasury):
-    result, context = get(tmp_path, series=["tbill_3m"], start=date(2026, 6, 1), end=date(2026, 11, 6), horizon_days=0)
+    result, context = get(tmp_path, series=["tbill_3m"], start=date(2026, 11, 3), end=date(2026, 11, 6), horizon_days=0)
     context.remember({"id": "prices-x", "kind": "prices", "source": "yfinance", "rows": [
-        {"date": f"2026-11-0{d}", "close": 100.0 + d, "adj_close": 100.0 + d} for d in (3, 4, 5, 6)]})
+        {"date": f"2026-10-0{d}", "close": 100.0 + d, "adj_close": 100.0 + d} for d in (5, 6, 7, 8)]})
     series = result.data["series"][0]
     wrong_dates = calculate(CalculateInput(formula="sharpe", inputs={"prices": "prices-x", "risk_free": series["average"]["id"]}), context)
-    assert wrong_dates.status == "invalid" and "start 2026-11-03 and end 2026-11-06" in wrong_dates.warnings[0]
+    assert wrong_dates.status == "invalid" and "start 2026-10-05 and end 2026-10-08" in wrong_dates.warnings[0]
     latest = calculate(CalculateInput(formula="sharpe", inputs={"prices": "prices-x", "risk_free": series["latest"]["id"]}), context)
     assert latest.status == "invalid" and "tbill_3m average" in latest.warnings[0]
+
+
+def test_an_average_is_dated_by_the_observations_it_uses_so_sharpe_sees_the_gap(tmp_path, treasury):
+    # Codex review: one bill rate, labelled with the asked year, passed next to a year of daily prices.
+    days = weekdays(date(2025, 11, 3), date(2026, 11, 3))
+    result, context = get(tmp_path, series=["tbill_3m"], start=days[0], end=days[-1], horizon_days=0)
+    average = result.data["series"][0]["average"]
+    assert (average["observations"], average["start"], average["end"]) == (1, "2026-11-03", "2026-11-03")
+    context.remember({"id": "prices-x", "kind": "prices", "source": "yfinance", "rows": [
+        {"date": d.isoformat(), "close": 100.0 + i % 5, "adj_close": 100.0 + i % 5} for i, d in enumerate(days)]})
+    sharpe = calculate(CalculateInput(formula="sharpe", inputs={"prices": "prices-x", "risk_free": average["id"]}), context)
+    assert len(days) == 262 and sharpe.status == "invalid"
+    assert "covers 2026-11-03 to 2026-11-03, fewer days than the prices (2025-11-03 to 2026-11-03)" in sharpe.warnings[0]
+    assert "shorten the price series to 2026-11-03 to 2026-11-03" in sharpe.warnings[0]
 
 
 def test_fred_reads_the_vintage_published_at_the_cutoff(tmp_path, fred):

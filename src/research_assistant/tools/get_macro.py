@@ -42,21 +42,28 @@ def _fact(name: str, provider: str, as_of: date, start: str | None, end: str, va
     return {"id": make_id("fact", "macro", provider, metric, start, end, vintage, value), **record}
 
 
+def _last_day(name: str, day: date) -> date:
+    """A monthly value covers its whole month."""
+    return day.replace(day=calendar.monthrange(day.year, day.month)[1]) if macro.SERIES[name][1] == "monthly" else day
+
+
 def _observation(name: str, provider: str, as_of: date, row: dict) -> dict:
-    """The latest value; a monthly value covers its whole month."""
+    """The latest value."""
     day = date.fromisoformat(row["date"])
     monthly = macro.SERIES[name][1] == "monthly"
-    end = day.replace(day=calendar.monthrange(day.year, day.month)[1]) if monthly else day
-    return _fact(name, provider, as_of, day.isoformat() if monthly else None, end.isoformat(), _ratio([row["value"]]))
+    return _fact(name, provider, as_of, day.isoformat() if monthly else None, _last_day(name, day).isoformat(),
+                 _ratio([row["value"]]))
 
 
 def _average(name: str, provider: str, as_of: date, rows: list[dict], start: date, end: date) -> dict | None:
+    """Dated by the observations it uses, not the dates asked for, so calculate's period check sees a gap."""
     inside = [r for r in rows if start.isoformat() <= r["date"] <= end.isoformat()]
     if not inside:
         return None
+    first, last = inside[0]["date"], _last_day(name, date.fromisoformat(inside[-1]["date"])).isoformat()
     note = (f"Average of {len(inside)} {macro.SERIES[name][1]} observations from {inside[0]['date']} to "
             f"{inside[-1]['date']}.")
-    return _fact(name, provider, as_of, start.isoformat(), end.isoformat(), _ratio([r["value"] for r in inside]),
+    return _fact(name, provider, as_of, first, last, _ratio([r["value"] for r in inside]),
                  metric=f"{name}_avg", label=f"{macro.SERIES[name][0]} (average)", observations=len(inside), notes=[note])
 
 
