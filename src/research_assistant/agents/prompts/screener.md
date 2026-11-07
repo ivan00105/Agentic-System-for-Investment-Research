@@ -22,14 +22,21 @@ Every company in the universe is screened on its annual SEC data for the latest 
 
 Valuation and risk need prices, so the host checks them on each candidate in turn, never in the screen, using its latest 10-K and latest close: market_cap (US dollars), pe, ps, pb (multiples: 30 means 30x), fcf_yield (a fraction), volatility (annualised, a fraction) and max_drawdown (a negative fraction: "never fell more than 30% from a peak" is max_drawdown >= -0.3, over about three years).
 
+Insider trading over the last year, from Form 4 filings, is checked the same way: insider_purchases, insider_sales and insider_net_purchases (US dollars, open-market trades only, so tax withholding and option exercises don't count) and insider_buyers (how many insiders bought). "Insiders are buying" is insider_buyers >= 1 or insider_net_purchases > 0; list it as a term. Foreign filers file no Form 4, so they come back unknown.
+
 ## Vague terms
 
 List in `terms` every word or phrase whose meaning a reasonable analyst could set differently, such as "large", "cheap", "reasonable valuation", "fast-growing", "profitable", "safe", "best", or "top" without a metric to rank by. For each one:
 - `term`: the words as the user wrote them;
 - `definition`: the filter, price check or ranking you made it, with its threshold;
-- `question`: one short question that lets the user set it, naming your proposal.
+- `question`: one short question that lets the user set it, naming your proposal;
+- `options`: 2-3 concrete readings the user can pick from, each one a filter, price check or ranking this screen can apply, with its threshold. One is your `definition`, word for word, marked `recommended`. For example "cheap": P/E below 15 (recommended), P/E below 25, P/S below 3. The screen has no sector averages or medians, so don't offer "below the sector median". The page also offers "Other" with a text box, so don't add one.
 
 A precise criterion ("operating margin above 25%") is not a vague term. Never drop a vague term and never define one without listing it. If the user already defined a term, use their definition and keep their wording.
+
+## The user's preferences
+
+The request may end with the user's preferences in `<preferences>`, from a short guided form: what matters most, time horizon, comfort with price swings and sectors. Use them to pick your proposals for vague terms; e.g. a low comfort with price swings makes a volatility or max_drawdown price check a good proposal, and a sector becomes `sic_prefixes` (list it as a term, with the codes). Don't turn a preference into a filter the request doesn't ask for without listing it as a term, so the user sees it. Put what the screen can't express in `not_covered`: dividends, and the time horizon (the screen uses the latest annual figures whatever the horizon).
 
 ## The rest of the spec
 

@@ -11,7 +11,7 @@ from typing import Callable
 
 from ..contracts import DomainError
 from ..model_access import check_model, load_model_settings
-from . import prices, prices_tiingo, prices_yfinance
+from . import fx, macro, prices, prices_tiingo, prices_yfinance
 from .errors import DataError
 from .sec import SecClient
 
@@ -21,6 +21,13 @@ KINDS = {
     "fundamentals": ("Fundamentals", "Reported figures such as revenue, operating income and cash flow."),
     "identity": ("Company lookup", "Matches a company name or ticker to the company SEC knows."),
     "prices": ("Daily prices", "Closing prices for market cap, valuation ratios and risk."),
+    "macro": ("Rates, inflation and release dates", "The risk-free rate for Sharpe ratios, Treasury yields, inflation "
+              "and unemployment as context, and the dates of major US data releases."),
+    "fx": ("Exchange rates", "Converts figures a foreign company reports in another currency (such as CNY or TWD) "
+           "into US dollars: each year's average rate for income and cash flow, the year-end rate for balances."),
+    "insiders": ("Insider trades", "Insiders' open-market purchases and sales from their SEC Form 4 filings."),
+    "peers": ("Peers and sector", "Peers by SIC industry code and size, and the sector ETF to compare against (its "
+              "prices come from the daily prices card)."),
     "llm": ("Model", "The language model that plans the research, calls the tools and writes the report."),
 }
 
@@ -36,6 +43,7 @@ class Provider:
     check: Callable[[], str] | None = None  # a live request; returns a message or raises
     missing: Callable[[], list[str]] | None = None  # what to set when not configured; default: its unset env names
     problem: Callable[[], str | None] = lambda: None  # why settings that are set still don't work
+    note: str = ""  # what this provider covers, when it isn't everything its card does
 
 
 def _unset(names) -> list[str]:
@@ -78,11 +86,21 @@ def all_providers() -> list[Provider]:
     sec = dict(tier=0, env=("SEC_USER_AGENT",), configured=_sec_configured, check=_sec_check, problem=_sec_problem)
     price_adapters = [prices.ADAPTERS[name] for name in prices.provider_order()]
     price_adapters += [a for a in (prices_tiingo, prices_yfinance) if a not in price_adapters]
+    macro_adapters = [macro.ADAPTERS[name] for name in macro.provider_order()]
+    macro_adapters += [a for a in macro.ADAPTERS.values() if a not in macro_adapters]
+    fx_adapters = [fx.ADAPTERS[name] for name in fx.provider_order()]
+    fx_adapters += [a for a in fx.ADAPTERS.values() if a not in fx_adapters]
     return [
         Provider("sec_archives", "filings", "SEC EDGAR filings", **sec),
         Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
         Provider("sec_tickers", "identity", "SEC company tickers", **sec),
+        Provider("sec_form4", "insiders", "SEC Form 4 filings", **sec),
+        Provider("sec_sic", "peers", "SEC company list by SIC code", **sec),
         *[Provider(a.NAME, "prices", a.LABEL, a.TIER, a.ENV, a.configured, a.check) for a in price_adapters],
+        *[Provider(a.NAME, "macro", a.LABEL, a.TIER, a.ENV, a.configured, a.check, note=a.NOTE) for a in macro_adapters],
+        # Names are unique across cards, so FRED's exchange rates are "fred_fx".
+        *[Provider(f"{a.NAME}_fx" if a.NAME in macro.ADAPTERS else a.NAME, "fx", a.LABEL, a.TIER, a.ENV, a.configured,
+                   a.check, note=a.NOTE) for a in fx_adapters],
         _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),
         _model_provider("openai", "OpenAI", 2, ("RESEARCH_MODEL", "OPENAI_API_KEY")),
         _model_provider("compatible", "OpenAI-compatible endpoint (e.g. local Ollama)", 0,
@@ -113,7 +131,7 @@ def status(checks: dict[str, dict]) -> list[dict]:
         kind["providers"].append({
             "name": provider.name, "label": provider.label, "tier": provider.tier, "env": list(provider.env),
             "configured": configured, "missing_env": [] if configured else _missing(provider), "problem": None if configured else provider.problem(),
-            "status": state, "last_check": last, "can_check": provider.check is not None})
+            "status": state, "last_check": last, "can_check": provider.check is not None, "note": provider.note or None})
     return [kind for kind in kinds.values() if kind["providers"]]
 
 

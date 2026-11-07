@@ -58,6 +58,17 @@ def _unit(node) -> str | None:
     return f"{top[0]}/{bottom[0]}" if len(top) == 1 and len(bottom) == 1 else None
 
 
+def texts(doc: Document, name: str) -> list[dict]:
+    """Non-numeric facts (ix:nonNumeric) named `name`, e.g. "dei:Security12bTitle", in document order.
+    Dimensioned ones are kept: a cover tags each listed class of stock under its own member."""
+    found = []
+    for node in doc.root.nodes("ix:nonnumeric"):
+        if node.attrs.get("name") == name:
+            _, start, end = doc.fragment(node)
+            found.append({"concept": name, "text": node.text(), "locator": f"#{node.attrs.get('id', '')} bytes [{start},{end})"})
+    return found
+
+
 def facts(sec: SecClient, filing: Filing, cache: DiskCache) -> list[dict]:
     """Every whole-company numeric fact in the filing's primary document; cached, since filings never change."""
     key = f"ixbrl|v2|{filing.url}"  # v2: facts carry the unit's measure

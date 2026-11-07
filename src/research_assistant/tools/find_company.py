@@ -40,8 +40,8 @@ def run(args: FindCompanyInput, context: ToolContext) -> ToolResult:
         context.remember(rows[0])
         source += " + SEC submissions"
         if details["foreign_filer"]:
-            warnings.append("Foreign private issuer (files 20-F/40-F): financials in IFRS or in a currency other "
-                            "than USD come back unsupported from get_financials.")
+            warnings.append("Foreign private issuer (files 20-F/40-F): financials may be in IFRS or another currency; "
+                            "get_financials converts them to USD when an exchange rate is available.")
         if not details["has_annual_report"]:
             warnings.append("No annual report in the last year of filings: a new registrant (e.g. after a "
                             "reorganisation) may keep its history under a predecessor CIK; search the former name.")

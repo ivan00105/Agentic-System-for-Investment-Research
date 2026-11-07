@@ -124,3 +124,19 @@ def test_a_past_cutoff_makes_screen_refuse_and_a_live_run_does_not(tmp_path, mon
     configure(monkeypatch, tmp_path, script())
     assert cli.main(["Rank Apple."]) == 0
     assert "step 1: screen -> ok" in capsys.readouterr().err
+
+
+def test_the_terminal_offers_each_terms_options_by_number(monkeypatch, capsys):
+    from research_assistant.agents.discover_spec import Term
+    term = Term(term="cheap", definition="P/E below 15", question="What P/E is cheap?",
+                options=[{"definition": "P/E below 15"}, {"definition": "P/E below 25"}])
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    for typed, expected in (["2"], "P/E below 25"), (["1"], ""), ([""], ""), (["9", "2"], "P/E below 25"), \
+                           (["P/S below 3"], "P/S below 3"):
+        monkeypatch.setattr("builtins.input", iter(typed).__next__)
+        assert cli.ask_user(term) == expected, typed
+    shown = capsys.readouterr().err
+    assert "  1. P/E below 15 (recommended)\n  2. P/E below 25\n" in shown and "Pick 1 to 2" in shown
+    plain = Term(term="large", definition="revenue over $10 billion", question="What is large?")
+    monkeypatch.setattr("builtins.input", lambda: "")
+    assert cli.ask_user(plain) == "" and "Proposed: revenue over $10 billion" in capsys.readouterr().err

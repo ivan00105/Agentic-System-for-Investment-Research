@@ -2,21 +2,25 @@
 under, and what the evidence panel shows when the chip is opened. Read from the frozen records, never fetched."""
 import re
 from datetime import date
+from decimal import Decimal
 
 from .checker import format_value
 
 GROUPS = {"fact": "Reported figures", "calc": "Calculations", "chunk": "Filing text", "filing": "Filings",
           "prices": "Prices", "check": "Checks against the filing", "company": "Companies",
-          "claim": "Analyst findings"}
+          "claim": "Analyst findings", "calendar": "Release dates", "insider": "Insider trades",
+          "peers": "Peers and sector"}
 METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_income": "Operating income",
            "net_income": "Net income", "research_and_development": "R&D spending",
            "operating_cash_flow": "Operating cash flow", "capex": "Capital spending", "eps_diluted": "Diluted EPS",
            "diluted_shares": "Diluted shares", "total_assets": "Total assets", "total_liabilities": "Total liabilities",
            "stockholders_equity": "Shareholders' equity", "cash": "Cash", "long_term_debt": "Long-term debt",
-           "shares_outstanding": "Shares outstanding"}
+           "shares_outstanding": "Shares outstanding",
+           "ordinary_shares_per_ads": "Ordinary shares per ADS"}
 FORMULAS = {"fcf": "Free cash flow", "market_cap": "Market cap", "pe": "P/E", "ps": "P/S", "pb": "P/B",
             "fcf_yield": "FCF yield", "ev": "Enterprise value", "total_return": "Total return",
-            "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta"}
+            "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta",
+            "sharpe": "Sharpe ratio", "relative_return": "Return against the benchmark"}
 MARGINS = {"gross_profit": "Gross margin", "operating_income": "Operating margin", "net_income": "Net margin",
            "fcf": "FCF margin", "operating_cash_flow": "Operating cash flow margin"}
 
@@ -26,7 +30,8 @@ def label(record: dict | None, records: dict[str, dict]) -> str:
     if record is None:
         return "Unknown record"
     if record.get("kind") == "fact":
-        return METRICS.get(record.get("metric"), str(record.get("metric")).replace("_", " ").capitalize())
+        metric = record.get("metric")
+        return METRICS.get(metric) or record.get("label") or str(metric).replace("_", " ").capitalize()
     formula, inputs = record.get("formula"), record.get("inputs") or {}
 
     def of(role):
@@ -83,6 +88,12 @@ def chip(record: dict | None, records: dict[str, dict]) -> str:
         return f"{record.get('ticker')} prices"
     if kind == "check":
         return f"Filing check: {record.get('verdict')}"
+    if kind == "calendar":
+        return f"Release dates from {record.get('start')}"
+    if kind == "peers":
+        return f"Peers of {record.get('name')}"
+    if kind == "insider":
+        return f"Form 4 {record.get('meaning')} {record.get('date')}"
     if kind == "company":
         return str(record.get("name"))
     if kind == "claim":
@@ -94,13 +105,21 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
     """What the evidence panel shows: a title, the excerpt itself, facts about it, and records it links to."""
     kind, rows, links = record.get("kind"), [], []
     title, excerpt, url = chip(record, records), "", record.get("filing_url") or record.get("url")
-    if kind == "fact":
+    if kind == "fact" and not record.get("accession"):  # a value from another provider, e.g. get_macro's rates
+        title = f"{label(record, records)}, {period(record, records)}"
+        excerpt = format_value(record)
+        rows = [("Source", record.get("source")), ("Series", record.get("series_id")),
+                ("Definition", record.get("definition")), ("As published on", record.get("vintage"))]
+        rows += [("Note", note) for note in record.get("notes") or []]
+        links = list(record.get("trades") or [])
+    elif kind == "fact":
         title = f"{label(record, records)}, {period(record, records)}"
         excerpt = format_value(record)
         rows = [("Reported as", record.get("tag")), ("Filing", f"{record.get('form')} {record.get('accession')}"),
                 ("Filed", record.get("filed"))]
         if record.get("original_value") is not None:
             rows.append(("First reported as", f"{record['original_value']} in {record.get('original_accession')}"))
+        rows += [("Note", note) for note in record.get("notes") or []]
     elif kind == "calc":
         title = f"{label(record, records)}, {period(record, records)}"
         excerpt = format_value(record) if record.get("value") is not None else f"Unavailable: {record.get('reason')}"
@@ -121,6 +140,25 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
                    "(as traded).") if closes else "No closing prices."
         rows = [("Source", record.get("source")),
                 ("Adjusted prices", "Include dividends, so nobody could have traded at them")]
+    elif kind == "peers":
+        title = f"Peers of {record.get('name')} (SIC {record.get('sic')}, {record.get('sic_description')})"
+        excerpt = "; ".join(f"{p['name']} ({', '.join(p['tickers'])})" for p in record.get("peers") or []) or "None chosen."
+        rows = [("How they were chosen", record.get("method")),
+                ("Sector benchmark", (record.get("sector") or {}).get("rule"))]
+    elif kind == "insider":
+        title = f"Insider {record.get('meaning')} by {record.get('owner')}, {record.get('date')}"
+        value = f" (${Decimal(record['value']):,.0f})" if record.get("value") else ""
+        excerpt = f"{record.get('shares')} shares of {record.get('security')} at ${record.get('price')}{value}"
+        rows = [("Role", record.get("role")), ("Code", f"{record.get('code')} ({record.get('meaning')})"),
+                ("10b5-1 plan", f"yes ({record.get('plan_basis')})" if record.get("plan_10b5_1") else "no"),
+                ("Shares owned after", record.get("owned_after")),
+                ("Held", "directly" if record.get("direct") else "indirectly"),
+                ("Filing", f"Form {record.get('form')} {record.get('accession')}, filed {record.get('filed')}")]
+        rows += [("Footnote", note) for note in record.get("footnotes") or []]
+    elif kind == "calendar":
+        title = f"Release dates, {record.get('start')} to {record.get('end')}"
+        excerpt = "; ".join(f"{r['date']}: {r['name']}" for r in record.get("releases") or []) or "No major releases."
+        rows = [("Source", record.get("source"))] + [("Note", note) for note in record.get("notes") or []]
     elif kind == "check":
         title = f"Check of {label(records.get(record.get('fact_id')), records).lower()} against the filing"
         excerpt = f"{record.get('verdict')}: expected {record.get('expected')}"

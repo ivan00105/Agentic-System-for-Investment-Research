@@ -193,6 +193,7 @@ def pinned(tmp_path, monkeypatch):
     (prompts / "coordinator.md").write_text("Plan the work.", encoding="utf-8")
     monkeypatch.setattr(run_eval, "PROMPTS", prompts)
     monkeypatch.setattr(run_eval, "git_commit", lambda: "a" * 40)
+    monkeypatch.setattr(run_eval, "git_changes", lambda: (True, "d" * 64))
     return prompts
 
 
@@ -203,6 +204,10 @@ def pinned(tmp_path, monkeypatch):
     (lambda mp, tmp, prompts: mp.setattr(config, "AGENT_MAX_STEPS", 5), "config: AGENT_MAX_STEPS changed"),
     (lambda mp, tmp, prompts: cases(tmp, CASE | {"notes": "changed"}), "case files: dev-aapl-growth changed"),
     (lambda mp, tmp, prompts: mp.setattr(run_eval, "git_commit", lambda: "b" * 40), "commit: aaaaaaa"),
+    # Second review: an uncommitted edit kept the commit the same, so a resume mixed two versions of the code.
+    (lambda mp, tmp, prompts: mp.setattr(run_eval, "git_changes", lambda: (True, "e" * 64)),
+     "uncommitted changes (git diff) differ"),
+    (lambda mp, tmp, prompts: mp.setattr(run_eval, "git_changes", lambda: (False, None)), "dirty: True then, False now"),
 ])
 def test_a_batch_keeps_a_manifest_and_refuses_to_resume_with_another_set_up(tmp_path, monkeypatch, capsys, pinned,
                                                                             change, expected):
@@ -212,6 +217,7 @@ def test_a_batch_keeps_a_manifest_and_refuses_to_resume_with_another_set_up(tmp_
     assert run_eval.main(["--conditions", "B", "--case-dir", str(folder), "--out", str(out)]) == 0
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     assert (manifest["provider"], manifest["model"], manifest["commit"]) == ("openrouter", "fake-model", "a" * 40)
+    assert (manifest["dirty"], manifest["diff"]) == (True, "d" * 64)
     assert list(manifest["prompts"]) == ["coordinator.md"] and manifest["config"]["AGENT_MAX_STEPS"] == 30
     assert list(manifest["cases"]) == ["dev-aapl-growth"]
     capsys.readouterr()

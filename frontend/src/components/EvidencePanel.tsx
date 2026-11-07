@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { agentApi, api, secUrl, stamp } from '../api'
+import { agentApi, api, sourceLink, stamp } from '../api'
 import type { AgentRecord, Evidence } from '../api'
 import { Badge } from './Badge'
 import { ErrorBox } from './ErrorBox'
@@ -41,7 +41,7 @@ export function EvidencePanel({runId, evidenceId, onClose}: {runId: string; evid
 export function RecordPanel({runId, trail, onOpen, onBack, onClose}: {runId: string; trail: string[]; onOpen: (id: string) => void; onBack: () => void; onClose: () => void}) {
   const recordId = trail[trail.length - 1] ?? null
   const {value: record, error, retry} = useLoad<AgentRecord>(recordId ? () => agentApi.record(runId, recordId) : null, `${runId}/${recordId}`)
-  const url = secUrl(record?.url ?? null)
+  const link = sourceLink(record?.url ?? null)
   return <EvidenceShell focus={recordId} onClose={onClose}>
     {trail.length > 1 && <button className="text-button" onClick={onBack}>← Back</button>}
     {error ? <ErrorBox message={error} retry={retry} /> : !record ? <p role="status">Loading saved evidence…</p> : <>
@@ -50,7 +50,7 @@ export function RecordPanel({runId, trail, onOpen, onBack, onClose}: {runId: str
       {record.rows.length > 0 && <dl className="source-meta">{record.rows.map((row, i) => <div key={i}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>}
       {record.available_at && <dl className="source-meta"><dt>Public from</dt><dd>{stamp(record.available_at)}</dd></dl>}
       {record.links.length > 0 && <><h3>Built from</h3><div className="source-chips">{record.links.map(link => <button type="button" key={link.id} className="source-chip" onClick={() => onOpen(link.id)}>{link.label}</button>)}</div></>}
-      {url && <a className="source-link" href={url} target="_blank" rel="noopener noreferrer">Open on SEC.gov ↗</a>}
+      {link && <a className="source-link" href={link.href} target="_blank" rel="noopener noreferrer">Open on {link.site} ↗</a>}
       <p className="mono muted">{record.id}</p>
     </>}
   </EvidenceShell>

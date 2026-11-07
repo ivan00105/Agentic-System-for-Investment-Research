@@ -36,8 +36,8 @@ test('with no keys, every kind of data has a card that names the variables to se
   await page.getByRole('button', {name: 'Setup & status', exact: true}).click()
   await expect(page).toHaveURL(/view=setup/)
   await expect(page.getByRole('heading', {name: 'Setup & status', exact: true})).toBeVisible()
-  for (const name of ['SEC filings', 'Fundamentals', 'Company lookup', 'Daily prices', 'Model']) await expect(card(page, name)).toBeVisible()
-  await expect(page.locator('.setup-summary')).toContainText('Not ready yet: SEC filings, Fundamentals, Company lookup, Model.')
+  for (const name of ['SEC filings', 'Fundamentals', 'Company lookup', 'Daily prices', 'Rates, inflation and release dates', 'Exchange rates', 'Insider trades', 'Peers and sector', 'Model']) await expect(card(page, name)).toBeVisible()
+  await expect(page.locator('.setup-summary')).toContainText('Not ready yet: SEC filings, Fundamentals, Company lookup, Insider trades, Peers and sector, Model.')
 
   const filings = card(page, 'SEC filings')
   await expect(filings.getByText('Nothing active', {exact: true})).toBeVisible()
@@ -51,6 +51,13 @@ test('with no keys, every kind of data has a card that names the variables to se
   await expect(row(prices, 'Yahoo Finance (yfinance)').getByText('Ready (no key needed)', {exact: true})).toBeVisible()
   await expect(row(prices, 'Tiingo').locator('.provider-missing')).toContainText('TIINGO_API_KEY')
   await expect(row(card(page, 'Model'), 'OpenRouter').locator('.provider-missing')).toContainText('RESEARCH_MODEL_PROVIDER=openrouter')
+
+  // Sources that aren't built are only named behind one collapsed line, with a link to the catalogue.
+  const others = page.locator('details').filter({hasText: 'Other sources we know about (not built)'})
+  await expect(others).not.toHaveAttribute('open', '')
+  await others.locator('summary').click()
+  await expect(others.getByRole('link', {name: 'REFERENCE §10, Data providers by kind'})).toHaveAttribute('href', /REFERENCE\.md#data-providers-by-kind/)
+  await others.locator('summary').click()
 
   // Keys are never typed into the browser, and there is no consent step.
   await expect(page.locator('input, textarea')).toHaveCount(0)

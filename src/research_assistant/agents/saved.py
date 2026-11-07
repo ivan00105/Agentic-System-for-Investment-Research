@@ -5,10 +5,11 @@ import os
 import re
 from pathlib import Path
 
+from . import preferences
 from .checker import PLACEHOLDER, lookup
 from .draft import SECTIONS
 from .evidence import load
-from .figures import figures
+from .figures import figures, raw
 from .objections import ISSUES
 from .progress import describe as progress_line
 from .report import RUN_STATUS, describe
@@ -29,7 +30,8 @@ def summary(path: Path) -> dict | None:
     if first is None:
         return None
     end = last if last and last.get("kind") == "run_end" else {}
-    return {"run_id": path.stem, "question": first.get("question"), "condition": first.get("condition"),
+    question, note = preferences.split(first.get("question"))
+    return {"run_id": path.stem, "question": question, "preferences": note, "condition": first.get("condition"),
             "cutoff": first.get("cutoff"), "model": first.get("model"), "started_at": first.get("at"),
             "status": end.get("status"), "ended_at": end.get("at"), "totals": end.get("totals")}
 
@@ -79,6 +81,7 @@ def report(path: Path) -> dict | None:
             "objections": [_objection(o) for o in end.get("objections") or []],
             "sources": [_source(n, i, run.records) for i, n in number.items()],
             "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
+            "raw": raw(checked["sources"], run.records) if checked else [],
             "discover": _discover(run, path.parent) if "candidates" in end else None,
             "markdown": end.get("markdown") or ""}
 
@@ -86,27 +89,42 @@ def report(path: Path) -> dict | None:
 def questions(path: Path) -> dict | None:
     """What a Discover run waiting for the user asks: its draft spec as shown, and each vague term's question."""
     found = next((e for e in reversed(read_events(path)) if e.get("kind") == "questions"), None)
-    return found and {"terms": found["terms"], "shown": found["shown"]}
+    return found and {"terms": found["terms"], "shown": found["shown"], "spec": found.get("spec")}
 
 
 def _discover(run, folder: Path) -> dict:
-    """A Discover run's shortlist: the spec as shown, the counts, and each checked candidate with its check's
-    lines and, for a researched one, its own run and that report's answer."""
+    """A Discover run's shortlist: the spec as shown, the counts, why the search ended, and each checked candidate
+    with its check's lines and, for a researched one, its own run with that report's answer, flags and status."""
     spec = next((e for e in reversed(run.events) if e["kind"] == "screen_spec"), None)
     checks = {e["rank"]: e for e in run.events if e["kind"] == "candidate"}
+    ends = {e["rank"]: e for e in run.events if e["kind"] == "research_end"}
+    screens = [r for r in run.records.values() if r.get("kind") == "screen"]  # its rows hold each company's tickers
+    tickers = {row["cik"]: row.get("tickers") or [] for r in screens for row in r.get("rows", [])}
     candidates = [{key: c.get(key) for key in ("rank", "cik", "name", "outcome", "verdict", "run_id")}
-                  | {"lines": (checks.get(c["rank"]) or {}).get("lines", []), "answer": _answer(folder, c.get("run_id"))}
+                  | {"tickers": tickers.get(c["cik"], []), "lines": (checks.get(c["rank"]) or {}).get("lines", [])}
+                  | _answer(folder, c.get("run_id"), ends.get(c["rank"]))
                   for c in run.end["candidates"]]
-    return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates}
+    return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates,
+            "notes": run.end.get("notes") or []}
 
 
-def _answer(folder: Path, run_id: str | None) -> str | None:
-    """The first summary statement of a pick's own report: its answer."""
+def _answer(folder: Path, run_id: str | None, research_end: dict | None) -> dict:
+    """A researched candidate's answer (the first summary statement of its own report) with that claim's
+    citations, its run's status, and warnings: the claim's flags, the report's other flags and an unfinished run."""
     path = folder / f"{run_id}.jsonl" if run_id and RUN_ID.fullmatch(run_id) else None
-    if path is None or not path.is_file():
-        return None
-    claims = ((_ends(path)[1] or {}).get("report") or {}).get("sections", {}).get("summary") or []
-    return claims[0]["text"] if claims else None
+    end = _ends(path)[1] if path and path.is_file() else None
+    checked = (end or {}).get("report") or {}
+    claim = next(iter(checked.get("sections", {}).get("summary") or []), None)
+    status = (end or research_end or {}).get("status")
+    warnings = [flag["problem"] for flag in claim["flags"]] if claim else []
+    if (others := len(checked.get("flags") or []) - len(warnings)) > 0:
+        warnings.append(f"Its report has {others} more flagged statement{'s' if others > 1 else ''}; open it to see them.")
+    if research_end and research_end.get("error"):
+        warnings.append(research_end["error"])
+    if status and status != "finished":
+        warnings.append(f"Its research run {RUN_STATUS.get(status, status)}.")
+    return {"answer": claim and claim["text"], "citations": claim["citations"] if claim else [], "warnings": warnings,
+            "run_status": status}
 
 
 def record(path: Path, record_id: str) -> dict | None:

@@ -73,3 +73,16 @@ def test_chips_and_the_evidence_panel_name_records_in_words():
     assert finding["group"] == "Analyst findings" and finding["links"] == [{"id": "chunk-1",
                                                                             "label": "10-K 2025 Item 1A ¶4"}]
     assert detail(PRICES, records)["excerpt"] == "2 trading days. Last close 11.50 on 2025-01-02 (as traded)."
+
+
+def test_the_raw_table_lists_each_cited_figure_and_every_input_behind_it():
+    from research_assistant.agents.figures import raw
+    rows = raw(["calc-pp", "prices-1", "company-" + CIK], RECORDS)
+    assert [r["id"] for r in rows] == ["calc-pp", "calc-m24", "calc-m23", OI["2024-12-31"]["id"],
+                                       REV["2024-12-31"]["id"], OI["2023-12-31"]["id"], REV["2023-12-31"]["id"]]
+    pp, m24 = rows[0], rows[1]
+    assert pp["formula"] == "change_pp" and pp["inputs"] == {"current": "calc-m24", "previous": "calc-m23"}
+    assert (pp["value"], pp["unit"], pp["company"]) == ("5", "pp", "Acme Corp")
+    assert m24["shown"] == "25.0%" and m24["inputs"]["numerator"] == OI["2024-12-31"]["id"]
+    revenue = rows[4]
+    assert (revenue["value"], revenue["tag"], revenue["form"]) == ("100000000000", "us-gaap:revenue", "10-K")

@@ -3,15 +3,17 @@ declared universe, in the background; follow its progress, answer Discover's que
 report. Saved runs are the trace files in data/traces/ (agents/saved.py), so History also lists runs started from
 the CLI."""
 import threading
+from dataclasses import replace
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
 from . import cli, config
-from .agents import discover, saved
+from .agents import discover, preferences, saved
+from .agents.discover_spec import ScreenSpec, unknown_fields
 from .agents.trace import Trace
 from .contracts import DomainError
 from .data import universe as universes
@@ -40,17 +42,27 @@ class StartRun(BaseModel):
     condition: Literal["B", "C", "D"] | None = None
     cutoff: date | None = None  # research as of the end of this day (UTC), as the CLI's --cutoff
     discover: Universe | None = None
+    # Another model ID of the configured provider (Advanced options); empty: RESEARCH_MODEL.
+    model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    # Discover: wait for the user to check or edit the drafted spec, even when it has no vague terms.
+    edit_spec: bool = False
+    # Discover: how many to return, from the page's count box; sent apart so a hand-edited question can't lose it.
+    top_k: int | None = Field(None, ge=1)
+    # "Help me start": what matters most, horizon, comfort with price swings, sectors. Added to the question.
+    preferences: str | None = None
 
 
 class Answers(BaseModel):
     answers: dict[str, str]  # term -> the user's definition; "" accepts the proposal
+    spec: dict | None = None  # the drafted spec as the user edited it; used as it is
 
 
 class Pending:
-    """A Discover run waiting for the user's answers to its vague-term questions."""
+    """A Discover run waiting for the user: answers to its vague-term questions, or an edited spec."""
 
     def __init__(self):
         self.answers: dict[str, str] = {}
+        self.spec: ScreenSpec | None = None
         self.ready = threading.Event()
 
 
@@ -64,23 +76,25 @@ class AgentRuns:
         self.lock = threading.Lock()
 
     def start(self, question: str, condition: str, settings, cutoff: datetime | None = None,
-              universe: universes.Universe | None = None) -> str:
+              universe: universes.Universe | None = None, edit_spec: bool = False, top_k: int | None = None) -> str:
         trace, stop = Trace.new(self.folder), threading.Event()
         with self.lock:
             self.active[trace.run_id] = stop
-        threading.Thread(target=self._run, args=(question, condition, settings, trace, stop, cutoff, universe),
-                         daemon=True).start()
+        threading.Thread(target=self._run, args=(question, condition, settings, trace, stop, cutoff, universe,
+                                                 edit_spec, top_k), daemon=True).start()
         return trace.run_id
 
     def _run(self, question: str, condition: str, settings, trace: Trace, stop: threading.Event,
-             cutoff: datetime | None, universe: universes.Universe | None):
+             cutoff: datetime | None, universe: universes.Universe | None, edit_spec: bool, top_k: int | None):
         try:
             with cli.sec_client() as sec, cli.model_client(settings) as client:
                 context = ToolContext(cutoff=cutoff or datetime.now(timezone.utc), sec=sec, stop=stop,
                                       historical=cutoff is not None)
                 if universe:
+                    waiter = Waiter(self, trace.run_id, stop, edit_spec)
                     discover.run(question, client, settings, context, universe, research=cli.CONDITIONS[condition],
-                                 condition=cli.LABELS[condition], ask=self._asker(trace.run_id, stop), trace=trace)
+                                 condition=cli.LABELS[condition], ask=waiter.ask, trace=trace, edit=waiter.edit,
+                                 review=edit_spec, top_k=top_k)
                 else:
                     cli.CONDITIONS[condition](question, client, settings, context, trace=trace)
         except Exception as exc:  # a bug must still end the trace, or the page would show the run going forever
@@ -92,27 +106,11 @@ class AgentRuns:
                 del self.active[trace.run_id]
                 self.waiting.pop(trace.run_id, None)
 
-    def _asker(self, run_id: str, stop: threading.Event):
-        """Discover's `ask`: the run waits until the page sends answers to all its questions, or it is cancelled."""
-        pending = Pending()
-
-        def ask(term) -> str | None:
-            with self.lock:
-                if not pending.ready.is_set() and not stop.is_set():
-                    self.waiting[run_id] = pending
-            while not pending.ready.wait(0.2):
-                if stop.is_set():  # cancelled: the proposal stands as assumed and the run stops before the screen
-                    with self.lock:
-                        self.waiting.pop(run_id, None)
-                    return None
-            return pending.answers.get(term.term)  # None for a term the page didn't answer: assumed
-        return ask
-
-    def answer(self, run_id: str, answers: dict[str, str]) -> bool:
+    def answer(self, run_id: str, answers: dict[str, str], spec: ScreenSpec | None = None) -> bool:
         with self.lock:
             pending = self.waiting.pop(run_id, None)
         if pending:
-            pending.answers = answers
+            pending.answers, pending.spec = answers, spec
             pending.ready.set()
         return pending is not None
 
@@ -150,6 +148,35 @@ class AgentRuns:
             return {**self.active, **dict.fromkeys(self.waiting)}  # None marks a run waiting for answers
 
 
+class Waiter:
+    """Discover's `ask` and `edit` for one run: it waits until the page sends one reply (the answers to all its
+    questions, perhaps with an edited spec), or until it is cancelled. `review`: wait even when nothing is asked."""
+
+    def __init__(self, runs: AgentRuns, run_id: str, stop: threading.Event, review: bool = False):
+        self.runs, self.run_id, self.stop, self.pending, self.review = runs, run_id, stop, Pending(), review
+
+    def _wait(self) -> bool:
+        with self.runs.lock:
+            if not self.pending.ready.is_set() and not self.stop.is_set():
+                self.runs.waiting[self.run_id] = self.pending
+        while not self.pending.ready.wait(0.2):
+            if self.stop.is_set():  # cancelled: proposals stand as assumed and the run stops before the screen
+                with self.runs.lock:
+                    self.runs.waiting.pop(self.run_id, None)
+                return False
+        return True
+
+    def ask(self, term) -> str | None:
+        return self.pending.answers.get(term.term) if self._wait() else None  # None if unanswered: assumed
+
+    def edit(self, spec: ScreenSpec) -> ScreenSpec | None:
+        """The spec the page sent with its answers, used whenever there is one (live check 5 Nov 2026: an edit sent to
+        a run started without review was dropped). Nothing asked and no review: no wait, no edit."""
+        if not (self.review or self.pending.ready.is_set()):
+            return None
+        return self.pending.spec if self._wait() else None
+
+
 def _status(found: dict, active: dict[str, threading.Event | None]) -> dict:
     if found["status"] is None:
         run_id = found["run_id"]
@@ -176,13 +203,16 @@ def start(body: StartRun, request: Request):
     if body.discover:
         try:
             with cli.sec_client() as sec:
-                declared = (universes.load(body.discover.name) if body.discover.name
+                declared = (universes.load(body.discover.name, sec) if body.discover.name
                             else universes.from_tickers(sec, body.discover.tickers))
         except (universes.UniverseError, DataError) as exc:
             raise DomainError(str(exc), "bad_universe", 422) from exc
     condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
     cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
-    return runs(request).view(runs(request).start(body.question, condition, settings, cutoff, declared))
+    settings = replace(settings, model=body.model) if body.model else settings
+    question = preferences.attach(body.question, body.preferences)
+    return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
+                                                  body.edit_spec and declared is not None, body.top_k))
 
 
 @router.get("")
@@ -199,8 +229,17 @@ def progress(run_id: str, request: Request):
 
 @router.post("/{run_id}/answers")
 def answer(run_id: str, body: Answers, request: Request):
-    """Discover's answers to its vague-term questions: text sets a term, "" accepts its proposal."""
-    if not runs(request).answer(run_id, body.answers):
+    """Discover's answers to its vague-term questions: text sets a term, "" accepts its proposal. An edited spec
+    replaces the draft as it is, so a field it doesn't know is an error, not dropped."""
+    if body.spec is not None and (unknown := unknown_fields(body.spec)):
+        raise DomainError(f"The edited spec has fields the screen doesn't know, so they would be ignored: "
+                          f"{', '.join(unknown)}. Spec fields: {', '.join(ScreenSpec.model_fields)}.", "bad_spec", 422)
+    try:
+        spec = ScreenSpec.model_validate(body.spec) if body.spec is not None else None
+    except ValidationError as exc:
+        problems = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'spec'}: {e['msg']}" for e in exc.errors())
+        raise DomainError(f"The edited spec isn't valid: {problems}", "bad_spec", 422) from exc
+    if not runs(request).answer(run_id, body.answers, spec):
         raise DomainError("This run is not waiting for answers.", "not_waiting", 409)
     return runs(request).view(run_id)
 

@@ -1,11 +1,11 @@
 // The pieces of an agent report: citation chips, claim lists, the key-numbers table, the review's changes and sources.
 import { useState } from 'react'
-import { secUrl } from '../../api'
+import { sourceLink } from '../../api'
 import type { AgentClaim, AgentObjection, AgentSection, AgentSource, KeyNumber } from '../../api'
 import { Badge } from '../Badge'
 
 export type Open = (recordId: string) => void
-const KINDS = ['fact', 'calc', 'prices', 'check', 'chunk', 'filing', 'company', 'claim']
+const KINDS = ['fact', 'calc', 'prices', 'check', 'chunk', 'filing', 'insider', 'peers', 'calendar', 'company', 'claim']
 const rank = (source?: AgentSource) => { const i = KINDS.indexOf(source?.kind ?? ''); return i < 0 ? KINDS.length : i }
 const CHIPS_SHOWN = 4 // the rest sit behind "+N more", never dropped
 
@@ -74,13 +74,14 @@ export function ReviewChanges({objections, sections}: {objections: AgentObjectio
   </>
 }
 
-const GROUPS = ['Reported figures', 'Calculations', 'Prices', 'Checks against the filing', 'Filing text', 'Filings', 'Companies', 'Analyst findings', 'Other']
+const GROUPS = ['Reported figures', 'Calculations', 'Prices', 'Checks against the filing', 'Filing text', 'Filings', 'Insider trades', 'Peers and sector', 'Release dates', 'Companies', 'Analyst findings', 'Other']
+const groupOf = (source: AgentSource) => GROUPS.includes(source.group ?? '') ? source.group! : 'Other' // a new group is never dropped
 export function SourcesList({sources, onOpen}: {sources: AgentSource[]; onOpen: Open}) {
-  const grouped = GROUPS.map(group => [group, sources.filter(s => (s.group ?? 'Other') === group)] as const).filter(([, items]) => items.length)
+  const grouped = GROUPS.map(group => [group, sources.filter(s => groupOf(s) === group)] as const).filter(([, items]) => items.length)
   return <>{grouped.map(([group, items]) => <details key={group} className="source-group"><summary>{group} <span>{items.length}</span></summary>
     <ol className="agent-sources">{items.map(source => <li key={source.id} id={`source-${source.n}`} value={source.n}>
       <button type="button" className="text-button" onClick={() => onOpen(source.id)}>{source.label ?? source.id}</button> <span className="muted">{source.text}</span>
-      {secUrl(source.url) && <> <a href={secUrl(source.url)!} target="_blank" rel="noopener noreferrer">SEC.gov ↗</a></>}
+      {sourceLink(source.url) && <> <a href={sourceLink(source.url)!.href} target="_blank" rel="noopener noreferrer">{sourceLink(source.url)!.site} ↗</a></>}
     </li>)}</ol>
   </details>)}</>
 }

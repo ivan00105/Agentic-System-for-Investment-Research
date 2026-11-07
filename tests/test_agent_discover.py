@@ -6,13 +6,14 @@ import openai
 import pandas as pd
 import pytest
 from fake_llm import FakeClient, reply, resubmit
-from sec_files import make_context
+from fx_rates import Frankfurter
+from sec_files import SecFiles, make_context
 
 from research_assistant.agents import discover, single_agent
 from research_assistant.agents.acceptance import Acceptance
 from research_assistant.agents.discover_spec import PriceCheck
 from research_assistant.agents.trace import Trace
-from research_assistant.data import prices_yfinance, universe
+from research_assistant.data import fx_frankfurter, prices_yfinance, universe
 from research_assistant.model_access import ModelSettings
 from research_assistant.tools.result import ToolResult
 from research_assistant.tools.screen import Filter
@@ -185,6 +186,24 @@ def test_price_checks_use_the_latest_close_and_10k(tmp_path, monkeypatch):
     assert record["formula"] == "pe" and context.records[record["inputs"]["market_cap"]]["formula"] == "market_cap"
 
 
+def test_a_margin_above_100_percent_is_unknown_but_still_cited(tmp_path):
+    # BitMine's CY2025 values: operating income, mostly crypto gains, was 73 times its revenue.
+    filing = {"accn": "0001829311-25-000050", "form": "10-K", "filed": "2025-11-21", "start": "2024-09-01",
+              "end": "2025-08-31"}
+    facts = {"cik": 1829311, "entityName": "BitMine", "facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [filing | {"val": 6095000}]}},
+        "OperatingIncomeLoss": {"units": {"USD": [filing | {"val": 444211000}]}}}}}
+    files = SecFiles({"/api/xbrl/companyfacts/CIK0001829311.json": httpx.Response(200, json=facts)})
+    context = make_context(tmp_path, files=files)
+    verdict = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001829311", ["BMNR"], [Filter(metric="operating_margin", op=">", value=0.25)])
+    (line,) = verdict.lines
+    assert (verdict.state, line.state) == ("unknown", "unknown")
+    assert line.text == ("operating margin > 25.0%: unknown (7,288% is above 100%: income beyond revenue (gains, "
+                         "other income) or revenue under a tag that isn't read)")
+    assert context.records[line.ids[0]]["formula"] == "ratio"
+
+
 def test_the_bundled_universe_is_declared_with_its_source():
     sp500 = universe.load("sp500_tech")
     assert len(sp500.members) == 97 and len(sp500.ciks) == 94  # GOOG/GOOGL, FOX/FOXA, NWS/NWSA
@@ -220,3 +239,143 @@ def test_research_runs_with_no_claims_count_as_failed(tmp_path, declared):
     assert result.counts["failed"] == 2 and result.counts["returned"] == 0
     events = [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
     assert [e["error"] for e in events if e["kind"] == "research_end"] == [apple.error, jpm.error]
+
+
+def test_a_spec_edited_directly_is_used_as_it_is_without_a_model_call(tmp_path, declared):
+    cheap = {"term": "cheap", "definition": "P/E below 20", "question": "What P/E is cheap?"}
+    draft = {"rank_by": "operating_margin", "terms": [cheap, LARGE]}
+    seen = []
+
+    def edit(spec):
+        seen.append(spec.model_dump(mode="json"))
+        return discover.ScreenSpec.model_validate({
+            "rank_by": "revenue", "filters": [{"metric": "revenue", "op": ">", "value": 0}], "top_k": 1,
+            "terms": [cheap | {"definition": "P/E below 12"}, LARGE]})
+    result, client, events = find(tmp_path, declared, spec(**draft), *research("AAPL", "0000320193"),
+                                  ask=lambda term: "", edit=edit)
+    assert seen[0]["terms"][0]["definition"] == "P/E below 20" and len(client.requests) == 5  # spec, then research
+    assert result.interpretation.spec.rank_by == "revenue"
+    assert result.interpretation.sources == {"cheap": "user", "large": "accepted"}
+    questions = next(e for e in events if e["kind"] == "questions")
+    assert questions["spec"]["terms"][0]["term"] == "cheap"
+    assert next(e for e in events if e["kind"] == "spec_edit")["spec"]["rank_by"] == "revenue"
+
+
+def test_a_spec_with_no_vague_terms_still_waits_for_review_when_asked(tmp_path, declared):
+    shown = []
+    result, _, events = find(tmp_path, declared, spec(top_k=1), *research("AAPL", "0000320193"),
+                             ask=lambda term: pytest.fail("no terms"), edit=lambda s: shown.append(s) or None,
+                             review=True)
+    assert len(shown) == 1 and [e["terms"] for e in events if e["kind"] == "questions"] == [[]]
+    assert not [e for e in events if e["kind"] == "spec_edit"] and result.interpretation.spec.top_k == 1
+
+
+def test_each_vague_term_offers_options_and_its_definition_is_the_recommended_one():
+    from research_assistant.agents.discover_spec import Term
+    cheap = {"term": "cheap", "definition": "P/E below 15", "question": "What P/E is cheap?"}
+    marked_wrong = Term(**cheap, options=[{"definition": "P/E below 15"}, {"definition": "P/E below 25", "recommended": True}])
+    assert [(o.definition, o.recommended) for o in marked_wrong.options] == [("P/E below 15", True), ("P/E below 25", False)]
+    reworded = Term(**cheap, options=[{"definition": "P/E under 15", "recommended": True}, {"definition": "P/E below 25"}])
+    assert [(o.definition, o.recommended) for o in reworded.options] == [("P/E below 15", True), ("P/E below 25", False)]
+    missing = Term(**cheap, options=[{"definition": "P/E below 25"}, {"definition": "P/S below 3"}])
+    assert [o.definition for o in missing.options] == ["P/E below 15", "P/E below 25", "P/S below 3"]
+    assert missing.options[0].recommended and not any(o.recommended for o in missing.options[1:])
+    assert Term(**cheap).options == []  # no options: the page and terminal ask for free text, as before
+
+
+def test_the_full_sp500_is_bundled_with_its_date_sectors_and_survivorship_note():
+    sp500 = universe.load("sp500")
+    assert len(sp500.members) == 503 and len(sp500.ciks) == 500  # GOOG/GOOGL, FOX/FOXA, NWS/NWSA
+    assert len({m.sector for m in sp500.members}) == 11 and all(m.sector for m in sp500.members)
+    assert sp500.as_of == "2026-11-05" and "wikipedia" in sp500.source and "survivorship" in sp500.note
+    tickers = {m.ticker for m in sp500.members}
+    assert {"BRK-B", "BF-B", "ON", "T"} <= tickers and not any("." in t for t in tickers)  # SEC's ticker style
+    assert set(universe.load("sp500_tech").ciks) <= set(sp500.ciks)
+
+
+def test_the_saved_shortlist_gives_each_candidate_its_tickers_for_compare_these(tmp_path, declared):
+    from research_assistant.agents import saved
+    result, _, _ = find(tmp_path, declared, spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}],
+                                                top_k=1), *research("AAPL", "0000320193"))
+    candidates = saved.report(result.trace_path)["discover"]["candidates"]
+    apple = next(c for c in candidates if c["cik"] == "0000320193")
+    assert apple["outcome"] == "picked" and apple["tickers"] == ["AAPL"]
+
+
+def test_every_sec_filer_with_a_ticker_is_a_universe_described_without_its_member_list(tmp_path):
+    from research_assistant.agents.discover_spec import describe
+    from research_assistant.data.companies import listed_companies
+    sec = make_context(tmp_path).sec
+    everyone = universe.load(universe.ALL_FILERS, sec)
+    listed = listed_companies(sec)
+    assert len(everyone.ciks) == len(listed) and not everyone.show_members and "survivorship" in everyone.note
+    assert len(everyone.members) == sum(len(c.tickers) for c in listed.values())
+    text = describe(everyone)
+    assert f"{len(everyone.ciks)} companies" in text and "aren't listed here" in text and "- AAPL:" not in text
+    assert "- AAPL: Apple Inc." in describe(universe.load("sp500"))
+    with pytest.raises(universe.UniverseError, match="needs SEC access"):
+        universe.load(universe.ALL_FILERS)
+
+
+def test_the_saved_shortlist_keeps_a_picks_flags_citations_and_status(tmp_path, declared):
+    # Second review: the web summary kept only a pick's first sentence, so a flagged answer looked clean.
+    from research_assistant.agents import saved
+    report = {"summary": [{"text": "AAPL made 391 billion dollars.", "citations": ["company-0000320193"]}]}
+    script = [reply("1. find_company"), reply(tool_calls=[("find_company", {"query": "AAPL"})]),
+              reply(tool_calls=[("submit_report", report)]), resubmit]
+    result, _, _ = find(tmp_path, declared, spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}],
+                                                top_k=1), *script)
+    apple = next(c for c in saved.report(result.trace_path)["discover"]["candidates"] if c["outcome"] == "picked")
+    assert apple["answer"] == "AAPL made 391 billion dollars." and apple["run_status"] == "finished"
+    assert apple["citations"] == ["company-0000320193"]
+    assert any("is typed" in w for w in apple["warnings"])
+
+
+def test_the_saved_shortlist_says_why_the_search_stopped(tmp_path, declared):
+    from research_assistant.agents import saved
+    result, _, _ = find(tmp_path, declared,
+                        spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}], top_k=1),
+                        ERROR, replacements=0)
+    found = saved.report(result.trace_path)["discover"]
+    assert any(n.startswith("Stopped at the research limit: 1 research runs") for n in found["notes"])
+    [failed] = [c for c in found["candidates"] if c["outcome"] == "research failed"]
+    assert failed["run_status"] == "failed" and failed["warnings"]
+
+
+def test_a_check_on_translated_dollars_says_its_currency_basis(tmp_path):
+    # Second review: get_financials warned that the USD figures are convenience translations; the check dropped it.
+    filing = {"accn": "0001577552-25-000010", "form": "20-F", "filed": "2025-05-20"}
+    revenue = [filing | {"start": start, "end": end, "val": val} for start, end, val in (
+        ("2023-04-01", "2024-03-31", 130000000000), ("2024-04-01", "2025-03-31", 137000000000))]
+    facts = {"cik": 1577552, "entityName": "Translated filer", "facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {
+            "USD": revenue, "CNY": [row | {"val": row["val"] * 7} for row in revenue]}}}}}
+    files = SecFiles({"/api/xbrl/companyfacts/CIK0001577552.json": httpx.Response(200, json=facts)})
+    context = make_context(tmp_path, files=files)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [Filter(metric="revenue_growth", op=">", value=0)]).lines
+    assert line.state == "pass" and line.text.endswith(
+        " Basis: USD as filed (revenue is also reported in CNY: the USD figures are probably convenience translations "
+        "at one exchange rate per filing, so changes across years mix exchange rates).")
+
+
+def test_an_ads_price_check_uses_the_ratio_from_the_share_counts_filing(tmp_path, monkeypatch):
+    days = pd.to_datetime(["2026-10-29", "2026-10-30"])
+    frame = pd.DataFrame({"Close": [158.0, 160.0], "Adj Close": [158.0, 160.0], "Volume": [1.0] * 2,
+                          "Dividends": [0.0] * 2, "Stock Splits": [0.0] * 2}, index=days)
+    monkeypatch.setattr(prices_yfinance, "_history", lambda ticker, start, end: (frame, pd.Series(dtype=float)))
+    context = make_context(tmp_path)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [PriceCheck(metric="market_cap", op=">", value=100e9)]).lines
+    record = context.records[line.ids[0]]
+    assert line.state == "pass" and record["value"] == str(20 * 18580374278)  # $160 per ADS / 8 x ordinary shares
+    assert context.records[record["inputs"]["ads_ratio"]]["value"] == "8"
+
+
+def test_a_check_on_converted_figures_says_its_rate_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(Frankfurter()))
+    context = make_context(tmp_path)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [Filter(metric="revenue_growth", op=">", value=0)]).lines
+    assert line.state == "fail" and line.text.endswith(  # 1,023.67bn CNY / 7.2 against 996.35bn CNY / 7.0
+        ". Basis: converted to USD (revenue converted from CNY at Frankfurter (ECB reference rates) (fallback) rates).")

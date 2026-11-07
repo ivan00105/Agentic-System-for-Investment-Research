@@ -217,8 +217,13 @@ class Critic:
                                    f"v{o.version}.")
             elif o.issue == "missing_material_risk" and out and out.outcome == "corrected" and added:
                 # A missing risk is fixed by adding a claim, so the claim it qualifies may stay as it was.
+                cited = [i for i in added if current[i].citations]
+                if not (citations and cited):
+                    o.notes.append(f"Round {n}: a claim was added, but it or the outcome cites no evidence, so it "
+                                   "stays open.")
+                    continue
                 o.close("corrected", n, explanation, citations)
-                o.new_claims = added
+                o.new_claims = cited
             elif claim.version != o.version and out and out.outcome == "corrected" and citations:
                 o.close("corrected", n, explanation, citations, new_version=claim.version)
             elif claim.version != o.version:
@@ -249,19 +254,18 @@ class Critic:
 
     def _qualify(self, report: CheckedReport):
         """A claim with a material objection left unresolved, or that cites a withdrawn claim, is qualified. So is a
-        claim that cites one with such an objection: one step only, not the whole chain."""
-        versions = {c.id: c.version for claims in report.sections.values() for c in claims}
-        open_ = {(o.claim, o.version): o for o in self.raised if o.outcome == "unresolved" and o.material}
+        claim that cites one with such an objection: one step only, not the whole chain. An open objection follows
+        its claim to newer versions, since only evidence closes it."""
+        open_ = {o.claim: o for o in self.raised if o.outcome == "unresolved" and o.material}
         for key, claims in report.sections.items():
             for i, c in enumerate(claims):
                 problems = [f"Objection {o.id} ({o.issue.replace('_', ' ')}) is unresolved: {o.problem}"
-                            for o in self.raised if (o.claim, o.version, o.outcome) == (c.id, c.version, "unresolved")
-                            and o.material]
+                            for o in self.raised if (o.claim, o.outcome) == (c.id, "unresolved") and o.material]
                 problems += [f"It cites {cited}, which was withdrawn after "
                              f"{self.ledger.withdrawn[cited]['objection']}." for cited in c.citations
                              if cited in self.ledger.withdrawn]
                 problems += [f"It cites {cited}, which has unresolved objection {o.id} ({o.issue.replace('_', ' ')})."
-                             for cited in c.citations if cited != c.id and (o := open_.get((cited, versions.get(cited))))]
+                             for cited in c.citations if cited != c.id and (o := open_.get(cited))]
                 for problem in problems:
                     c.flags.append(Flag(f"{key}[{i}]", problem))
                     report.flags.append(c.flags[-1])

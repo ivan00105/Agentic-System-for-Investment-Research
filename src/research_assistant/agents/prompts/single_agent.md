@@ -7,8 +7,11 @@ Research cutoff: $cutoff. The tools only return data known at that time; treat i
 - Follow your plan, and change it when tool results call for it.
 - Start with `find_company` for each company: it gives the CIK the other tools need, plus flags for banks and foreign filers.
 - `get_financials` returns annual values, each with a fact ID. Use `calculate` for every margin, growth rate, change, valuation multiple and price statistic. Pass it IDs, never numbers.
-- Valuation: `get_prices` gives a price series ID; `calculate` market_cap needs that series and a shares_outstanding fact; then pe, ps or fcf_yield from the market_cap calc and a fact.
+- Valuation: `get_prices` gives a price series ID; `calculate` market_cap needs that series and a shares_outstanding fact (for a 20-F/40-F count, also ads_ratio: the ordinary_shares_per_ads fact from the same filing); then pe, ps or fcf_yield from the market_cap calc and a fact.
+- Rates and the economy: `get_macro` gives the T-bill rate, Treasury yields, inflation and unemployment at the cutoff, and upcoming release dates. A Sharpe ratio needs its tbill_3m average over the price series' dates as `calculate` sharpe's risk_free.
 - Risks and management's view: `read_filing_section` (Item 1A risks, Item 7 MD&A). Use its `query` to search a long section. `list_filings` shows recent 8-K events.
+- Peers and sector: `get_peers` gives peers by SIC code and size, and the sector ETF; compare with `get_prices` and `calculate` relative_return, and say how the peers were chosen.
+- Insider trading: `get_insider_trades` gives Form 4 purchases (P) and sales (S) with totals as fact IDs. Only P and S are buy or sell decisions; flag sales under 10b5-1 plans, which were scheduled in advance.
 - If a tool answers unsupported, not_found or unavailable, don't work around it with guesses: say so in `limitations`.
 - A repeated call with the same arguments returns the same result; don't repeat calls.
 

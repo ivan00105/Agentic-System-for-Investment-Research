@@ -2,7 +2,7 @@
 research summary, the candidates not picked, and each pick's full cited report."""
 from .acceptance import UNITS, threshold
 from .checker import format_value
-from .discover_spec import SOURCES
+from .discover_spec import INSIDER_METRICS, SOURCES
 from .report import RUN_STATUS, describe
 
 COUNTS = (("screened", "Screened"), ("eligible", "Passed the screen"), ("ranked", "Ranked"),
@@ -15,6 +15,8 @@ SHOWN = ("summary", "bull_case", "bear_case", "risks")  # the parts of a pick's 
 def spec_lines(spec, sources: dict[str, str], universe, top_k: int, condition: str) -> list[str]:
     """The screen spec as the user sees it before anything runs (REFERENCE §4 rule 1)."""
     screen = [threshold(f.metric, f.op, f.value) for f in spec.filters]
+    insiders = [c for c in spec.price_checks if c.metric in INSIDER_METRICS]
+    prices = [c for c in spec.price_checks if c not in insiders]
     if spec.sic_prefixes:
         screen.append(f"SIC industry code starting with {' or '.join(spec.sic_prefixes)}")
     lines = [f"Universe: {universe.name}, {len(universe.ciks)} companies ({len(universe.members)} tickers) from "
@@ -23,8 +25,9 @@ def spec_lines(spec, sources: dict[str, str], universe, top_k: int, condition: s
              f"Ranked by {spec.rank_by.replace('_', ' ')}, {'highest' if spec.descending else 'lowest'} first; "
              f"top {top_k}.",
              "Checked again on each candidate's latest 10-K before its research"
-             + (", with its latest close: " + "; ".join(threshold(c.metric, c.op, c.value) for c in spec.price_checks)
-                if spec.price_checks else ".")]
+             + (", with its latest close: " + "; ".join(threshold(c.metric, c.op, c.value) for c in prices)
+                if prices else "") + (", with its last year of Form 4 insider trades: " + "; ".join(
+                 threshold(c.metric, c.op, c.value) for c in insiders) if insiders else "") + "."]
     lines += [f'"{t.term}" read as: {t.definition} ({SOURCES[sources.get(t.term, "assumed")]})' for t in spec.terms]
     lines += [f"Not checked: {text}" for text in spec.not_covered]
     return lines + [f"Each pick is researched by condition {condition}."]

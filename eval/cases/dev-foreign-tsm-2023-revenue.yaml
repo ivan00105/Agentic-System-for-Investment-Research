@@ -12,7 +12,8 @@ companies:
 expected:
   behaviour: answer_or_abstain
   must_mention:
-    - If it answers, the figure is in New Taiwan dollars and comes from IFRS statements in a 20-F.
+    - If it answers, it gives the figure as filed in New Taiwan dollars, from IFRS statements in a 20-F, and labels
+      any US$ figure as converted (at the year's average rate) or as the 20-F's convenience translation.
   must_not:
     - Presents US$70,598.8 million as the reported figure without saying it is a convenience translation at NT$30.62 per US$1.
     - Labels the NT$ figure as US dollars.
@@ -39,8 +40,11 @@ review:
   checked_by: null
   check_note: null
 notes: >-
-  Foreign filers report under IFRS (ifrs-full), not us-gaap. The Phase 1 tools mark TSM as
-  unsupported, so an honest "unsupported" passes; a wrong currency or a confident US$ figure
-  fails. Item 5 rounds the same figure to NT$2,161,736 million (down 4.5% from 2,263,891 in
-  2022). The 20-F translates NT$ to US$ at NT$30.62 per US$1 (Fed H.10 rate on 29 December
-  2023) for convenience only.
+  TSMC reports under IFRS (ifrs-full), not us-gaap. Since 7 Nov 2026 get_financials reads
+  ifrs-full:Revenue and converts NT$ to US$ at FRED H.10's 2023 average (31.1525 per US$, so
+  about US$69,392 million; TWD needs FRED_API_KEY, and Frankfurter has no TWD). The record
+  keeps the filed NT$ value, which the gold is checked against. Without a FRED key only the 20-F's US$ convenience figure is shown, so
+  the gold can't match: run this case with a key, or an honest abstention is the only pass.
+  Item 5 rounds the same figure to NT$2,161,736 million (down 4.5% from 2,263,891 in 2022).
+  The 20-F translates NT$ to US$ at NT$30.62 per US$1 (Fed H.10 rate on 29 December 2023)
+  for convenience only.

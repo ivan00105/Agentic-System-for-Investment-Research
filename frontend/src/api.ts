@@ -75,10 +75,11 @@ export const investigationLabel = (request: RunRequest) => request.connection_ch
 // Agent runs (conditions B, C, D, and Discover), saved as trace files and served by /api/agent-runs.
 export type Condition = 'B' | 'C' | 'D'
 export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
-export interface AgentRunSummary { run_id: string; status: string; question?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
+export interface AgentRunSummary { run_id: string; status: string; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
 export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string }
-export interface DiscoverTerm { term: string; definition: string; question: string }
-export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: {terms: DiscoverTerm[]; shown: string[]} | null }
+export interface DiscoverTerm { term: string; definition: string; question: string; options?: {definition: string; recommended: boolean}[] }
+export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
+export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
@@ -86,13 +87,14 @@ export interface AgentSource { n: number; id: string; text: string; url: string 
 export interface KeyNumber { id: string; company: string | null; metric: string; period: string; value: string; change: string | null; change_id: string | null }
 export interface ChartPoint { end: string; value: number; label: string; ids: string[] }
 export interface CompanyChart { cik: string; company: string; revenue: ChartPoint[]; margin: {label: string | null; points: ChartPoint[]}; price: {id: string; ticker: string | null; source: string | null; points: [string, number][]} | null }
-export interface DiscoverCandidate { rank: number; cik: string; name: string | null; outcome: string; verdict: string | null; run_id: string | null; lines: {state: string; text: string; ids: string[]}[]; answer: string | null }
-export interface DiscoverResult { spec: string[] | null; counts: Record<string, number>; candidates: DiscoverCandidate[] }
-export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; discover?: DiscoverResult | null; markdown: string }
+export interface DiscoverCandidate { rank: number; cik: string; name: string | null; tickers?: string[]; outcome: string; verdict: string | null; run_id: string | null; lines: {state: string; text: string; ids: string[]}[]; answer: string | null; citations?: string[]; warnings?: string[]; run_status?: string | null }
+export interface DiscoverResult { spec: string[] | null; counts: Record<string, number>; candidates: DiscoverCandidate[]; notes?: string[] }
+export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
+export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]} }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
-export interface UniverseInfo { id: string; name: string; companies: number; as_of: string; note: string }
+export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
 const run = (id: string) => `/agent-runs/${encodeURIComponent(id)}`
 export const agentApi = {
@@ -100,7 +102,7 @@ export const agentApi = {
   list: () => request<{items: AgentRunSummary[]}>('/agent-runs'),
   get: (id: string) => request<AgentProgress>(run(id)),
   cancel: (id: string) => request<AgentRunSummary>(`${run(id)}/cancel`, post({})),
-  answer: (id: string, answers: Record<string, string>) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers})),
+  answer: (id: string, answers: Record<string, string>, spec?: unknown) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers, ...(spec !== undefined && {spec})})),
   report: (id: string) => request<AgentReport>(`${run(id)}/report`),
   record: (id: string, record: string) => request<AgentRecord>(`${run(id)}/records/${encodeURIComponent(record)}`),
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),
@@ -108,7 +110,7 @@ export const agentApi = {
 }
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
-export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean }
+export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null }
 export interface DataKind { kind: string; label: string; purpose: string; active: string | null; providers: ProviderStatus[] }
 export const setupApi = {
   status: () => request<{kinds: DataKind[]}>('/status'),
@@ -117,4 +119,6 @@ export const setupApi = {
 }
 export const agentRunning = (status: string) => status === 'running' || status === 'stopping' || status === 'waiting'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.
-export const secUrl = (url: string | null) => url && /^https:\/\/(www|data)\.sec\.gov\//.test(url) ? url : null
+// A record's link opens only on a host our data providers use; any other URL stays unlinked.
+const SITES: [RegExp, string][] = [[/^https:\/\/(www|data)\.sec\.gov\//, 'SEC.gov'], [/^https:\/\/fred\.stlouisfed\.org\//, 'FRED'], [/^https:\/\/home\.treasury\.gov\//, 'Treasury.gov']]
+export const sourceLink = (url: string | null) => { const site = url ? SITES.find(([pattern]) => pattern.test(url)) : undefined; return url && site ? {href: url, site: site[1]} : null }

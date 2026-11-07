@@ -145,3 +145,29 @@ def test_a_run_with_a_cutoff_is_historical_so_screen_refuses(web):
                            reply(tool_calls=[("submit_report", REPORT)]), resubmit)
     run = wait(web, start(web, "Rank Apple.", condition="B", cutoff="2026-11-01"))
     assert "step 1: screen -> invalid" in [line["text"] for line in run["progress"]]
+
+
+def test_a_preferences_note_reaches_the_agents_and_shows_apart_from_the_question(web):
+    web.model = FakeClient(reply("1. find_company"), FIND_APPLE, reply(tool_calls=[("submit_report", REPORT)]),
+                           resubmit)
+    note = "Matters most: dividends.\nTime horizon: years."
+    run = wait(web, start(web, "Who is Apple?", condition="B", preferences=f"  {note}  "))
+    assert run["question"] == "Who is Apple?" and run["preferences"] == note
+    plan_request = web.model.requests[0]["messages"][1]["content"]
+    assert plan_request == f"Who is Apple?\n\n<preferences>\n{note}\n</preferences>"
+    assert "<preferences>" in web.model.requests[1]["messages"][1]["content"]  # the lead's loop too
+    first = json.loads((web.traces / f"{run['run_id']}.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert first["question"] == plan_request  # the trace keeps what the agents read
+    report = web.get(f"/api/agent-runs/{run['run_id']}/report").json()
+    assert report["preferences"] == note and "<preferences>" in report["markdown"]
+    assert web.get("/api/agent-runs").json()["items"][0]["preferences"] == note
+
+
+def test_the_note_splits_off_wherever_it_sits_in_a_question():
+    from research_assistant.agents import preferences
+    question = preferences.attach("Find companies.", "Comfort with price swings: low.")
+    brief = f'Explain whether Acme fits this request: "{question}"\n\nIt is shortlist pick 1 of the 3 asked for.'
+    assert preferences.split(brief) == ('Explain whether Acme fits this request: "Find companies."\n\nIt is '
+                                        "shortlist pick 1 of the 3 asked for.", "Comfort with price swings: low.")
+    assert preferences.split("Who is Apple?") == ("Who is Apple?", None)
+    assert preferences.attach("Who is Apple?", "  ") == "Who is Apple?"

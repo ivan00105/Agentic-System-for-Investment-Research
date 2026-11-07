@@ -92,6 +92,9 @@ def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], con
                 return LoopResult("finished", output, steps)
     except (OpenAIError, TimeoutError) as exc:
         return _failed(exc, trace, steps)
+    if context.stop.is_set():  # cancelled during the last step: no partial-report call either
+        trace.write("cancelled", step=steps)
+        return LoopResult("stopped", None, steps)
     return _finalize(client, model, request_kwargs, messages, tools, finish, trace, steps, max_steps)
 
 

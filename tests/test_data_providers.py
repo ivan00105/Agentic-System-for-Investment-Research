@@ -30,7 +30,7 @@ def scripted_model(monkeypatch, *script):
 
 def test_zero_configuration_degrades_to_not_configured_and_tier_zero_prices():
     kinds = by_kind(providers.status({}))
-    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "llm"]
+    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "macro", "fx", "insiders", "peers", "llm"]
     assert kinds["prices"]["label"] == "Daily prices" and kinds["prices"]["purpose"]
     sec = provider(kinds["fundamentals"], "sec_companyfacts")
     assert (sec["status"], sec["missing_env"], sec["tier"], sec["problem"]) == ("not_configured", ["SEC_USER_AGENT"], 0, None)
@@ -144,3 +144,12 @@ def test_model_check_endpoint_remembers_a_failure(tmp_path, monkeypatch):
         llm = by_kind(client.get("/api/status").json()["kinds"])["llm"]
         assert provider(llm, "openrouter")["status"] == "check_failed"
         assert llm["active"] == "openrouter"
+
+
+def test_exchange_rates_work_without_a_key_and_fred_goes_first_with_one(monkeypatch):
+    fx_card = by_kind(providers.status({}))["fx"]
+    assert fx_card["label"] == "Exchange rates" and [p["name"] for p in fx_card["providers"]] == ["fred_fx", "frankfurter"]
+    assert provider(fx_card, "fred_fx")["missing_env"] == ["FRED_API_KEY"] and fx_card["active"] == "frankfurter"
+    assert provider(fx_card, "frankfurter")["status"] == "ready" and "not TWD" in provider(fx_card, "frankfurter")["note"]
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+    assert by_kind(providers.status({}))["fx"]["active"] == "fred_fx"
