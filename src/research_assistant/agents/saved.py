@@ -11,7 +11,7 @@ from .draft import SECTIONS
 from .evidence import load
 from .figures import figures, raw
 from .objections import ISSUES
-from .progress import describe as progress_line
+from .progress import timeline
 from .report import RUN_STATUS, describe
 from .sources import GROUPS, chip, detail
 
@@ -37,19 +37,9 @@ def summary(path: Path) -> dict | None:
 
 
 def progress(path: Path) -> list[dict]:
-    """One line per step worth showing, the same lines the CLI prints, with the role that took it (the CLI's
-    "[role] " prefix) and the event kind, so the page can group the lines by role."""
-    lines = []
-    for event in read_events(path):
-        try:
-            text = progress_line(event)
-        except (KeyError, TypeError):  # traces from before a field was added
-            text = event.get("kind")
-        if text:
-            role = event.get("agent")
-            lines.append({"seq": event.get("seq"), "at": event.get("at"), "kind": event.get("kind"), "role": role,
-                          "text": text.removeprefix(f"[{role}] ") if role else text})
-    return lines
+    """The run's timeline: one entry per model step (its tool calls folded under it) or other event worth a line,
+    with the role that wrote it and the event kind, so the page can group the entries by role."""
+    return timeline(read_events(path))
 
 
 def read_events(path: Path) -> list[dict]:

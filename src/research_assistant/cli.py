@@ -13,6 +13,7 @@ from openai import OpenAI
 from . import config
 from .agents import critic, discover, evidence, isolated_review, single_agent, team
 from .agents.progress import describe
+from .agents.tool_lines import Seen
 from .data import universe
 from .data.errors import DataError
 from .data.sec import SecClient
@@ -24,6 +25,7 @@ sec_client = SecClient
 # Evaluation conditions the CLI can run (REFERENCE §7); A is the web app's fixed pipeline.
 CONDITIONS = {"B": single_agent.run, "C": team.run, "D": critic.run}
 LABELS = {"B": single_agent.CONDITION, "C": team.CONDITION, "D": critic.CONDITION}
+SEEN = Seen()  # records and company names the progress lines have seen; IDs are content hashes, so runs never clash
 
 
 def model_client(settings):
@@ -188,8 +190,8 @@ def recheck(path: Path) -> int:
 
 
 def progress(event: dict):
-    """One line per step on stderr, so a run of a few minutes isn't silent."""
-    if line := describe(event):
+    """One line per event on stderr, so a run of a few minutes isn't silent."""
+    if line := describe(event, SEEN):
         print(line, file=sys.stderr, flush=True)
 
 

@@ -76,7 +76,9 @@ export const investigationLabel = (request: RunRequest) => request.connection_ch
 export type Condition = 'B' | 'C' | 'D'
 export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
 export interface AgentRunSummary { run_id: string; status: string; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
-export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string }
+// A model step is one line ("Step 4 · 10 calculations · all OK"); its tool calls fold under it as `details`.
+export interface ProgressDetail { seq: number | null; text: string; status: string | null }
+export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string; step?: number | null; details?: ProgressDetail[] }
 export interface DiscoverTerm { term: string; definition: string; question: string; options?: {definition: string; recommended: boolean}[] }
 export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
 export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }

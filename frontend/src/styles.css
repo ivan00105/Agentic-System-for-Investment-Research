@@ -388,6 +388,10 @@ h2{font-size:19px}
 .timeline details ol{list-style:none;padding:6px 0 0 14px;margin:0;border-left:2px solid #d6ded2}
 .activity .timeline details li{display:grid;grid-template-columns:90px 1fr;gap:12px;padding:5px 0;border:0;font-size:11px;overflow-wrap:anywhere;white-space:pre-wrap}
 .timeline time{color:var(--muted);font-size:10px}
+.activity .timeline details details summary{display:block;min-height:0;cursor:pointer}
+.activity .timeline details details ol{padding-top:4px}
+.activity .timeline details details li{display:block;padding:3px 0}
+.timeline-problem{color:var(--amber)}
 .discover-questions{border:1px solid #e0cf9f;background:#fdf8ea;border-radius:6px;padding:18px 20px;margin:14px 0}
 .discover-questions form{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
 .spec-lines{padding-left:18px;margin:8px 0 14px;font-size:12px;line-height:1.8;color:#47594c}

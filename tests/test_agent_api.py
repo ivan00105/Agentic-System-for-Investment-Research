@@ -38,7 +38,9 @@ def test_a_question_runs_in_the_background_and_its_report_reopens_from_history(w
     assert run["status"] == "finished" and run["question"] == "Who is Apple?"
     assert run["condition"] == "B (single agent)" and run["totals"]["model_calls"] == 4
     lines = [line["text"] for line in run["progress"]]
-    assert lines[:3] == ["plan ready", "step 1: model asks for find_company", "step 1: find_company -> ok"]
+    assert lines[:3] == ["plan ready", "Step 1 · company lookup · OK", "Step 2 · handing in the report · OK"]
+    assert run["progress"][1]["details"] == [
+        {"seq": 4, "text": 'Company lookup: "AAPL" → OK, Apple Inc. (AAPL)', "status": "ok"}]
     assert {line["role"] for line in run["progress"]} == {"single_agent"} and run["progress"][0]["kind"] == "plan"
     assert "checker: 0 flags" in lines and (web.traces / f"{run_id}.jsonl").is_file()
 
@@ -144,7 +146,8 @@ def test_a_run_with_a_cutoff_is_historical_so_screen_refuses(web):
                                                                              "year": 2024})]),
                            reply(tool_calls=[("submit_report", REPORT)]), resubmit)
     run = wait(web, start(web, "Rank Apple.", condition="B", cutoff="2026-11-01"))
-    assert "step 1: screen -> invalid" in [line["text"] for line in run["progress"]]
+    [step] = [line for line in run["progress"] if line["text"] == "Step 1 · screen · 1 invalid"]
+    assert step["details"][0]["text"].startswith("Screen → invalid: ")
 
 
 def test_a_preferences_note_reaches_the_agents_and_shows_apart_from_the_question(web):

@@ -32,7 +32,8 @@ def test_a_question_prints_the_report_and_where_the_trace_is(tmp_path, monkeypat
     assert "- Apple Inc. files annual reports with the SEC. [1]" in out
     trace = Path(re.search(r"^Trace saved to (.+)$", out, re.MULTILINE)[1])
     assert trace.is_file() and trace.parent == tmp_path / "traces"
-    assert "plan ready" in err and "step 1: find_company -> ok" in err and "checker: 0 flags" in err
+    assert "plan ready" in err and "step 1: asked for company lookup" in err and "checker: 0 flags" in err
+    assert 'step 1: Company lookup: "AAPL" → OK, Apple Inc. (AAPL)' in err and "step 2: handing in the report" in err
 
 
 def test_condition_c_runs_the_team_and_says_who_did_each_step(tmp_path, monkeypatch, capsys):
@@ -47,8 +48,8 @@ def test_condition_c_runs_the_team_and_says_who_did_each_step(tmp_path, monkeypa
     out, err = capsys.readouterr()
     assert "- Condition: C (analyst team)" in out and "- Apple Inc. files annual reports with the SEC. [1]" in out
     for line in ("[coordinator] plan ready", "[fundamentals] task: Who is Apple?",
-                 "[fundamentals] step 1: find_company -> ok", "[fundamentals] done (finished): 1 findings",
-                 "[coordinator] step 1: ask_fundamentals -> ok", "[coordinator] checker: 0 flags"):
+                 '[fundamentals] step 1: Company lookup: "AAPL" → OK', "[fundamentals] done (finished): 1 findings",
+                 "[coordinator] step 1: Fundamentals analyst → OK, 1 finding, 0 gaps", "[coordinator] checker: 0 flags"):
         assert line in err
 
 
@@ -93,8 +94,8 @@ def test_universe_runs_discover_and_shows_the_spec_before_research(tmp_path, mon
     out, err = capsys.readouterr()
     assert "## Screen spec" in out and '"reasonable valuation" read as: P/E below 40 (set by the user)' in out
     assert "- reasonable valuation: P/E below 40" in client.requests[0]["messages"][1]["content"]
-    assert "\nscreen spec:\n  - Universe: Two" in err and "[host] screen -> ok" in err
-    assert err.index("screen spec:") < err.index("[host] screen -> ok")
+    assert "\nscreen spec:\n  - Universe: Two" in err and "[host] Screen: 2 companies, 1 filter, ranked by" in err
+    assert err.index("screen spec:") < err.index("[host] Screen:")
 
 
 def test_discover_refuses_a_past_cutoff_and_malformed_definitions(capsys):
@@ -120,10 +121,10 @@ def test_a_past_cutoff_makes_screen_refuse_and_a_live_run_does_not(tmp_path, mon
                           reply(tool_calls=[("submit_report", REPORT)]), resubmit)
     configure(monkeypatch, tmp_path, script())
     assert cli.main(["Rank Apple.", "--cutoff", "2026-11-01"]) == 0
-    assert "step 1: screen -> invalid" in capsys.readouterr().err
+    assert "step 1: Screen → invalid: " in capsys.readouterr().err
     configure(monkeypatch, tmp_path, script())
     assert cli.main(["Rank Apple."]) == 0
-    assert "step 1: screen -> ok" in capsys.readouterr().err
+    assert "step 1: Screen: " in capsys.readouterr().err
 
 
 def test_the_terminal_offers_each_terms_options_by_number(monkeypatch, capsys):
