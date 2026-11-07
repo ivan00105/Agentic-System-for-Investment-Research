@@ -15,7 +15,8 @@ METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_inco
            "operating_cash_flow": "Operating cash flow", "capex": "Capital spending", "eps_diluted": "Diluted EPS",
            "diluted_shares": "Diluted shares", "total_assets": "Total assets", "total_liabilities": "Total liabilities",
            "stockholders_equity": "Shareholders' equity", "cash": "Cash", "long_term_debt": "Long-term debt",
-           "shares_outstanding": "Shares outstanding"}
+           "shares_outstanding": "Shares outstanding",
+           "ordinary_shares_per_ads": "Ordinary shares per ADS"}
 FORMULAS = {"fcf": "Free cash flow", "market_cap": "Market cap", "pe": "P/E", "ps": "P/S", "pb": "P/B",
             "fcf_yield": "FCF yield", "ev": "Enterprise value", "total_return": "Total return",
             "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta",
@@ -118,6 +119,7 @@ def detail(record: dict, records: dict[str, dict]) -> dict:
                 ("Filed", record.get("filed"))]
         if record.get("original_value") is not None:
             rows.append(("First reported as", f"{record['original_value']} in {record.get('original_accession')}"))
+        rows += [("Note", note) for note in record.get("notes") or []]
     elif kind == "calc":
         title = f"{label(record, records)}, {period(record, records)}"
         excerpt = format_value(record) if record.get("value") is not None else f"Unavailable: {record.get('reason')}"

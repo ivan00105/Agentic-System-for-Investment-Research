@@ -356,3 +356,16 @@ def test_a_check_on_translated_dollars_says_its_currency_basis(tmp_path):
     assert line.state == "pass" and line.text.endswith(
         " Basis: USD as filed (revenue is also reported in CNY: the USD figures are probably convenience translations "
         "at one exchange rate per filing, so changes across years mix exchange rates).")
+
+
+def test_an_ads_price_check_uses_the_ratio_from_the_share_counts_filing(tmp_path, monkeypatch):
+    days = pd.to_datetime(["2026-10-29", "2026-10-30"])
+    frame = pd.DataFrame({"Close": [158.0, 160.0], "Adj Close": [158.0, 160.0], "Volume": [1.0] * 2,
+                          "Dividends": [0.0] * 2, "Stock Splits": [0.0] * 2}, index=days)
+    monkeypatch.setattr(prices_yfinance, "_history", lambda ticker, start, end: (frame, pd.Series(dtype=float)))
+    context = make_context(tmp_path)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [PriceCheck(metric="market_cap", op=">", value=100e9)]).lines
+    record = context.records[line.ids[0]]
+    assert line.state == "pass" and record["value"] == str(20 * 18580374278)  # $160 per ADS / 8 x ordinary shares
+    assert context.records[record["inputs"]["ads_ratio"]]["value"] == "8"

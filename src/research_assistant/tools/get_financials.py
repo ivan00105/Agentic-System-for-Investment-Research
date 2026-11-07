@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from .. import config
 from ..data import companies, sec_facts
 from ..data.sec import cik10
+from . import share_basis
 from .result import Tool, ToolContext, ToolResult, make_id
 
 Metric = Literal[tuple(sec_facts.CONCEPTS)]
@@ -73,6 +74,7 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
         if (units := sec_facts.other_units(payload, concept)) and concept.unit == "USD":
             warnings.append(f"{name} is also reported in {', '.join(units)}: the USD figures are probably convenience "
                             "translations at one exchange rate per filing, so changes across years mix exchange rates.")
+    share_basis.add(context, cik, metrics, ids, warnings)
     ok = [m for m in metrics.values() if m["status"] == "ok"]
     if len(ok) == len(metrics):
         status = "ok"
@@ -87,4 +89,5 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("get_financials", "Annual financials from SEC filings (10-K), newest fiscal year first, as known at the "
             "research cutoff: revenue, margins inputs, cash flow, capex, EPS, balance sheet and shares. Every value has "
-            "a fact ID to cite and to pass to calculate.", GetFinancialsInput, run, "SEC companyfacts")
+            "a fact ID to cite and to pass to calculate. A 20-F/40-F share count comes with ordinary_shares_per_ads from the "
+            "same filing's cover (calculate's ads_ratio for market cap).", GetFinancialsInput, run, "SEC companyfacts")

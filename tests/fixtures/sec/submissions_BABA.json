@@ -1,0 +1,94 @@
+{
+ "cik": "0001577552",
+ "entityType": "other",
+ "sic": "7389",
+ "sicDescription": "Services-Business Services, NEC",
+ "ownerOrg": "07 Trade & Services",
+ "insiderTransactionForOwnerExists": 1,
+ "insiderTransactionForIssuerExists": 1,
+ "name": "Alibaba Group Holding Ltd",
+ "tickers": [
+  "BABA",
+  "BABAF",
+  "BBAAY"
+ ],
+ "exchanges": [
+  "NYSE",
+  "OTC",
+  "OTC"
+ ],
+ "category": "Large accelerated filer",
+ "fiscalYearEnd": null,
+ "stateOfIncorporation": "K3",
+ "stateOfIncorporationDescription": "Hong Kong",
+ "formerNames": [],
+ "filings": {
+  "recent": {
+   "accessionNumber": [
+    "0001193125-26-413036",
+    "0001193125-26-231755"
+   ],
+   "filingDate": [
+    "2026-10-05",
+    "2026-05-20"
+   ],
+   "reportDate": [
+    "2026-10-01",
+    "2026-03-31"
+   ],
+   "acceptanceDateTime": [
+    "2026-10-05T10:03:26.000Z",
+    "2026-05-20T11:56:35.000Z"
+   ],
+   "act": [
+    "",
+    "34"
+   ],
+   "form": [
+    "4",
+    "20-F"
+   ],
+   "fileNumber": [
+    "",
+    "001-36614"
+   ],
+   "filmNumber": [
+    "",
+    "261001528"
+   ],
+   "items": [
+    "",
+    ""
+   ],
+   "core_type": [
+    "4",
+    "XBRL"
+   ],
+   "size": [
+    13202,
+    50237760
+   ],
+   "isXBRL": [
+    0,
+    1
+   ],
+   "isInlineXBRL": [
+    0,
+    1
+   ],
+   "isXBRLNumeric": [
+    0,
+    1
+   ],
+   "primaryDocument": [
+    "xslF345X06/ownership.xml",
+    "baba-20260331.htm"
+   ],
+   "primaryDocDescription": [
+    "4",
+    "20-F"
+   ]
+  },
+  "files": []
+ }
+}

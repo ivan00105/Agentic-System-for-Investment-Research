@@ -32,18 +32,21 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
               and (f["start"] or None) == fact["start"]]
     same = [f for f in tagged if f["unit"] == fact["unit"]]  # USD only ever checks against USD
     readable = [f for f in same if f["value"] is not None]
-    matches = [f for f in readable if Decimal(f["value"]) == Decimal(fact["value"])]
+    expected = fact.get("tagged_value") or fact["value"]  # a count the page prints in full is checked against its tag
+    matches = [f for f in readable if Decimal(f["value"]) == Decimal(expected)]
     # A number we can't read is "unverified", never a mismatch.
     verdict = "match" if matches else "mismatch" if readable else "unverified" if same else "not_in_filing"
     shown = (matches or readable or same or tagged)[:5]
     record = {"id": make_id("check", args.fact_id, filing.accession), "kind": "check", "fact_id": args.fact_id,
-              "verdict": verdict, "expected": fact["value"], "concept": fact["tag"], "period_end": fact["end"],
+              "verdict": verdict, "expected": expected, "concept": fact["tag"], "period_end": fact["end"],
               "filing_url": filing.url, "found": shown}
     context.remember(record)
     warnings = []
+    if fact.get("tagged_value") and matches:
+        warnings.append(f"The fact uses the number the page prints, {fact['value']}; the tag holds {expected}.")
     if verdict == "mismatch":
         warnings.append(f"The filing tags {fact['tag']} for this period as {', '.join(f['raw'] for f in shown)}, "
-                        f"not {fact['value']}.")
+                        f"not {expected}.")
     elif verdict == "unverified":
         warnings.append(f"The filing tags {fact['tag']} for this period, but its number "
                         f"({', '.join(repr(f['raw']) + ' format ' + (f['format'] or 'none') for f in shown)}) could not "

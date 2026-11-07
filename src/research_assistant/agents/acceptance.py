@@ -5,7 +5,7 @@ passes, and each line cites the records it rests on."""
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from ..tools import registry
+from ..tools import registry, share_basis
 from ..tools.result import ToolContext, ToolResult
 from ..tools.screen import OPERATORS, implausible
 from .checker import format_value
@@ -127,6 +127,8 @@ class Acceptance:
         elif name in PLANS:
             formula, roles = PLANS[name]
             inputs = {role: self._resolve(source) for role, source in roles.items()}
+            if formula == "market_cap" and (ratio := self._ads_ratio(inputs["shares"])):
+                inputs["ads_ratio"] = ratio
             result = self.call("calculate", {"formula": formula, "inputs": inputs})
             if not result.ids:
                 raise Unknown(f"calculate {formula} came back {result.status}: {' '.join(result.warnings)}")
@@ -135,6 +137,11 @@ class Acceptance:
             found = self._fact(*name.split("@"))
         self.done[name] = found
         return found
+
+    def _ads_ratio(self, shares_id: str) -> str | None:
+        """A 20-F/40-F count's ADS ratio, from the same filing; without one, calculate says why it's unsupported."""
+        accession = self.context.records[shares_id].get("accession")
+        return next((v["id"] for v in self.facts.get(share_basis.METRIC, []) if v["accession"] == accession), None)
 
     def _fact(self, metric: str, which: str = "latest") -> str:
         if self.missing:

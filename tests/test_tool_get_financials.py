@@ -187,3 +187,42 @@ def test_a_total_from_an_older_filing_does_not_override_the_latest_one(tmp_path)
     assert values(result, "revenue") == [("2024-12-31", "10964000")]
     assert ("revenue for the period ending 2024-12-31: a larger us-gaap:Revenues total (1670000000) is in filing "
             f"{UDR_2025[0]}, not the latest {UDR_2026[0]}; the latest filing's value is kept.") in result.warnings
+
+
+def test_a_20f_share_count_comes_with_the_ads_ratio_from_its_cover(tmp_path):
+    result, context = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]["values"][0]
+    assert ratio["value"] == "8" and ratio["accession"] == shares["accession"] == "0001193125-26-231755"
+    assert ratio["tag"] == "dei:Security12bTitle" and "each representing eight Ordinary Shares" in ratio["notes"][0]
+    assert ratio["id"] in result.ids and context.records[ratio["id"]]["unit"] == "shares/ADS"
+
+
+def test_a_cover_count_the_tag_cuts_off_uses_the_printed_number(tmp_path):
+    # BABA's 2026 cover tags "18,580,374,27" and prints the last 8 after the tag, so companyfacts has 1,858,037,427.
+    result, context = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    assert shares["value"] == "18580374278" and shares["tagged_value"] == "1858037427"
+    assert context.records[shares["id"]]["value"] == "18580374278" and shares["id"] in result.ids
+    assert any("cuts the number off" in w for w in result.warnings)
+
+
+def test_a_direct_listing_is_one_ordinary_share_per_listed_share(tmp_path):
+    result, _ = financials(tmp_path, cik="1015922", metrics=["shares_outstanding"], years=1)
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]["values"][0]
+    assert ratio["value"] == "1" and ratio["tag"] == "no depositary shares"
+    assert result.data["metrics"]["shares_outstanding"]["values"][0]["value"] == "105596035"
+
+
+def test_a_ratio_whose_filing_is_missing_is_unsupported_not_fatal(tmp_path):
+    empty = {"cik": "1577552", "filings": {"recent": {}, "files": []}}
+    files = SecFiles({"/submissions/CIK0001577552.json": httpx.Response(200, json=empty)})
+    result, _ = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1, files=files)
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]
+    assert result.status == "partial" and ratio["status"] == "unsupported" and "not in SEC's list" in ratio["reason"]
+    assert result.data["metrics"]["shares_outstanding"]["values"][0]["value"] == "1858037427"  # cover unread: as filed
+
+
+def test_a_10k_share_count_needs_no_ads_ratio(tmp_path):
+    result, _ = financials(tmp_path, metrics=["shares_outstanding"])
+    assert "ordinary_shares_per_ads" not in result.data["metrics"]

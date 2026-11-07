@@ -1,0 +1,90 @@
+{
+ "cik": "0001015922",
+ "entityType": "other",
+ "sic": "7372",
+ "sicDescription": "Services-Prepackaged Software",
+ "ownerOrg": "06 Technology",
+ "insiderTransactionForOwnerExists": 0,
+ "insiderTransactionForIssuerExists": 1,
+ "name": "CHECK POINT SOFTWARE TECHNOLOGIES LTD",
+ "tickers": [
+  "CHKP"
+ ],
+ "exchanges": [
+  "Nasdaq"
+ ],
+ "category": "Large accelerated filer",
+ "fiscalYearEnd": "1231",
+ "stateOfIncorporation": "",
+ "stateOfIncorporationDescription": "",
+ "formerNames": [],
+ "filings": {
+  "recent": {
+   "accessionNumber": [
+    "0001178913-26-004848",
+    "0001178913-26-001932"
+   ],
+   "filingDate": [
+    "2026-10-26",
+    "2026-03-31"
+   ],
+   "reportDate": [
+    "2026-10-22",
+    "2025-12-31"
+   ],
+   "acceptanceDateTime": [
+    "2026-10-26T20:03:06.000Z",
+    "2026-03-31T11:15:40.000Z"
+   ],
+   "act": [
+    "",
+    "34"
+   ],
+   "form": [
+    "4",
+    "20-F"
+   ],
+   "fileNumber": [
+    "",
+    "000-28584"
+   ],
+   "filmNumber": [
+    "",
+    "26816884"
+   ],
+   "items": [
+    "",
+    ""
+   ],
+   "core_type": [
+    "4",
+    "XBRL"
+   ],
+   "size": [
+    5787,
+    14087223
+   ],
+   "isXBRL": [
+    0,
+    1
+   ],
+   "isInlineXBRL": [
+    0,
+    1
+   ],
+   "isXBRLNumeric": [
+    0,
+    null
+   ],
+   "primaryDocument": [
+    "xslF345X06/ownership.xml",
+    "zk2634942.htm"
+   ],
+   "primaryDocDescription": [
+    "FORM 4",
+    "20-F"
+   ]
+  },
+  "files": []
+ }
+}

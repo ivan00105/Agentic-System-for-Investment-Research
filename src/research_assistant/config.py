@@ -58,6 +58,9 @@ COMPANY_SUGGEST_MAX = 8
 # Fiscal years returned when the agent doesn't ask: enough for growth and trends. Older years are
 # counted in a warning and the agent can ask for them.
 FINANCIALS_DEFAULT_YEARS = 5
+# A 20-F cover without inline XBRL names its ADS ratio in the Section 12(b) row, right after "American
+# Depositary Shares"; a ratio further away than this belongs to another row, so it isn't used.
+COVER_RATIO_WINDOW_CHARS = 300
 
 # Filings returned per list_filings call. More are counted in a warning; the agent narrows with
 # `forms` or `since`, or pages with `before`.
@@ -102,6 +105,9 @@ TRADING_DAYS_PER_YEAR = 252
 # A Sharpe ratio's risk-free average must cover the price series' dates to within this many days on each end: the
 # bond and stock markets close on different holidays, so their first and last days can differ a little.
 RISK_FREE_WINDOW_SLACK_DAYS = 7
+# A 20-F/40-F share count and ADS ratio are as of the annual filing; a price more than this many days after that
+# filing gets a warning, since buybacks or a ratio change may have happened since.
+SHARE_FILING_MAX_AGE_DAYS = 365
 
 # --- Macro: risk-free rate, rates, inflation, release dates (REFERENCE §10) -----------------
 

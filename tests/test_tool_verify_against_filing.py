@@ -93,3 +93,12 @@ def test_an_unreadable_number_is_unverified_not_a_mismatch(apple, monkeypatch):
     monkeypatch.setattr(ixbrl, "_number", lambda node: None)
     result = verify(context, ids["2025-09-27", "revenue"])
     assert result.data["verdict"] == "unverified" and "could not be read" in result.warnings[0]
+
+
+def test_a_cover_count_the_tag_cuts_off_is_checked_against_the_tag(tmp_path):
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1577552", metrics=["shares_outstanding"], years=1), context)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    check = verify(context, shares["id"])
+    assert check.data["verdict"] == "match" and check.data["expected"] == "1858037427"
+    assert any("the page prints, 18580374278" in w for w in check.warnings)

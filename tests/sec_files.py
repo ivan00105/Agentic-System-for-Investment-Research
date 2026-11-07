@@ -8,7 +8,8 @@ from research_assistant.data.sec import SecClient
 from research_assistant.tools.result import ToolContext
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "sec"
-TICKER_BY_CIK = {"0000320193": "AAPL", "0000019617": "JPM", "0001046179": "TSM"}
+TICKER_BY_CIK = {"0000320193": "AAPL", "0000019617": "JPM", "0001046179": "TSM", "0001577552": "BABA",
+                 "0001015922": "CHKP"}
 # Late enough that every fixture filing is public.
 CUTOFF = datetime(2026, 11, 1, tzinfo=timezone.utc)
 
