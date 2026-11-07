@@ -341,7 +341,7 @@ h2{font-size:19px}
 @media(max-width:640px){.agent-progress li{grid-template-columns:1fr;gap:4px}}
 
 /* Agent pages: guided question box, live timeline and the answer-first report */
-.starter-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.starter-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .starter{display:flex;flex-direction:column;gap:6px;text-align:left;background:#f5f7f0;border:1px solid #c9d3c3;border-radius:6px;padding:14px 16px;color:var(--ink);min-height:84px}
 .starter strong{font-size:13px}
 .starter span{font-size:12px;color:var(--muted);line-height:1.6}
@@ -366,10 +366,13 @@ h2{font-size:19px}
 .radio input{width:18px;height:18px;min-height:0;margin:2px 0 0;flex-shrink:0;accent-color:var(--green)}
 .radio small{display:block;font-weight:400;color:var(--muted);line-height:1.6}
 .find-options .count{max-width:220px}
-.topic-chips{display:flex;flex-wrap:wrap;gap:8px}
-.topic{background:#f5f7f0;border:1px solid #c9d3c3;border-radius:16px;padding:6px 14px;font-size:12px;color:var(--ink);min-height:34px}
+.topic-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;width:100%}
+.topic{display:flex;flex-direction:column;gap:2px;text-align:left;background:#f5f7f0;border:1px solid #c9d3c3;border-radius:6px;padding:8px 12px;color:var(--ink);min-height:34px}
+.topic strong{font-size:12px}
+.topic span{font-size:11px;color:var(--muted);line-height:1.5}
 .topic[aria-pressed=true]{background:var(--green);border-color:var(--green);color:#fff}
-.topic[aria-pressed=true]::before{content:"\2713  "}
+.topic[aria-pressed=true] span{color:#fff}
+.topic[aria-pressed=true] strong::before{content:"\2713  "}
 .examples{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
 .examples ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column}
 .examples .text-button{text-align:left;font-weight:500}
@@ -447,6 +450,7 @@ h2{font-size:19px}
 
 @media(max-width:640px){.starter-cards,.cases{grid-template-columns:1fr}
 .starter{min-height:0}
+.topic-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
 .agent-answer>li{font-size:18px}
 .activity .timeline details li{grid-template-columns:1fr;gap:2px}
 .baseline-switch{flex-wrap:wrap}}
@@ -467,7 +471,7 @@ h2{font-size:19px}
 .spec-editor{width:100%;font-size:12px}
 .spec-editor textarea{width:100%;min-height:220px;padding:10px;border:1px solid #c9d2c6;border-radius:4px;background:#fffefa;color:var(--ink);resize:vertical}
 .agent-options input:not([type]),.agent-options input[type=date]{width:100%}
-/* Help me start and the preferences note */
+/* Guide me and the preferences note */
 .starter.guided{border-style:dashed}
 .guided-start{border:1px solid var(--line);background:#fbfbf6;border-radius:6px;padding:18px 20px;margin:0 0 18px;display:flex;flex-direction:column;gap:14px}
 .guided-start h2{margin-bottom:4px}
@@ -479,8 +483,7 @@ h2{font-size:19px}
 .preferences-note textarea{min-height:90px}
 .preferences-shown{border-left:3px solid var(--green);background:var(--green-soft);padding:10px 14px;margin:6px 0 4px;border-radius:0 4px 4px 0}
 .preferences-shown p{white-space:pre-line;font-size:13px;margin:4px 0}
-@media(max-width:1190px){.starter-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.starter-cards{grid-template-columns:1fr}}
+@media(max-width:900px){.starter-cards{grid-template-columns:1fr}}
 .term .radio{margin:6px 0}
 .term input:not([type=radio]){width:100%}
 /* Modes: the comparison note and Compare these */

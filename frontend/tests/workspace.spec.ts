@@ -422,7 +422,7 @@ test('the agent page opens on an empty question box whose helpers only fill the 
   await expect(page.getByLabel('Your question')).toHaveValue('')
   await page.getByRole('button', {name: 'Compare NVIDIA and AMD on growth and valuation.'}).click()
   await expect(page.getByLabel('Your question')).toHaveValue('Compare NVIDIA and AMD on growth and valuation.')
-  await page.locator('.starter', {hasText: 'Find companies'}).click()
+  await page.locator('.starter', {hasText: 'Find companies by my criteria'}).click()
   await expect(page.getByRole('group', {name: 'Where to look'})).toBeVisible()
   await expect(page.getByRole('button', {name: 'Find companies →'})).toBeEnabled()
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
