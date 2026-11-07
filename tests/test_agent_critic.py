@@ -260,7 +260,8 @@ def test_an_added_risk_without_evidence_does_not_close_the_objection(tmp_path, r
     _, _, events = missing_risk_run(tmp_path, risk_cites, outcome_cites)
     [o] = events[-1]["objections"]
     assert (o["outcome"], o["new_claims"]) == ("unresolved", [])
-    assert "Round 1: a claim was added, but it or the outcome cites no evidence, so it stays open." in o["notes"]
+    assert ("Round 1: a claim was added, but it stays open: that needs a new Risks claim and an outcome that each "
+            "cite a tool record.") in o["notes"]
 
 
 def saved_run(tmp_path, historical=False):
@@ -368,7 +369,7 @@ def test_a_review_of_a_historical_run_stays_historical(tmp_path, monkeypatch, ca
 
 @pytest.mark.parametrize("outcomes,why", [
     ([], "no outcome was given"),
-    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without a citation"),
+    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without evidence"),
 ])
 def test_a_new_version_alone_does_not_close_an_objection_as_corrected(tmp_path, outcomes, why):
     # Codex review: any new claim version closed its objection as corrected, with no outcome or evidence.

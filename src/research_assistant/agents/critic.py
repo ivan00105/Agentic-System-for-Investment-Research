@@ -184,7 +184,7 @@ class Critic:
                 before: set[str]):
         """Each objection's outcome, from the ledger (did the claim change or go?) and the coordinator's answer."""
         current = {c.id: c for claims in report.sections.values() for c in claims}
-        added = [i for i in current if i not in before]
+        added, risks = [i for i in current if i not in before], {c.id for c in report.sections.get("risks", [])}
         given = {}
         for i, out in enumerate(revision.outcomes):
             key = "objection-" + out.objection.strip().strip("{}").removeprefix("objection:").removeprefix("objection-")
@@ -198,6 +198,9 @@ class Critic:
                 citations = list(dict.fromkeys(used + resolved))
                 o.notes += _text_notes(out.explanation, flags, f"round {n} explanation") + [f"Round {n}: citation {raw!r} is not an ID any tool "
                                                                "returned." for raw in unknown]
+            evidence = self._evidence(citations)
+            if claims := [c for c in citations if c not in evidence]:
+                o.notes.append(f"Round {n}: citing claims ({', '.join(claims)}) is not evidence; only tool records count.")
             if o.owner != COORDINATOR.name and o.owner not in asked:
                 o.notes.append(f"Round {n}: the coordinator answered it without asking the {o.owner} analyst.")
             claim = current.get(o.claim)
@@ -208,7 +211,7 @@ class Critic:
                     o.notes.append(f"Called {out.outcome}, but the claim is no longer in the report, so it is recorded "
                                    "as withdrawn.")
             elif out and out.outcome in ("defended", "unresolved"):
-                if out.outcome == "defended" and not citations:
+                if out.outcome == "defended" and not evidence:
                     o.notes.append(f"Round {n}: defended without citing evidence, so it stays open.")
                     continue
                 o.close(out.outcome, n, explanation, citations)
@@ -216,19 +219,20 @@ class Critic:
                     o.notes.append(f"The claim has since changed to v{claim.version}; this outcome is about "
                                    f"v{o.version}.")
             elif o.issue == "missing_material_risk" and out and out.outcome == "corrected" and added:
-                # A missing risk is fixed by adding a claim, so the claim it qualifies may stay as it was.
-                cited = [i for i in added if current[i].citations]
-                if not (citations and cited):
-                    o.notes.append(f"Round {n}: a claim was added, but it or the outcome cites no evidence, so it "
-                                   "stays open.")
+                # A missing risk is fixed by adding a claim, so the claim it qualifies may stay as it was. Whether the
+                # added claim is about this risk isn't checked: that would need another model call.
+                cited = [i for i in added if i in risks and self._evidence(current[i].citations)]
+                if not (evidence and cited):
+                    o.notes.append(f"Round {n}: a claim was added, but it stays open: that needs a new Risks claim and "
+                                   "an outcome that each cite a tool record.")
                     continue
                 o.close("corrected", n, explanation, citations)
                 o.new_claims = cited
-            elif claim.version != o.version and out and out.outcome == "corrected" and citations:
+            elif claim.version != o.version and out and out.outcome == "corrected" and evidence:
                 o.close("corrected", n, explanation, citations, new_version=claim.version)
             elif claim.version != o.version:
                 why = "no outcome was given" if out is None else (
-                    "corrected without a citation" if out.outcome == "corrected" else f"called {out.outcome}")
+                    "corrected without evidence" if out.outcome == "corrected" else f"called {out.outcome}")
                 o.notes.append(f"Round {n}: the claim changed to v{claim.version}, but no evidence it fixes the problem "
                                f"({why}), so it stays open.")
             else:
@@ -238,6 +242,10 @@ class Critic:
         self.trace.write("outcomes", round=n, unknown_objections=unknown, outcomes=[
             {"objection": o.id, "claim": o.claim, "version": o.version, "outcome": o.outcome,
              "new_version": o.new_version, "new_claims": o.new_claims, "notes": o.notes} for o in pending])
+
+    def _evidence(self, ids: list[str]) -> list[str]:
+        """The tool records among `ids`. A claim (a report statement or an analyst's finding) can't close an objection."""
+        return [i for i in ids if (record := self.context.records.get(i)) and record.get("kind") != "claim"]
 
     def _resolve(self, raw_ids: list[str]) -> tuple[list[str], list[str]]:
         resolved, unknown = [], []
