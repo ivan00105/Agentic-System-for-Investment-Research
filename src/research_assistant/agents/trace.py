@@ -21,8 +21,10 @@ class Trace:
 
     Events hold the model's visible text and tool calls, never its hidden reasoning (REFERENCE §2)."""
 
-    def __init__(self, path: Path, run_id: str, echo: Callable[[dict], None] | None = None):
+    def __init__(self, path: Path, run_id: str, echo: Callable[[dict], None] | None = None,
+                 parent_run_id: str | None = None):
         self.path, self.run_id, self.echo = Path(path), run_id, echo
+        self.parent_run_id = parent_run_id  # the run that started this one (a Discover pick, "Compare these")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.seq = 0
         self.totals = _zero()
@@ -33,9 +35,10 @@ class Trace:
         self.by_agent: dict[str, dict] = {}  # totals per role
 
     @classmethod
-    def new(cls, folder: Path | None = None, echo: Callable[[dict], None] | None = None) -> "Trace":
+    def new(cls, folder: Path | None = None, echo: Callable[[dict], None] | None = None,
+            parent_run_id: str | None = None) -> "Trace":
         run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-") + uuid4().hex[:6]
-        return cls((folder or config.trace_dir()) / f"{run_id}.jsonl", run_id, echo)
+        return cls((folder or config.trace_dir()) / f"{run_id}.jsonl", run_id, echo, parent_run_id)
 
     @contextmanager
     def acting_as(self, agent: str):
@@ -52,6 +55,8 @@ class Trace:
         self.seq += 1
         event = {"seq": self.seq, "at": datetime.now(timezone.utc).isoformat(), "kind": kind,
                  **({"agent": self.agent} if self.agent else {}), **fields}
+        if kind == "run_start" and self.parent_run_id:  # History nests the run under its parent (agents/saved.py)
+            event["parent_run_id"] = self.parent_run_id
         if "usage" in fields:
             self._count(fields["usage"] or {})
             if fields.get("provider") and fields["provider"] not in self.hosts:

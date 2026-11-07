@@ -91,6 +91,18 @@ def test_candidates_failing_the_10k_check_are_replaced_and_the_pick_is_researche
     assert any(e["records"] for e in host if e["name"] == "calculate")
 
 
+def test_each_pick_names_its_discover_run_and_its_brief_reads_back_as_a_short_title(tmp_path, declared):
+    result, _, events = find(tmp_path, declared,
+                             spec(filters=[{"metric": "operating_margin", "op": ">", "value": 0.25}], top_k=1),
+                             *research("AAPL", "0000320193"))
+    apple = result.candidates[3]
+    start = json.loads(apple.run.trace_path.read_text(encoding="utf-8").splitlines()[0])
+    assert start["kind"] == "run_start" and start["parent_run_id"] == result.run_id
+    assert "parent_run_id" not in events[0]  # the Discover run itself was started by the user
+    assert next(e for e in events if e["kind"] == "research_start")["run_id"] == apple.run.run_id
+    assert discover.pick_title(start["question"]) == "Pick 1 of 1: Apple Inc. (AAPL)"
+
+
 def test_a_failed_research_run_is_replaced_by_the_next_candidate(tmp_path, declared):
     result, _, _ = find(tmp_path, declared,
                         spec(rank_by="revenue", filters=[{"metric": "revenue", "op": ">", "value": 0}], top_k=1),

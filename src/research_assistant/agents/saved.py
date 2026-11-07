@@ -1,5 +1,6 @@
 """Saved agent runs, read back from their trace files (PROJECT_GUIDE Phase 7: the files in data/traces/ are the
-store, no database): a summary per run for History, a run's progress lines, and its checked report."""
+store, no database): a summary per run for History, a run's progress lines, and its checked report. Traces are
+frozen evidence, so the user's labels and archived flags live apart, in labels.json in the same folder."""
 import json
 import os
 import re
@@ -7,6 +8,7 @@ from pathlib import Path
 
 from . import preferences
 from .checker import PLACEHOLDER, lookup
+from .discover import pick_title
 from .draft import SECTIONS
 from .evidence import load
 from .figures import figures, raw
@@ -16,24 +18,90 @@ from .report import RUN_STATUS, describe
 from .sources import GROUPS, chip, detail
 
 RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")  # the IDs Trace.new gives; any other file is not a run
+LABELS = "labels.json"
 
 
-def runs(folder: Path) -> list[dict]:
-    """Every saved run, newest first (run IDs start with the time)."""
+def runs(folder: Path, archived: bool = False) -> list[dict]:
+    """The top-level runs, newest first (run IDs start with the time), each with the runs it started under
+    `children`, oldest first. Archived runs are listed apart; a child goes wherever its parent is."""
+    return [run for run in tree(folder) if run["archived"] == archived]
+
+
+def tree(folder: Path) -> list[dict]:
+    """Every saved run, nested under the run that started it (see _parents)."""
     paths = sorted(folder.glob("*.jsonl"), reverse=True) if folder.is_dir() else []
-    return [found for path in paths if RUN_ID.fullmatch(path.stem) and (found := summary(path))]
+    marks, found, started = labels(folder), {}, {}
+    for path in paths:
+        if RUN_ID.fullmatch(path.stem) and (read := _summary(path, marks.get(path.stem))):
+            found[path.stem], started[path.stem] = read
+    parents = _parents(found, started)
+    roots = {run_id: _root(run_id, parents) for run_id in found}
+    top = {run_id: run | {"children": []} for run_id, run in found.items() if roots[run_id] == run_id}
+    for run_id in sorted(parents):  # oldest first: pick 1, pick 2, ...
+        child = found[run_id]  # a child that isn't a pick came from "Compare these" on the shortlist
+        top[roots[run_id]]["children"].append(child | {"kind": child["kind"] or "comparison"})
+    return list(top.values())
 
 
-def summary(path: Path) -> dict | None:
-    """What History shows. `status` is None while the trace has no run_end: still running, or cut off by a crash."""
+def _root(run_id: str, parents: dict[str, str]) -> str:
+    while run_id in parents:  # _parents never keeps a link that closes a loop, so this ends
+        run_id = parents[run_id]
+    return run_id
+
+
+def summary(path: Path, mark: dict | None = None) -> dict | None:
+    """What History shows. `status` is None while the trace has no run_end: still running, or cut off by a crash.
+    `mark` is the run's entry in labels.json."""
+    read = _summary(path, mark)
+    return read and read[0]
+
+
+def _summary(path: Path, mark: dict | None) -> tuple[dict, list[str]] | None:
+    """The summary, and the runs a Discover run_end lists as its research runs."""
     first, last = _ends(path)
     if first is None:
         return None
-    end = last if last and last.get("kind") == "run_end" else {}
+    end, mark = last if last and last.get("kind") == "run_end" else {}, mark or {}
     question, note = preferences.split(first.get("question"))
-    return {"run_id": path.stem, "question": question, "preferences": note, "condition": first.get("condition"),
-            "cutoff": first.get("cutoff"), "model": first.get("model"), "started_at": first.get("at"),
-            "status": end.get("status"), "ended_at": end.get("at"), "totals": end.get("totals")}
+    pick = pick_title(question)
+    # The title: the user's label, a pick's company, else the question. Lists clamp it; the run page shows it all.
+    return ({"run_id": path.stem, "title": mark.get("label") or pick or question, "label": mark.get("label"),
+             "question": question, "preferences": note, "kind": "pick" if pick else None,
+             "parent_run_id": first.get("parent_run_id"), "archived": bool(mark.get("archived")),
+             "condition": first.get("condition"), "cutoff": first.get("cutoff"), "model": first.get("model"),
+             "started_at": first.get("at"), "status": end.get("status"), "ended_at": end.get("at"),
+             "totals": end.get("totals")},
+            [c["run_id"] for c in end.get("candidates") or [] if isinstance(c, dict) and c.get("run_id")])
+
+
+def _parents(found: dict[str, dict], started: dict[str, list[str]]) -> dict[str, str]:
+    """Each run's parent: the run_start's parent_run_id, or for traces saved before it was written, the Discover
+    run whose run_end lists it. Only a saved run started no later than its child counts (the ID's time part, since
+    runs in the same second have random suffixes), and a link that would close a loop is dropped."""
+    links = {child: run_id for run_id, children in started.items() for child in children}
+    links |= {run_id: run["parent_run_id"] for run_id, run in found.items() if run["parent_run_id"]}
+    parents = {}
+    for child, parent in sorted(links.items()):
+        if (child in found and parent in found and parent != child and parent[:15] <= child[:15]
+                and _root(parent, parents) != child):
+            parents[child] = parent
+    return parents
+
+
+def labels(folder: Path) -> dict[str, dict]:
+    """labels.json: run ID -> {"label": ..., "archived": true}. Unreadable reads as none, so History still lists."""
+    try:
+        return _marks(folder)
+    except ValueError:
+        return {}
+
+
+def _marks(folder: Path) -> dict[str, dict]:
+    path = folder / LABELS
+    found = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    if not isinstance(found, dict):
+        raise ValueError(f"{path} is not a JSON object")
+    return found
 
 
 def progress(path: Path) -> list[dict]:

@@ -8,7 +8,7 @@ import { useLevel } from '../../level'
 import { STATUS } from './labels'
 import { RunTimeline } from './RunTimeline'
 
-export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRun: (id: string) => void; onNew: () => void; onCompare: (companies: CompanyMatch[]) => void}) {
+export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRun: (id: string) => void; onNew: () => void; onCompare: (companies: CompanyMatch[], parent: string) => void}) {
   const [run, setRun] = useState<AgentProgress | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
@@ -37,12 +37,15 @@ export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRu
   if (error) return <>{back}<div className="notice error" role="alert"><p>{error}</p><button className="secondary" onClick={() => setAttempt(a => a + 1)}>Retry</button></div></>
   if (!run) return <div className="notice" role="status">Loading the agent run…</div>
   const running = agentRunning(run.status)
+  const title = run.title ?? run.question ?? 'Starting…'
   return <>
     {back}
     <section className="report-body agent-run">
       <div className="report-section">
         <div className="section-label">AGENT RUN · {run.condition ?? 'starting'}</div>
-        <h2 className="agent-run-question">{run.question ?? 'Starting…'}</h2>
+        <h2 className="agent-run-question">{title}</h2>
+        {run.question && (run.kind === 'pick' ? <details className="run-brief"><summary>The brief its research agents got</summary><p>{run.question}</p></details>
+          : run.question !== title && <p className="run-brief">{run.question}</p>)}
         {run.preferences && <div className="preferences-shown"><div className="section-label">YOUR PREFERENCES</div><p>{run.preferences}</p><p className="muted">From Help me start. The agents read this note with the question; it shapes what they stress, not the evidence rules.</p></div>}
         <div className="run-state" aria-live="polite"><span className={running ? 'pulse-dot' : 'status-dot'} /><strong>{STATUS[run.status] ?? run.status}</strong>{run.started_at && <span>Started {stamp(run.started_at)}</span>}</div>
         {running && <div className="run-actions"><button className="secondary" disabled={run.status === 'stopping'} onClick={() => void cancel()}>{run.status === 'stopping' ? 'Stopping…' : 'Cancel run'}</button>
@@ -54,6 +57,6 @@ export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRu
       </div>
     </section>
     {report?.discover && report.error && <div className="notice error" role="alert">The run failed: {report.error}</div>}
-    {report && (report.discover ? <DiscoverReport result={report.discover} onOpenRun={onOpenRun} onCompare={onCompare} /> : <AgentReport runId={id} report={report} />)}
+    {report && (report.discover ? <DiscoverReport result={report.discover} onOpenRun={onOpenRun} onCompare={companies => onCompare(companies, id)} /> : <AgentReport runId={id} report={report} />)}
   </>
 }

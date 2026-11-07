@@ -24,6 +24,32 @@ test('a Discover shortlist opens as a side-by-side comparison you can check firs
   await expect(page.locator('.starter', {hasText: 'Companies I already know'})).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('a comparison is filed under its Discover run only while its question comes from the shortlist', async ({page}) => {
+  const sent: Record<string, unknown>[] = []
+  await page.route('**/api/agent-runs', route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    sent.push(route.request().postDataJSON())
+    return route.fulfill({status: 202, json: {run_id: RUN, status: 'running'}})
+  })
+  await mockRun(page, {question: 'Find profitable tech companies.'}, SHORTLIST)
+  const research = page.getByRole('button', {name: 'Research this question →'})
+  async function compareThen(change: () => Promise<unknown>) {
+    await page.goto(`/?view=research&agent=${RUN}`)
+    await page.getByRole('button', {name: 'Compare these →'}).click()
+    await change()
+    await research.click()
+    await expect(page).toHaveURL(/agent=/)
+  }
+  await compareThen(async () => {})
+  await compareThen(() => page.getByRole('button', {name: 'Remove Apple Inc.'}).click())
+  await compareThen(() => page.getByRole('button', {name: 'Compare NVIDIA and AMD on growth and valuation.'}).click())
+  await compareThen(async () => {
+    await page.locator('.starter', {hasText: 'Find companies by my criteria'}).click()
+    await page.locator('.starter', {hasText: 'Companies I already know'}).click()
+  })
+  expect(sent.map(body => body.parent_run_id)).toEqual([RUN, undefined, undefined, undefined])
+})
+
 const COMPANIES = {AAPL: {cik: '0000320193', name: 'Apple Inc.', tickers: ['AAPL'], exchanges: ['Nasdaq']}, MSFT: {cik: '0000789019', name: 'MICROSOFT CORP', tickers: ['MSFT'], exchanges: ['Nasdaq']}}
 async function pickCompanies(page: import('@playwright/test').Page, tickers: (keyof typeof COMPANIES)[]) {
   await page.route('**/api/companies?*', route => { const q = new URL(route.request().url()).searchParams.get('q')!.toUpperCase() as keyof typeof COMPANIES; return route.fulfill({json: {items: [COMPANIES[q]], total: 1}}) })

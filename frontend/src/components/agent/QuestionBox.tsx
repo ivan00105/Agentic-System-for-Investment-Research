@@ -25,7 +25,8 @@ const EXAMPLES: {kind: Kind | null; text: string}[] = [
   {kind: 'find', text: 'Find large, profitable tech companies at a reasonable valuation.'},
 ]
 
-export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => void; initial?: CompanyMatch[] | null}) {
+// parent: the Discover run whose "Compare these" filled the box; History files the comparison under it.
+export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: string) => void; initial?: CompanyMatch[] | null; parent?: string | null}) {
   const [kind, setKind] = useState<Kind | null>(initial?.length ? 'known' : null)
   const [companies, setCompanies] = useState<CompanyMatch[]>(initial ?? [])
   const [topics, setTopics] = useState<Topic[]>([])
@@ -34,6 +35,7 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
   const [count, setCount] = useState('')
   const [question, setQuestion] = useState('')
   const [edited, setEdited] = useState(false)
+  const [link, setLink] = useState(parent ?? null) // dropped once the question no longer comes from that shortlist
   const {level} = useLevel()
   const [guided, setGuided] = useState(level === 'beginner' && !initial?.length)
   const [note, setNote] = useState('') // the preferences note "Guide me" wrote; the user can edit it
@@ -55,20 +57,21 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
   const widest = universes.filter(u => !u.dynamic).sort((a, b) => (b.companies ?? 0) - (a.companies ?? 0))[0]
   // Guide me only picks chips and a sector, so the question stays built from the choices and the chips keep working.
   function guide({topics: picked, sector: chosen, note: written}: Guided) {
-    setKind('find'); setCompanies([]); setTopics(picked); setSector(chosen); setEdited(false); setNote(written); setGuided(false); setError('')
+    setKind('find'); setCompanies([]); setLink(null); setTopics(picked); setSector(chosen); setEdited(false); setNote(written); setGuided(false); setError('')
     if (widest) setAmong(widest.id)
   }
   function choose(next: Kind) {
     setKind(next); setEdited(false); setError(''); setGuided(false)
+    if (next !== kind) setLink(null)
     if (next === 'known') setCompanies(c => c.slice(0, COMPARE_MAX))
     if (next === 'find' && companies.length && !universe) setAmong('mine')
   }
   function pickCompanies(next: CompanyMatch[]) {
-    setCompanies(next)
+    setCompanies(next); setLink(null)
     if (!find && next.length) setKind('known')
   }
   function example(next: {kind: Kind | null; text: string}) {
-    setKind(next.kind); setCompanies([]); setTopics([]); setQuestion(next.text); setEdited(true); setError(''); setNote(''); setSector(''); setGuided(false)
+    setKind(next.kind); setCompanies([]); setLink(null); setTopics([]); setQuestion(next.text); setEdited(true); setError(''); setNote(''); setSector(''); setGuided(false)
     if (next.kind === 'find' && universes.length) setAmong(universes[0].id)
   }
   async function submit(event: FormEvent) {
@@ -76,7 +79,7 @@ export function QuestionBox({onStarted, initial}: {onStarted: (id: string) => vo
     if (busy || !question.trim()) return
     if (find && among === 'mine' && !companies.length) { setError('Pick at least one company for your own list, or choose a bundled list.'); return }
     const {condition, model, editSpec, cutoff} = options
-    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(note.trim() && {preferences: note.trim()}),
+    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(note.trim() && {preferences: note.trim()}), ...(link && !find && {parent_run_id: link}),
       ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(topK && {top_k: topK}), ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
     setBusy(true); setError('')
     try { onStarted((await agentApi.start(body)).run_id) }

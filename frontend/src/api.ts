@@ -75,7 +75,8 @@ export const investigationLabel = (request: RunRequest) => request.connection_ch
 // Agent runs (conditions B, C, D, and Discover), saved as trace files and served by /api/agent-runs.
 export type Condition = 'B' | 'C' | 'D'
 export interface AgentTotals { model_calls: number; tool_calls: number; total_tokens: number; cached_tokens: number | null; cost: number | null }
-export interface AgentRunSummary { run_id: string; status: string; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
+// title: the user's label, a pick's company, else the question. children: the runs it started (picks, a comparison).
+export interface AgentRunSummary { run_id: string; status: string; title?: string | null; label?: string | null; kind?: 'pick' | 'comparison' | null; parent_run_id?: string | null; archived?: boolean; children?: AgentRunSummary[]; question?: string | null; preferences?: string | null; condition?: string | null; cutoff?: string | null; model?: string | null; started_at?: string | null; ended_at?: string | null; totals?: AgentTotals | null }
 // A model step is one line ("Step 4 · 10 calculations · all OK"); its tool calls fold under it as `details`.
 export interface ProgressDetail { seq: number | null; text: string; status: string | null }
 export interface ProgressLine { seq: number | null; at: string | null; kind?: string | null; role?: string | null; text: string; step?: number | null; details?: ProgressDetail[] }
@@ -94,14 +95,14 @@ export interface DiscoverResult { spec: string[] | null; counts: Record<string, 
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
 export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
 const run = (id: string) => `/agent-runs/${encodeURIComponent(id)}`
 export const agentApi = {
   start: (body: StartAgentRun) => request<AgentRunSummary>('/agent-runs', post(body)),
-  list: () => request<{items: AgentRunSummary[]}>('/agent-runs'),
+  list: (archived = false) => request<{items: AgentRunSummary[]}>(`/agent-runs?archived=${archived}`),
   get: (id: string) => request<AgentProgress>(run(id)),
   cancel: (id: string) => request<AgentRunSummary>(`${run(id)}/cancel`, post({})),
   answer: (id: string, answers: Record<string, string>, spec?: unknown) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers, ...(spec !== undefined && {spec})})),

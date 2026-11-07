@@ -28,12 +28,13 @@ function route() {
   const view: View = asked === 'research' && id ? 'baseline' : asked && VIEWS.includes(asked) ? asked : 'research'
   // "Compare these" on a Discover shortlist hands its picks to the question box in the history entry.
   const compare = view === 'research' && Array.isArray(history.state?.compare) ? history.state.compare as CompanyMatch[] : null
-  return {view, id: view === 'baseline' || view === 'discovery' ? id : null, ticker: params.get('company'), agent: view === 'research' ? params.get('agent') : null, compare}
+  const compareFrom = compare && typeof history.state?.parent === 'string' ? history.state.parent as string : null // the Discover run
+  return {view, id: view === 'baseline' || view === 'discovery' ? id : null, ticker: params.get('company'), agent: view === 'research' ? params.get('agent') : null, compare, compareFrom}
 }
 
 export default function App() {
   const [locationState, setLocationState] = useState(route)
-  const {view, id, ticker, agent, compare} = locationState
+  const {view, id, ticker, agent, compare, compareFrom} = locationState
   function navigate(nextView: View, nextId: string | null = null, company: string | null = null) {
     const params = new URLSearchParams({view: nextView === 'baseline' && nextId ? 'research' : nextView})
     if (nextId) params.set('run', nextId)
@@ -45,8 +46,8 @@ export default function App() {
     history.pushState({}, '', `?view=research&agent=${encodeURIComponent(runId)}`)
     setLocationState(route())
   }
-  function openCompare(companies: CompanyMatch[]) {
-    history.pushState({compare: companies}, '', '?view=research')
+  function openCompare(companies: CompanyMatch[], parent: string) {
+    history.pushState({compare: companies, parent}, '', '?view=research')
     setLocationState(route())
   }
   useEffect(() => {const onPop = () => setLocationState(route()); addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop)}, [])
@@ -60,7 +61,7 @@ export default function App() {
       <div className="page-heading"><div><div className="eyebrow">EVIDENCE-GROUNDED RESEARCH</div><h1>{title}</h1><p>{lead}</p></div><span className="edition">FIELDNOTES / 01</span></div>
       {view === 'setup' ? <SetupPage />
         : view === 'history' ? <HistoryPage onOpenAgent={openAgent} onOpen={openBaseline} />
-        : view === 'research' ? <ResearchPage agent={agent} compare={compare} openAgent={openAgent} onCompare={openCompare} onNew={() => navigate('research')} onHistory={() => navigate('history')} />
+        : view === 'research' ? <ResearchPage agent={agent} compare={compare} compareFrom={compareFrom} openAgent={openAgent} onCompare={openCompare} onNew={() => navigate('research')} onHistory={() => navigate('history')} />
         : <>
           <div className="baseline-switch" role="group" aria-label="Baseline A form">{(['baseline', 'discovery'] as View[]).map(item => <button key={item} className="secondary" aria-pressed={view === item} onClick={() => navigate(item)}>{item === 'baseline' ? 'One company' : 'Five-company screen'}</button>)}</div>
           <BaselinePage key={view} view={view === 'baseline' ? 'research' : 'discovery'} id={id} ticker={ticker} navigate={(next, runId, company) => navigate(next === 'research' ? 'baseline' : next, runId, company)} />

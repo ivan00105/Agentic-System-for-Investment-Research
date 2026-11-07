@@ -7,6 +7,7 @@ result is a shortlist with counts; fewer than k is fine and says why.
 The Discover trace holds the spec step, the host's tool calls and one event per candidate; each research run keeps
 its own trace, and the Discover run's totals add theirs in.
 """
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -108,11 +109,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
             continue
         researched += 1
         brief = _brief(question, candidate, spec, universe, sum(c.outcome == "picked" for c in ranked) + 1, top_k)
-        trace.write("research_start", rank=candidate.rank, cik=candidate.cik, name=candidate.name, question=brief)
+        child = Trace.new(trace.path.parent, echo, parent_run_id=trace.run_id)
+        trace.write("research_start", rank=candidate.rank, cik=candidate.cik, name=candidate.name, question=brief,
+                    run_id=child.run_id)
         try:
             candidate.run = research(brief, client, settings, ToolContext(
                 cutoff=context.cutoff, sec=context.sec, price_providers=context.price_providers,
-                cache_dir=context.cache_dir, stop=context.stop), trace_dir=trace.path.parent, echo=echo)
+                cache_dir=context.cache_dir, stop=context.stop), trace=child)
         except Exception as exc:  # a bug in one research run must not lose the others; its own trace shows where
             candidate.error = f"The research run crashed ({type(exc).__name__}: {exc}). This is a bug."
         run = candidate.run
@@ -146,6 +149,21 @@ def _brief(question: str, candidate: Candidate, spec, universe: Universe, pick: 
             + (f"\nHow the request's terms were read:{terms}" if terms else "")
             + "\n\nCover its business quality, growth, margins, valuation and main risks, on its latest annual "
             "figures. Research this company only; don't screen for other companies.")
+
+
+# Reads a _brief back as a short title; tests/test_agent_discover.py keeps the two in step.
+BRIEF = re.compile(r"Explain whether (?P<name>[^\n]+) \((?P<tickers>[^()\n]*), CIK \d+\) fits this request"
+                   r"(?:[\s\S]*?It is shortlist pick (?P<n>\d+) of the (?P<of>\d+) asked for)?")
+
+
+def pick_title(question: str | None) -> str | None:
+    """A pick's title from its brief, e.g. "Pick 2 of 5: Apple Inc. (AAPL)"; None for any other question.
+    Briefs saved before 3 Nov 2026 give no pick number."""
+    if not (found := BRIEF.match(question or "")):
+        return None
+    ticker = found["tickers"].split(", ")[0]
+    who = found["name"] + (f" ({ticker})" if ticker != "no ticker" else "")
+    return f"Pick {found['n']} of {found['of']}: {who}" if found["n"] else f"Pick: {who}"
 
 
 def _counts(screen: dict, ranked: list[Candidate], top_k: int) -> dict:

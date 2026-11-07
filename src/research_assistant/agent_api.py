@@ -50,6 +50,8 @@ class StartRun(BaseModel):
     top_k: int | None = Field(None, ge=1)
     # "Help me start": what matters most, horizon, comfort with price swings, sectors. Added to the question.
     preferences: str | None = None
+    # The Discover run whose "Compare these" started this one; History nests it there.
+    parent_run_id: Annotated[str, StringConstraints(pattern=saved.RUN_ID.pattern)] | None = None
 
 
 class Answers(BaseModel):
@@ -76,8 +78,9 @@ class AgentRuns:
         self.lock = threading.Lock()
 
     def start(self, question: str, condition: str, settings, cutoff: datetime | None = None,
-              universe: universes.Universe | None = None, edit_spec: bool = False, top_k: int | None = None) -> str:
-        trace, stop = Trace.new(self.folder), threading.Event()
+              universe: universes.Universe | None = None, edit_spec: bool = False, top_k: int | None = None,
+              parent_run_id: str | None = None) -> str:
+        trace, stop = Trace.new(self.folder, parent_run_id=parent_run_id), threading.Event()
         with self.lock:
             self.active[trace.run_id] = stop
         threading.Thread(target=self._run, args=(question, condition, settings, trace, stop, cutoff, universe,
@@ -133,14 +136,16 @@ class AgentRuns:
     def view(self, run_id: str) -> dict:
         """A run's summary. Its status comes from run_end once written, else running, stopping or incomplete."""
         active, path = self._active(), self.path(run_id)
-        found = saved.summary(path) if saved.RUN_ID.fullmatch(run_id) and path.is_file() else None
+        found = (saved.summary(path, saved.labels(self.folder).get(run_id))
+                 if saved.RUN_ID.fullmatch(run_id) and path.is_file() else None)
         if found is None and run_id not in active:
             raise DomainError("No saved agent run has that ID.", "not_found", 404)
         return _status(found or {"run_id": run_id, "status": None}, active)  # a run so new it has no event yet
 
-    def history(self) -> list[dict]:
+    def history(self, archived: bool = False) -> list[dict]:
         active = self._active()
-        return [_status(found, active) for found in saved.runs(self.folder)]
+        return [_status(found | {"children": [_status(child, active) for child in found["children"]]}, active)
+                for found in saved.runs(self.folder, archived)]
 
     def _active(self) -> dict[str, threading.Event | None]:
         # Read before the trace: a run writes run_end before it leaves `active`, so it never looks incomplete.
@@ -212,12 +217,13 @@ def start(body: StartRun, request: Request):
     settings = replace(settings, model=body.model) if body.model else settings
     question = preferences.attach(body.question, body.preferences)
     return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
-                                                  body.edit_spec and declared is not None, body.top_k))
+                                                  body.edit_spec and declared is not None, body.top_k,
+                                                  body.parent_run_id))
 
 
 @router.get("")
-def history(request: Request):
-    return {"items": runs(request).history()}
+def history(request: Request, archived: bool = False):
+    return {"items": runs(request).history(archived)}
 
 
 @router.get("/{run_id}")
