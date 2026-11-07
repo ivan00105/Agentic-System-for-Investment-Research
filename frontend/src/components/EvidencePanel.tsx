@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { agentApi, api, sourceLink, stamp } from '../api'
-import type { AgentRecord, Evidence } from '../api'
+import { agentApi, sourceLink, stamp } from '../api'
+import type { AgentRecord } from '../api'
 import { Badge } from './Badge'
 import { ErrorBox } from './ErrorBox'
 
-// The source desk beside a report: baseline A's evidence and an agent run's records open in the same panel.
+// The source desk beside an agent run's report: a frozen record opens here.
 function EvidenceShell({focus, onClose, children}: {focus: string | null; onClose: () => void; children: ReactNode}) {
   const heading = useRef<HTMLHeadingElement>(null)
   const open = focus !== null
@@ -25,16 +25,6 @@ function useLoad<T>(load: (() => Promise<T>) | null, key: string) {
     return () => {alive = false}
   }, [key, attempt])
   return {value, error, retry: () => setAttempt(a => a + 1)}
-}
-
-export function EvidencePanel({runId, evidenceId, onClose}: {runId: string; evidenceId: string | null; onClose: () => void}) {
-  const {value: evidence, error, retry} = useLoad<Evidence>(evidenceId ? () => api.evidence(runId, evidenceId) : null, `${runId}/${evidenceId}`)
-  const safeUrl = evidence?.source_url && /^https:\/\/data\.sec\.gov\//.test(evidence.source_url) ? evidence.source_url : null
-  return <EvidenceShell focus={evidenceId} onClose={onClose}>
-    {error ? <ErrorBox message={error} retry={retry} /> : !evidence ? <p role="status">Loading saved evidence…</p> : <>
-      <Badge tone={evidence.synthetic ? 'amber' : 'green'}>{evidence.synthetic ? 'Synthetic teaching source' : 'SEC company facts'}</Badge><h3 className="source-title">{evidence.title}</h3><pre className="excerpt">{evidence.excerpt}</pre><dl className="source-meta"><dt>Reporting period</dt><dd>{evidence.period}</dd><dt>Available by</dt><dd>{stamp(evidence.available_at)}</dd><dt>Saved on</dt><dd>{stamp(evidence.retrieved_at)}</dd></dl><details className="technical-details"><summary>Source details</summary><dl className="source-meta"><dt>Source locator</dt><dd>{evidence.locator}</dd><dt>Snapshot SHA-256</dt><dd className="mono hash">{evidence.snapshot_hash}</dd></dl></details>{safeUrl ? <a className="source-link" href={safeUrl} target="_blank" rel="noopener noreferrer">Open SEC source ↗</a> : <p className="muted">{evidence.synthetic ? 'This synthetic fixture has no original filing URL.' : 'No supported original source URL is recorded.'}</p>}
-    </>}
-  </EvidenceShell>
 }
 
 // An agent run's frozen record; a calculation links to its inputs and an analyst finding to what it cites.
