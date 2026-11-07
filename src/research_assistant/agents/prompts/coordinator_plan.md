@@ -9,6 +9,6 @@ Write a short numbered plan:
 - which companies, metrics and fiscal periods the question needs;
 - which analyst to ask for what, and which `calculate` formulas answer the question (margins, growth, valuation, risk);
 - which filing sections matter (Item 1A for risks, Item 7 for management's discussion) and whether recent 8-K events matter;
-- what may come back unsupported (banks have no operating income, IFRS filers such as TSMC are unsupported, a foreign filer's other-currency figures come converted to USD, there is no statistical outlook model yet).
+- what may come back unsupported (banks have no operating income, an IFRS filer such as TSMC has no long-term debt figure, a foreign filer's other-currency figures come converted to USD only when an exchange rate is available, there is no statistical outlook model yet).
 
 Plan only. Don't answer the question and don't state any figures.

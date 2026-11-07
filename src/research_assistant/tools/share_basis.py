@@ -1,5 +1,5 @@
 """A 20-F or 40-F share count's basis (REFERENCE §5): how many ordinary shares one ADS stands for, as a citable
-fact read from the same filing's cover, and the share count as that cover page shows it."""
+fact read from the same filing (its cover, else its text), and the share count as that cover page shows it."""
 from decimal import Decimal
 from fractions import Fraction
 
@@ -37,6 +37,9 @@ def _record(cik: str, filing, cover: dict) -> dict:
     value = Fraction(cover["ratio"])
     if cover["how"] == "no depositary shares":
         note = f"The cover lists no depositary shares ({cover['basis']}), so one US-listed share is one ordinary share."
+    elif cover["how"] == sec_cover.FILING_TEXT:
+        note = (f"The cover gives no ratio, so it is read from the filing's text, the only ratio it states: "
+                f"\"{cover['basis']}\".")
     else:
         where = "inline XBRL title" if cover["how"] == sec_cover.TITLE_TAG else "Section 12(b) table"
         note = f"Read from the cover's {where}: \"{cover['basis']}\"."

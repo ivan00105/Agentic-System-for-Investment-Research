@@ -23,27 +23,40 @@ class Concept:
     kind: str  # duration: a fiscal year; instant: a fiscal year end; cover: any 10-K/10-Q cover date
 
 
+# IFRS filers (TSMC) come last: edgartools 5.62.1's names (https://github.com/dgunning/edgartools), from
+# edgar/standardization/synonym_groups.py and edgar/entity/mappings_loader.py. Owners' lines match US GAAP's parent's.
 CONCEPTS = {c.metric: c for c in (
     Concept("revenue", ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:Revenues",
                         "us-gaap:SalesRevenueNet", "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax",
-                        "us-gaap:RevenuesNetOfInterestExpense"), "USD", "duration"),
-    Concept("gross_profit", ("us-gaap:GrossProfit",), "USD", "duration"),
-    Concept("operating_income", ("us-gaap:OperatingIncomeLoss",), "USD", "duration"),
-    Concept("net_income", ("us-gaap:NetIncomeLoss",), "USD", "duration"),
+                        "us-gaap:RevenuesNetOfInterestExpense", "ifrs-full:Revenue",
+                        "ifrs-full:RevenueFromContractsWithCustomers"), "USD", "duration"),
+    Concept("gross_profit", ("us-gaap:GrossProfit", "ifrs-full:GrossProfit"), "USD", "duration"),
+    Concept("operating_income", ("us-gaap:OperatingIncomeLoss", "ifrs-full:ProfitLossFromOperatingActivities"),
+            "USD", "duration"),
+    Concept("net_income", ("us-gaap:NetIncomeLoss", "ifrs-full:ProfitLossAttributableToOwnersOfParent",
+                           "ifrs-full:ProfitLoss"), "USD", "duration"),
     Concept("research_and_development", ("us-gaap:ResearchAndDevelopmentExpense",
-             "us-gaap:ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"), "USD", "duration"),
+             "us-gaap:ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
+             "ifrs-full:ResearchAndDevelopmentExpense"), "USD", "duration"),
     Concept("operating_cash_flow", ("us-gaap:NetCashProvidedByUsedInOperatingActivities",
-             "us-gaap:NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"), "USD", "duration"),
+             "us-gaap:NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+             "ifrs-full:CashFlowsFromUsedInOperatingActivities"), "USD", "duration"),
     # Payments, so a positive number is cash spent.
     Concept("capex", ("us-gaap:PaymentsToAcquirePropertyPlantAndEquipment",
-                      "us-gaap:PaymentsToAcquireProductiveAssets"), "USD", "duration"),
-    Concept("eps_diluted", ("us-gaap:EarningsPerShareDiluted",), "USD/shares", "duration"),
-    Concept("diluted_shares", ("us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",), "shares", "duration"),
-    Concept("total_assets", ("us-gaap:Assets",), "USD", "instant"),
-    Concept("total_liabilities", ("us-gaap:Liabilities",), "USD", "instant"),
-    Concept("stockholders_equity", ("us-gaap:StockholdersEquity",), "USD", "instant"),
-    Concept("cash", ("us-gaap:CashAndCashEquivalentsAtCarryingValue",), "USD", "instant"),
-    # Total long-term debt first; the noncurrent part only when the total isn't tagged. Never summed.
+                      "us-gaap:PaymentsToAcquireProductiveAssets",
+                      "ifrs-full:PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"), "USD", "duration"),
+    Concept("eps_diluted", ("us-gaap:EarningsPerShareDiluted", "ifrs-full:DilutedEarningsLossPerShare"),
+            "USD/shares", "duration"),
+    Concept("diluted_shares", ("us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",
+                               "ifrs-full:AdjustedWeightedAverageShares"), "shares", "duration"),
+    Concept("total_assets", ("us-gaap:Assets", "ifrs-full:Assets"), "USD", "instant"),
+    Concept("total_liabilities", ("us-gaap:Liabilities", "ifrs-full:Liabilities"), "USD", "instant"),
+    Concept("stockholders_equity", ("us-gaap:StockholdersEquity", "ifrs-full:EquityAttributableToOwnersOfParent"),
+            "USD", "instant"),
+    Concept("cash", ("us-gaap:CashAndCashEquivalentsAtCarryingValue", "ifrs-full:CashAndCashEquivalents"), "USD",
+            "instant"),
+    # Total long-term debt first; the noncurrent part only when the total isn't tagged. Never summed. No IFRS tag:
+    # IFRS has no total, and TSMC's LongtermBorrowings (bank loans) leaves out its bonds, about 30 times larger.
     Concept("long_term_debt", ("us-gaap:LongTermDebt", "us-gaap:LongTermDebtNoncurrent"), "USD", "instant"),
     # Cover-page count first. Issuers with several share classes only tag it per class, which companyfacts
     # drops, so the balance-sheet total is the fallback.
@@ -51,9 +64,11 @@ CONCEPTS = {c.metric: c for c in (
                                    "us-gaap:CommonStockSharesOutstanding"), "shares", "cover"),
 )}
 FISCAL_YEAR_METRICS = ("revenue", "net_income", "operating_cash_flow")
-# ASC 606 contract revenue leaves out lease income (REITs) and interest (banks), so it can be a slice of the total.
+# ASC 606 / IFRS 15 contract revenue leaves out lease income (REITs) and interest (banks), so it can be a slice of the
+# total. TSMC's FY2025 20-F tags its NET REVENUE line only with the IFRS 15 tag.
 CONTRACT_REVENUE_TAGS = ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
-                         "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax")
+                         "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax",
+                         "ifrs-full:RevenueFromContractsWithCustomers")
 
 
 @dataclass(frozen=True)
@@ -69,6 +84,8 @@ class Fact:
     filed: date
     original_value: Decimal | None = None  # set when an earlier filing reported a different value
     original_accession: str | None = None
+    document: str | None = None  # set when read from the filing's own inline XBRL, not companyfacts
+    locator: str | None = None
 
 
 def available_at(filed: date) -> datetime:
@@ -99,7 +116,8 @@ def _rows(payload: dict, concept: Concept, cutoff: datetime, unit: str | None = 
                 continue
             if concept.kind == "cover" and form not in COVER_FORMS:
                 continue
-            yield priority, tag, Fact(concept.metric, tag, unit or concept.unit, value, start, end, accession, form, filed)
+            yield priority, tag, Fact(concept.metric, tag, unit or concept.unit, value, start, end, accession, form, filed,
+                                      document=row.get("document"), locator=row.get("locator"))
 
 
 def other_units(payload: dict, concept: Concept) -> list[str]:
@@ -124,6 +142,20 @@ def reporting_unit(payload: dict, concept: Concept) -> str:
             if shape.fullmatch(unit):
                 counts[unit] = counts.get(unit, 0) + sum(1 for r in rows if r.get("form") in ANNUAL_FORMS)
     return max(counts, key=lambda u: (counts[u], u == concept.unit)) if counts else concept.unit
+
+
+def unread_annual_filing(payload: dict, cutoff: datetime) -> Fact | None:
+    """The newest annual cover count whose filing gave companyfacts no revenue, net income or cash flow (TSMC's FY2025
+    20-F: its cover is there, its IFRS statements are not), else None. Amendments often carry only a cover, so skip them."""
+    covers = [f for _, _, f in _rows(payload, CONCEPTS["shares_outstanding"], cutoff)
+              if f.form in ANNUAL_FORMS and not f.form.endswith("/A")]
+    if not covers:
+        return None
+    newest = max(covers, key=lambda f: (f.filed, f.accession))
+    used = {str(row.get("accn")) for metric in FISCAL_YEAR_METRICS for tag in CONCEPTS[metric].tags
+            for rows in payload.get("facts", {}).get(tag.split(":")[0], {}).get(tag.split(":")[1], {})
+            .get("units", {}).values() for row in rows}
+    return None if newest.accession in used else newest
 
 
 def fiscal_year_ends(payload: dict, cutoff: datetime) -> set[date]:
@@ -185,7 +217,9 @@ def frame(sec, concept: Concept, year: int) -> dict[str, dict]:
     from .sec import cik10
 
     hits: dict[str, list[dict]] = {}
-    for tag in concept.tags:  # best tag first
+    # US GAAP tags only, best first: an IFRS filer's USD frame holds just its convenience translations at one rate,
+    # and each extra tag is another large download.
+    for tag in (t for t in concept.tags if t.startswith("us-gaap:")):
         taxonomy, name = tag.split(":")
         period = f"CY{year}" if concept.kind == "duration" else f"CY{year}Q4I"
         try:

@@ -1,11 +1,12 @@
-"""get_financials: multi-year annual fundamentals from SEC companyfacts, each value citable by ID."""
+"""get_financials: multi-year annual fundamentals from SEC companyfacts, each value citable by ID. A newest annual
+filing companyfacts holds only the cover of is read from its own inline XBRL instead (REFERENCE §5)."""
 from functools import partial
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from .. import config
-from ..data import companies, sec_facts
+from ..data import companies, filing_facts, sec_facts, sec_filings
 from ..data.sec import cik10
 from ..data.errors import DataError
 from . import fx_convert, share_basis
@@ -41,7 +42,31 @@ def _record(cik: str, name: str, fact, url: str) -> dict:
               "filing_url": f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{fact.accession.replace('-', '')}/"}
     if fact.original_value is not None:
         record.update(original_value=str(fact.original_value), original_accession=fact.original_accession)
+    if fact.document:
+        record.update(source_url=fact.document, locator=fact.locator, notes=[
+            "Read from the filing's own inline XBRL: SEC companyfacts has only this filing's cover."])
     return record
+
+
+def _fill_unread(context: ToolContext, cik: str, payload: dict) -> tuple[dict, str | None]:
+    """When companyfacts holds only the newest annual filing's cover (TSMC's FY2025 20-F), that filing's own inline
+    XBRL facts are added; plus a warning saying which happened."""
+    unread = sec_facts.unread_annual_filing(payload, context.cutoff)
+    if unread is None:
+        return payload, None
+    lacks = (f"The newest {unread.form} ({unread.accession}, filed {unread.filed}) has only its cover in SEC "
+             "companyfacts, none of its statements")
+    try:
+        filing = sec_filings.find(context.sec, cik, unread.accession)
+        if filing is None:
+            raise DataError(f"filing {unread.accession} is not in SEC's list", "not_found")
+        filled, added = filing_facts.merged(payload, context.sec, filing, context.cache("ixbrl_cache"))
+    except DataError as exc:
+        return payload, f"{lacks}, and reading the filing itself failed ({exc}), so its figures are missing here."
+    if not added:
+        return payload, f"{lacks}, and its inline XBRL has none of these figures either."
+    return filled, (f"{lacks}, so its figures here are read from the filing's own inline XBRL ({filing.url}); each such "
+                    "value's notes say so.")
 
 
 def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
@@ -49,16 +74,21 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
     response = context.sec.companyfacts(cik)
     payload = response.json()
     source = "SEC companyfacts"
-    if "us-gaap" not in sec_facts.taxonomies(payload):
-        kind = "IFRS (a foreign private issuer)" if "ifrs-full" in sec_facts.taxonomies(payload) else "no US GAAP taxonomy"
+    if not sec_facts.taxonomies(payload) & {"us-gaap", "ifrs-full"}:
         return ToolResult(status="unsupported", source=source, data={"cik": cik, "name": payload.get("entityName")},
-                          warnings=[f"{payload.get('entityName', cik)} reports under {kind}; only US GAAP fundamentals are supported."])
+                          warnings=[f"{payload.get('entityName', cik)} reports no US GAAP or IFRS financial statements "
+                                    "in companyfacts."])
     years = args.years or config.FINANCIALS_DEFAULT_YEARS
+    metrics, ids, warnings, converted, rates = {}, [], [], {}, []
+    if sec_facts.fiscal_year_ends(payload, context.cutoff):
+        filled, note = _fill_unread(context, cik, payload)
+        if filled is not payload:
+            payload, source = filled, source + "; SEC filing (inline XBRL)"
+        warnings += [note] if note else []
     year_ends = sec_facts.fiscal_year_ends(payload, context.cutoff)
     kept_ends = sorted(year_ends, reverse=True)[:years]
     oldest = min(kept_ends) if kept_ends else None
     financial = None  # looked up only if a metric is missing
-    metrics, ids, warnings, converted, rates = {}, [], [], {}, []
     pick = partial(_pick, payload, context, cik, response.url, year_ends, oldest, years)
     for name in args.metrics or list(sec_facts.CONCEPTS):
         concept = sec_facts.CONCEPTS[name]
@@ -82,6 +112,10 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
         if len(facts) > len(records):
             warnings.append(f"{name}: {len(facts) - len(records)} older values not shown; ask for more years to see them.")
         if not records:
+            if not {t.split(":")[0] for t in concept.tags} & (filed_in := sec_facts.taxonomies(payload) - {"dei", "srt"}):
+                metrics[name] = {"status": "unsupported", "reason": f"This filer reports under {', '.join(sorted(filed_in))}"
+                                 f", and {name} is read only from {', '.join(concept.tags)}."}
+                continue
             if financial is None:
                 financial = companies.profile(context.sec, cik)["financial_sector"]
             unsupported = financial and name in NOT_REPORTED_BY_FINANCIALS
@@ -122,8 +156,8 @@ def run(args: GetFinancialsInput, context: ToolContext) -> ToolResult:
     return ToolResult(status=status, data=data, ids=ids, source=source, warnings=warnings)
 
 
-TOOL = Tool("get_financials", "Annual financials from SEC filings (10-K), newest fiscal year first, as known at the "
-            "research cutoff: revenue, margins inputs, cash flow, capex, EPS, balance sheet and shares. Every value has "
-            "a fact ID to cite and to pass to calculate. Figures a foreign filer reports in another currency come converted "
+TOOL = Tool("get_financials", "Annual financials from SEC filings (10-K, 20-F, 40-F; US GAAP or IFRS), newest fiscal "
+            "year first, as known at the research cutoff: revenue, margins inputs, cash flow, capex, EPS, balance sheet "
+            "and shares. Every value has a fact ID to cite and to pass to calculate. Figures a foreign filer reports in another currency come converted "
             "to USD, each with its filed value, rate and rate source. A 20-F/40-F share count comes with ordinary_shares_per_ads from the "
-            "same filing's cover (calculate's ads_ratio for market cap).", GetFinancialsInput, run, "SEC companyfacts")
+            "same filing (calculate's ads_ratio for market cap).", GetFinancialsInput, run, "SEC companyfacts")

@@ -165,7 +165,7 @@ def _same_window(rate: dict, start: str | None, end: str | None) -> None:
 
 def _market_cap(r: dict[str, dict], warnings: list[str]):
     """As-traded close x shares. A 20-F/40-F count is of ordinary shares, so the close of a US-listed share (often an
-    ADS) is first divided by the ordinary shares it stands for, read from the same filing's cover."""
+    ADS) is first divided by the ordinary shares it stands for, read from the same filing."""
     raw = _closes(r["prices"], "close")
     if not raw:
         raise Rejected(f"{r['prices']['id']} has no as-traded close.")
@@ -183,8 +183,8 @@ def _market_cap(r: dict[str, dict], warnings: list[str]):
                            f"{shares.get('accession')}; use the {ADS_RATIO_METRIC} fact from the share count's filing.")
         per_listed = _number(ratio)
         notes = [f"As-traded close of a US-listed share on {last} / {ratio['value']} ordinary shares per listed share "
-                 f"x {shares['value']} ordinary shares outstanding on {shares_end}; the ratio is from the cover of the "
-                 f"same {form} ({shares.get('accession')}): \"{ratio.get('title')}\"."]
+                 f"x {shares['value']} ordinary shares outstanding on {shares_end}; the ratio is from the same {form} "
+                 f"({shares.get('accession')}): \"{ratio.get('title')}\"."]
         filed = date.fromisoformat(shares["filed"])
         if (day - filed).days > config.SHARE_FILING_MAX_AGE_DAYS:
             notes.append(f"The share count and ADS ratio come from a {form} filed {filed}, more than a year before "

@@ -5,10 +5,10 @@ from decimal import Decimal
 
 import httpx
 import pytest
-from fx_rates import Frankfurter
+from fx_rates import Frankfurter, Fred
 from sec_files import FIXTURES, SecFiles, make_context
 
-from research_assistant.data import fx_frankfurter
+from research_assistant.data import fx_frankfurter, macro_fred
 from research_assistant.tools.get_financials import GetFinancialsInput, run
 
 APPLE_FACTS = "/api/xbrl/companyfacts/CIK0000320193.json"
@@ -128,9 +128,104 @@ def test_bank_operating_income_is_unsupported_but_revenue_works(tmp_path):
     assert values(result, "revenue")[0][0] == "2025-12-31"
 
 
-def test_ifrs_filer_is_unsupported(tmp_path):
-    result, _ = financials(tmp_path, cik="1046179")
-    assert result.status == "unsupported" and "IFRS" in result.warnings[0]
+TSM = "1046179"
+TSM_FACTS = "/api/xbrl/companyfacts/CIK0001046179.json"
+
+
+@pytest.fixture
+def fred(monkeypatch):
+    """FRED H.10 keyed and mocked at 32 TWD per dollar."""
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+    mock = Fred({"DEXTAUS": lambda day: 32.0})
+    monkeypatch.setattr(macro_fred, "transport", httpx.MockTransport(mock))
+    monkeypatch.setattr(macro_fred.LIMITER, "wait", lambda: None)
+    return mock
+
+
+TSM_20F = "/Archives/edgar/data/1046179/000162828026025362/tsm-20251231.htm"
+def unreadable_20f() -> SecFiles:
+    """companyfacts' IFRS rows only (FY2024 and before): the FY2025 20-F itself can't be fetched."""
+    return SecFiles({TSM_20F: httpx.Response(404)})
+
+
+def test_an_ifrs_filer_converts_twd_at_fred_rates(tmp_path, fred):
+    result, context = financials(tmp_path, cik=TSM, metrics=["revenue", "net_income", "total_assets", "eps_diluted"],
+                                 years=1, files=unreadable_20f())
+    assert result.status == "ok"
+    revenue = result.data["metrics"]["revenue"]["values"][0]
+    assert (revenue["tag"], revenue["end"], revenue["form"]) == ("ifrs-full:Revenue", "2024-12-31", "20-F")
+    assert (revenue["reported_value"], revenue["reported_unit"], revenue["fx_rate"]) == ("2894307700000", "TWD", "32.000000")
+    assert revenue["value"] == str((Decimal(2894307700000) / 32).quantize(Decimal(1)))
+    assert revenue["fx_source"] == "FRED H.10 (Federal Reserve)" and revenue["fx_url"].endswith("/DEXTAUS")
+    income = result.data["metrics"]["net_income"]["values"][0]
+    assert income["tag"] == "ifrs-full:ProfitLossAttributableToOwnersOfParent"  # owners' share, as NetIncomeLoss
+    assert result.data["metrics"]["eps_diluted"]["values"][0]["value"] == "1.3959"  # 44.67 TWD / 32
+    assert context.records[revenue["id"]]["unit"] == "USD" and revenue["id"] in result.ids
+    assert result.source == "SEC companyfacts; exchange rates: FRED H.10 (Federal Reserve)"
+    assert any(w.startswith("Converted to USD from TWD at FRED H.10") for w in result.warnings)
+
+
+def test_a_filing_with_only_its_cover_in_companyfacts_is_read_from_its_ixbrl(tmp_path, fred):
+    # TSMC's FY2025 20-F gave companyfacts its cover count but none of its IFRS statements.
+    result, context = financials(tmp_path, cik=TSM, metrics=["revenue", "net_income"], years=2)
+    assert result.status == "ok" and result.source.startswith("SEC companyfacts; SEC filing (inline XBRL);")
+    assert result.warnings[0] == (
+        "The newest 20-F (0001628280-26-025362, filed 2026-04-16) has only its cover in SEC companyfacts, none of its "
+        "statements, so its figures here are read from the filing's own inline XBRL (https://www.sec.gov" + TSM_20F +
+        "); each such value's notes say so.")
+    latest, before = result.data["metrics"]["revenue"]["values"]
+    # Its NET REVENUE row uses the IFRS 15 tag; the year before comes from the same 20-F's comparative column.
+    assert (latest["end"], latest["reported_value"], latest["tag"]) == (
+        "2025-12-31", "3809054300000", "ifrs-full:RevenueFromContractsWithCustomers")
+    assert latest["accession"] == before["accession"] == "0001628280-26-025362" and before["end"] == "2024-12-31"
+    assert latest["notes"][0].startswith("Read from the filing's own inline XBRL") and latest["locator"].startswith("#")
+    assert context.records[latest["id"]]["source_url"] == "https://www.sec.gov" + TSM_20F
+    assert result.data["metrics"]["net_income"]["values"][0]["reported_value"] == "1697604000000"
+    assert not any("restated" in w for w in result.warnings)  # FY2024 is the same in both 20-Fs
+    apple, _ = financials(tmp_path / "aapl", metrics=["revenue"], years=1)
+    assert not any("only its cover" in w for w in apple.warnings) and apple.source == "SEC companyfacts"
+
+
+def test_without_a_fred_key_twd_is_unsupported_and_says_why(tmp_path):
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    del payload["facts"]["ifrs-full"]["Assets"]["units"]["USD"]
+    files = SecFiles({TSM_FACTS: httpx.Response(200, json=payload), TSM_20F: httpx.Response(404)})
+    result, _ = financials(tmp_path, cik=TSM, metrics=["revenue", "total_assets"], years=1, files=files)
+    assets = result.data["metrics"]["total_assets"]
+    assert assets["status"] == "unsupported" and assets["reason"].startswith("Reported in TWD, not USD")
+    assert "Frankfurter" not in assets["reason"] and "FRED_API_KEY" in assets["reason"]  # the ECB has no TWD
+    assert values(result, "revenue") == [("2024-12-31", "88268000000")]  # the 20-F's own convenience translation
+    assert any(w.startswith("revenue: no TWD exchange rate") for w in result.warnings)
+    # The FY2025 20-F couldn't be read, so its figures are missing and the warning says why.
+    assert "reading the filing itself failed" in result.warnings[0]
+
+
+def test_ifrs_long_term_debt_is_unsupported_not_read_from_bank_loans(tmp_path):
+    # TSMC tags LongtermBorrowings (bank loans) and its far larger bonds apart; IFRS has no total to read.
+    result, _ = financials(tmp_path, cik=TSM, metrics=["long_term_debt"])
+    debt = result.data["metrics"]["long_term_debt"]
+    assert result.status == "unsupported" and debt["status"] == "unsupported"
+    assert debt["reason"] == ("This filer reports under ifrs-full, and long_term_debt is read only from "
+                              "us-gaap:LongTermDebt, us-gaap:LongTermDebtNoncurrent.")
+
+
+def test_tsmc_share_count_comes_with_five_from_its_filings_text(tmp_path):
+    result, context = financials(tmp_path, cik=TSM, metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    (ratio,) = result.data["metrics"]["ordinary_shares_per_ads"]["values"]
+    assert shares["value"] == "25932524521" and ratio["accession"] == shares["accession"] == "0001628280-26-025362"
+    assert ratio["value"] == "5" and ratio["tag"] == "filing text"
+    assert ratio["notes"] == ["The cover gives no ratio, so it is read from the filing's text, the only ratio it "
+                              "states: \"each ADS represents five (5) common shares\"."]
+    assert context.records[ratio["id"]]["unit"] == "shares/ADS"
+
+
+def test_a_filer_with_neither_us_gaap_nor_ifrs_is_unsupported(tmp_path):
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    del payload["facts"]["ifrs-full"]
+    files = SecFiles({TSM_FACTS: httpx.Response(200, json=payload)})
+    result, _ = financials(tmp_path, cik=TSM, files=files)
+    assert result.status == "unsupported" and "no US GAAP or IFRS" in result.warnings[0]
 
 
 def test_missing_metric_is_not_reported_with_the_tags_tried(tmp_path):

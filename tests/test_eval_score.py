@@ -204,6 +204,18 @@ def test_a_value_of_another_metric_never_counts():
     assert score.judge(CASE["gold"][1], 320193, [GROWTH], income)["outcome"] == "missing"
 
 
+def test_gold_in_the_filed_currency_matches_a_converted_figures_filed_value():
+    # TSMC's 2023 revenue: gold in NT$ millions, the record converted to USD and keeping the NT$ it was filed in.
+    gold = {"name": "net_revenue_2023", "metric": "revenue", "value": 2161735.8, "unit": "TWD millions",
+            "fiscal_period": "FY2023", "period_end": date(2023, 12, 31)}
+    tsm = {"id": "fact-tsm", "kind": "fact", "cik": "0001046179", "metric": "revenue", "unit": "USD",
+           "value": "69381000000", "reported_value": "2161735800000", "reported_unit": "TWD",
+           "start": "2023-01-01", "end": "2023-12-31"}
+    assert score.judge(gold, 1046179, [tsm], {"fact-tsm": tsm})["outcome"] == "correct"
+    dollars = {**gold, "value": 2161735.8, "unit": "USD millions"}  # the NT$ number labelled as dollars
+    assert score.judge(dollars, 1046179, [tsm], {"fact-tsm": tsm})["outcome"] == "missing"
+
+
 def test_an_interim_value_is_not_the_annual_gold():
     judged = score.judge(CASE["gold"][0], 320193, [{**FY25, "start": "2025-06-29"}], RECORDS)
     assert judged["outcome"] == "needs review" and "interim" in judged["note"]

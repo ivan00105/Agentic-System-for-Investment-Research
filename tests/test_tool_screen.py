@@ -26,6 +26,14 @@ def test_filters_rank_and_counts(tmp_path):
     assert "restated, not point-in-time" in result.warnings[0]
 
 
+def test_frames_read_us_gaap_tags_only(tmp_path):
+    # An IFRS filer's USD frame holds only convenience translations, so ifrs-full tags are never fetched.
+    files = SecFiles()
+    screen(tmp_path, files, universe=UNIVERSE, year=2024, rank_by="revenue")
+    frames = [p for p in files.paths if p.startswith("/api/xbrl/frames/")]
+    assert frames and all(p.startswith("/api/xbrl/frames/us-gaap/") for p in frames)
+
+
 def test_ties_break_on_cik_not_name(tmp_path):
     path = "/api/xbrl/frames/us-gaap/NetIncomeLoss/USD/CY2024.json"
     frame = json.loads((FIXTURES / "frame_NetIncomeLoss_CY2024.json").read_text())

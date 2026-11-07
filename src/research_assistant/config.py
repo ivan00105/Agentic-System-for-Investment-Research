@@ -61,6 +61,9 @@ FINANCIALS_DEFAULT_YEARS = 5
 # A 20-F cover without inline XBRL names its ADS ratio in the Section 12(b) row, right after "American
 # Depositary Shares"; a ratio further away than this belongs to another row, so it isn't used.
 COVER_RATIO_WINDOW_CHARS = 300
+# When the cover gives no ratio, a sentence in the filing can ("ADSs (each ADS represents five (5) common shares)",
+# TSMC). It counts only if it names the ADS itself or this close after a mention, so an RSA's "each represents" doesn't.
+FILING_RATIO_LOOKBACK_CHARS = 80
 
 # Filings returned per list_filings call. More are counted in a warning; the agent narrows with
 # `forms` or `since`, or pages with `before`.

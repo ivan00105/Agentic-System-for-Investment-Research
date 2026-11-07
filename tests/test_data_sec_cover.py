@@ -64,11 +64,38 @@ def test_without_the_tag_the_cover_text_is_read():
     assert found["basis"] == "American Depositary Shares, each representing two ordinary shares"
 
 
+FOOTNOTE = ("* TSM New York Stock Exchange * Not for trading, but only in connection with the listing of American "
+            "Depositary Shares representing such Common Shares.")
+
+
 def test_a_listed_class_that_trades_as_ads_without_a_ratio_is_a_problem():
     # TSMC's cover tags only "Common Shares"; a footnote says they trade as ADSs, with no ratio.
-    found = cover(title("Common Shares") + "* TSM New York Stock Exchange * Not for trading, but only in connection "
-                  "with the listing of American Depositary Shares representing such Common Shares.")
+    found = cover(title("Common Shares") + FOOTNOTE)
     assert found["ratio"] is None and "mentions American depositary shares" in found["problem"]
+    assert found["problem"].endswith("the filing's text states none.")
+
+
+def test_tsmc_cover_leaves_the_ratio_to_the_filings_text():
+    # TSMC's FY2025 20-F gives the ratio once, in an Item 6 footnote.
+    found = sec_cover._read(Document((FIXTURES / "tsm-20251231.htm").read_bytes()))
+    assert found["ratio"] == "5/1" and found["how"] == "filing text" and found["problem"] is None
+    assert found["basis"] == "each ADS represents five (5) common shares"
+    assert found["shares"] == [{"tagged": "25,932,524,521", "shown": None}]
+
+
+def test_a_ratio_in_the_text_counts_only_next_to_an_ads():
+    near = cover(title("Common Shares") + FOOTNOTE + " American Depositary Shares (ADSs), each representing five "
+                 "common shares, trade in New York.")
+    assert near["ratio"] == "5/1" and near["basis"].startswith("ADSs), each representing five common shares")
+    far = cover(title("Common Shares") + FOOTNOTE + " " + "Directors hold restricted stock awards. " * 3
+                + "Each RSA represents one common share.")
+    assert far["ratio"] is None and far["problem"].endswith("states none.")
+
+
+def test_ratios_the_text_disagrees_on_are_a_problem():
+    found = cover(title("Common Shares") + FOOTNOTE + " Until 2019 each ADS represents one share; now each ADS "
+                  "represents eight ordinary shares.")
+    assert found["ratio"] is None and "states more than one" in found["problem"]
 
 
 def test_two_depositary_classes_or_an_unreadable_one_are_problems():

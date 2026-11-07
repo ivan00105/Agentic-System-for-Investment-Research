@@ -12,7 +12,8 @@ The rules, simple on purpose:
   tolerance and has the same period end and kind (annual, interim or a balance; a kind that can't be told needs
   review). Tolerance: the case's `tolerance`,
   else half a unit in the gold's last digit (1577 -> 0.5). The gold's unit converts to the record's ("USD millions"
-  -> USD x 10^6, "percent" -> ratio / 100). A metric is a get_financials metric (revenue), its growth or CAGR
+  -> USD x 10^6, "percent" -> ratio / 100); gold in a filing's own currency ("TWD millions") checks a converted
+  figure's filed value. A metric is a get_financials metric (revenue), its growth or CAGR
   (revenue_growth), a ratio of two (operating_income_to_revenue) or another calculate formula (fcf); a metric no tool
   measures (cost_of_goods_sold), or a gold item without one, needs review.
 - The right size with the other sign, the right value for another period end or kind, or a match whose company
@@ -164,11 +165,13 @@ def judge(item: dict, cik: int | None, numbers: list[dict], records: dict[str, d
     gold, slack = Decimal(str(item["value"])) * scale, tolerance(item) * scale
     kind, near = gold_kind(item), None
     for record in numbers:
-        if record.get("unit") != unit or measure(record, records) != item["metric"]:
+        # A figure converted to USD keeps its filed value, so gold in the filing's currency (TSMC's TWD) checks that.
+        filed = record.get("reported_unit") == unit and record.get("reported_value") is not None
+        if (record.get("unit") != unit and not filed) or measure(record, records) != item["metric"]:
             continue  # total assets never count as revenue, whatever the value
         if record.get("cik") and cik and int(record["cik"]) != cik:
             continue
-        value = Decimal(str(record["value"]))
+        value = Decimal(str(record["reported_value"] if filed else record["value"]))
         if abs(value - gold) <= slack:
             found = period_kind(record, records)
             if record.get("end") != str(item["period_end"]):
