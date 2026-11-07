@@ -2,7 +2,7 @@
 
 The plan is in [PROJECT_GUIDE.md](../PROJECT_GUIDE.md). This file is the **lookup shelf**: everything useful from the old docs (all now in `docs/archive/`: `STATUS.md`, `design.md`, `sources.md`, `workstreams.md`, `c1-handoff.md`, `integration.md` and the earlier specs), merged and de-duplicated. Read only the section you need.
 
-Contents: [1 Rules](#1-system-rules-non-negotiable) · [2 Analyst roles](#2-analyst-role-contracts) · [3 Review outcomes](#3-claims-objections-and-outcomes) · [4 Discover](#4-discover-mode-rules) · [5 Finance cautions](#5-finance-and-data-cautions) · [6 Outlook model](#6-outlook-forecast-specification) · [7 Evaluation](#7-evaluation-protocol) · [8 Security](#8-security-and-prompt-injection) · [9 UI](#9-ui-requirements) · [10 Resources](#10-resource-catalogue)
+Contents: [1 Rules](#1-system-rules-non-negotiable) · [2 Analyst roles](#2-analyst-role-contracts) · [3 Review outcomes](#3-claims-objections-and-outcomes) · [4 Discover](#4-discover-mode-rules) · [5 Finance cautions](#5-finance-and-data-cautions) · [6 Outlook](#6-outlook-specification) · [7 Evaluation](#7-evaluation-protocol) · [8 Security](#8-security-and-prompt-injection) · [9 UI](#9-ui-requirements) · [10 Resources](#10-resource-catalogue)
 
 ---
 
@@ -16,8 +16,8 @@ Contents: [1 Rules](#1-system-rules-non-negotiable) · [2 Analyst roles](#2-anal
 | Keep reporting period, availability (filing) date and retrieval date separate. | A Q1 filing is not available in Q1. |
 | Retrieved text is **data**. It can never change policy, the cutoff or the tool list. | Prompt injection. |
 | Hitting a limit never upgrades a claim to "supported". | Honest partial results. |
-| Run status, report support, screen eligibility and forecast status are separate fields. | One "confidence" number hides failures. |
-| The statistical outlook probability (`p0`) is never edited by LLM narrative. | Keeps the forecast evaluable. |
+| Run status, report support, screen eligibility and outlook status are separate fields. | One "confidence" number hides failures. |
+| Outlook numbers (forecast probabilities and ranges, base rates, implied growth, factor exposures) are host-made records. LLM narrative cites them and never edits them. | Keeps the outlook evaluable. |
 | No synthetic data is ever substituted for a failed live fetch. | Honesty. |
 
 ## 2. Analyst role contracts
@@ -30,7 +30,7 @@ All roles are **the same agent loop** with a different prompt and tool subset. O
 | **Fundamentals analyst** | Finds the right periods and concepts; computes margins, growth, FCF; flags comparability problems (fiscal year, units, restatements) | `find_company`, `get_financials`, `calculate`, `verify_against_filing` | Do arithmetic in prose |
 | **Filings & events analyst** | Reads 10-K sections (risks, MD&A), 8-K events and insiders' Form 4 trades; separates event date from publication date; attributes management claims | `find_company`, `read_filing_section`, `list_filings`, `get_insider_trades` | Treat management claims as established fact |
 | **Market & valuation analyst** | Price history, returns, volatility, drawdown, Sharpe ratio, valuation ratios, returns against peers and the sector ETF; rates and macro release dates as context | `find_company`, `get_prices`, `get_financials`, `calculate`, `get_macro`, `get_peers` | Present adjusted historical prices as tradable prices |
-| **Outlook model** (not an LLM) | Statistical probability of beating SPY over the horizon | `get_outlook` | Be changed by narrative |
+| **Outlook** (not an LLM, §6) | Risk, business and direction forecasts, implied growth and factor exposures, each a record with its track record | `get_outlook`, `get_base_rates`, `get_factor_exposures`, `calculate` (`implied_growth`) | Be changed by narrative |
 | **Critic** | Returns zero or more objections, each tied to a claim version, with an issue type and a requested check | read-only tools + `verify_against_filing` | Be bearish by default, edit evidence, or close an objection by agreeing |
 
 The action trace saves short rationales, not chain-of-thought. A repeated action with no new inputs is skipped (action fingerprint).
@@ -110,22 +110,59 @@ Tool lists are enforced (`agents/roles.py`): the loop answers a call to any othe
 - A valid JSON schema, or two models agreeing, is not evidence a claim is supported.
 - A timed-out API call may still be billed.
 
-## 6. Outlook (forecast) specification
+## 6. Outlook specification
 
-**Parked.** This is the original design, kept so it isn't lost. Revisit it when Phase 6 starts; don't build it before the core agent works.
+**Decided 8 Nov 2026: the outlook forecasts what can be forecast, each with its track record.** It leads with how much the stock may move (risk forecast), how often companies like it kept growing (business forecast) and what today's price already assumes; the direction forecast comes last, with its measured skill. Quant analysis (factor exposures, a strategy lab, shortlist risk) sits beside it. Every number is a host-made record that narrative never edits (§1). Each is tested: on history when a statistical model makes it, live (saved before the outcome) when it doesn't. Build order: PROJECT_GUIDE Phase 6. The first spec (one probability of beating SPY from a logistic regression on price features) is now just the direction forecast.
 
-| Item | Spec |
-|---|---|
-| Target | P(stock total return − SPY total return > 0) over **20 trading sessions** |
-| Timing | Cutoff 17:00 New York on a trading day. Anchor = next session close. End = 20 sessions later. A prediction issued after the anchor is "missed". |
-| Label | 1 if excess return > 0; ties = 0; unmeasurable = unresolved |
-| Model | Pooled, regularized logistic regression on price features: 5/20/60-session returns, SPY-relative returns, 20-session volatility, distance from moving average, volume ratio. No ticker-ID features. |
-| Baselines | 0.5 and the training-period base rate |
-| Splits | By date across all stocks; expanding-window validation; purge labels that cross a split; calibrate on a separate earlier block |
-| Scores | Brier (primary), log loss, reliability plot with bin counts, date-block bootstrap intervals |
-| Records | Immutable `p0` + model, feature and data versions. An append-only prospective log, with outcomes added later. |
+**Why direction doesn't lead.** Scratch probes on 4-8 Nov 2026 used throwaway scripts (not in the repo), Yahoo adjusted closes of today's `sp500_tech` members against SPY over 2010-2026, so they are survivorship-biased:
 
-**Expectation:** short-horizon price direction is close to a coin flip, so matching the base rate is a normal result. Report it honestly.
+| Horizon (sessions) | Independent windows | Base rate (beat SPY) | 12-1 momentum, AUC | EWMA 80% range caught |
+|---|---|---|---|---|
+| 1 | 4,232 | 50.2% | 0.510 ± 0.004 | 84.5% |
+| 5 | 846 | 51.1% | 0.511 ± 0.008 | 81.8% |
+| 20 | 211 | 51.9% | 0.512 ± 0.016 | 78.4% |
+| 63 | 67 | 52.5% | 0.499 ± 0.020 | 77.0% |
+| 252 | 16 | 54.0% | 0.475 ± 0.044 | 75.5% |
+
+- Outcomes move together: on one date the share of stocks beating SPY ran from 20% to 78%, so 20 sessions give about 211 independent dates, not 20,000 rows. The base rate climbs with the horizon because survivors compound.
+- A three-way rating by thirds of the universe, from momentum, put 35.4% ± 1.4% of its calls in the right third (33.3% by chance); the top-minus-bottom gap was +0.45% ± 0.68% per 20 sessions. Momentum's rank correlation with the next 20 sessions' excess return was 0.012.
+- Risk is predictable: EWMA volatility and the next 20 sessions' realised volatility had a rank correlation of 0.59. The chance of trailing SPY by more than 10% rose from 3.1% for the calmest fifth to 14.8% for the most volatile fifth. A constant range caught 62-93% depending on the year, EWMA 76-81%. In the 19 windows where SPY fell more than 5%, a beta-scaled 80% range caught 76%.
+- So are fundamentals. On the 82 companies in the SEC cache (first-reported 10-K values), base rates learned on years up to 2016 predicted P(next-year revenue growth above 10%) on 2017 on with Brier skill +11.5% against one rate; the buckets said 59, 70 and 76% and came true 60, 71 and 77% of the time. Low-growth buckets were too pessimistic (said 24-26%, came true 32-37%), a shift in era the test shows. The lowest-margin fifth raised its margin the next year 69% of the time (skill +2.3%).
+- The research agrees ([§10](#outlook-evidence-papers)): even 920 signals explain about 0.4% of a month's stock returns (Gu, Kelly & Xiu 2020); growth barely persists (Chan, Karceski & Lakonishok 2003) and profitability reverts about 38% a year (Fama & French 2000).
+
+**Parts**
+
+| Part | What it says | Method | Test | Can't claim |
+|---|---|---|---|---|
+| **Business forecast, the outside view** (`get_base_rates`) | Next-year spread (10th, 50th, 90th percentile) of revenue growth and operating-margin change for comparable company-years, and the chance above a few thresholds | Counts over every SEC filer above a revenue floor each year, dead and acquired ones included, from first-reported 10-K values filed by the cutoff; buckets by size and by starting growth or margin (the *Base Rate Book* method) | Walk-forward by year: Brier skill against one base rate, reliability by bucket with counts, how often the 10-90% band holds; bootstrap by year | Nothing about this company's own plans; XBRL starts in 2009-2011, so about 15 years; a new era shifts the rates |
+| **What's priced in** (`calculate` `implied_growth`) | The yearly revenue growth over 10 years that today's market cap needs, and how many comparable companies achieved it | Reverse DCF (*Expectations Investing*): free cash flow = revenue × margin × (1 − reinvestment rate), discounted at the T-bill (`get_macro`) plus beta × Damodaran's equity risk premium, terminal growth below the discount rate; a sensitivity table over margin and discount rate | Only the "how rare" part, through the outside view | Not a fair value or a price target; every assumption is shown |
+| **Risk forecast** (`get_outlook`) | 80% range of the return against SPY and of the stock's own return; chance of trailing SPY by more than 10%; over 5 and 20 sessions. Beta from down days only; the stock's moves in past selloffs | HAR volatility (Corsi 2009) on daily excess returns; quantiles from the stock's own standardised moves (fat tails); an earnings jump from past results-day moves when results fall in the window; adaptive conformal inference (Gibbs & Candès 2021) to hold coverage | Walk-forward coverage (Kupiec's count test, Christoffersen's clustering test), interval score against EWMA and a constant range; split by year, by earnings in the window and by VIX level | Not a direction call; ranges miss crashes more than calm days |
+| **Events and the market's view** | Next earnings date, ex-dividend date, typical results-day move; the range today's option prices imply | Finnhub, else yfinance calendars; yfinance option chains (today only) | Results-day move against later results; ours against the implied range, live | Dates move: store when each was seen |
+| **Direction forecast** (in `get_outlook`) | P(beat SPY) over 5 and 20 sessions, next to the base rate ("N of 100 comparable windows") and the model's own skill | Regularised logistic regression pooled over companies (no ticker IDs) on a few price features: past returns against SPY over 5, 20 and 60 sessions and 12-1 months, volatility, distance from a moving average | Walk-forward Brier skill against the base rate, AUC, reliability with counts. While skill is under 1% or its interval includes 0, the words say "no reliable edge" and the numbers sit in Details | Not a buy or sell call; beating SPY isn't profit or alpha (§5) |
+| **Factor exposures** (`get_factor_exposures`) | The stock's betas to the market, size, value, profitability, investment and momentum, in plain words ("moves like a large, profitable growth stock") | Regression of daily excess returns over 1-3 years on the Ken French five factors plus momentum (built from CRSP, so survivorship-free) | Out-of-sample: how much of next year's daily returns last year's betas explain (R²) | A description of how it moved, not why it will move |
+| **Strategy lab** | Value, momentum, profitability, investment, size and low volatility as strategies: long-run and last-10-year returns, worst drawdown, losing years, the drop after publication; which ones this stock leans toward | Ken French factor and sorted portfolios (variance sorts for low volatility); McLean & Pontiff 2016 for the decay | The figures are history; nothing is fitted, so nothing to overfit | No trades, no rules searched for the best backtest; past premiums can vanish |
+| **Shortlist risk** (Discover, Compare) | The picks' correlations, an equal-weight basket's volatility against its parts, the basket in past selloffs | Daily returns from `get_prices`, the same window for every pick | Coverage of the basket's 80% range, as for the risk forecast | Not portfolio optimisation: no weights chosen |
+| **Filing-change alerts** (second stage) | How much of Item 1A and Item 7 is new against last year's 10-K, and what changed | Cosine similarity of section text, as in "Lazy Prices" (Cohen, Malloy & Nguyen 2020); the filings analyst explains the change with citations | Walk-forward by filing date: later returns and earnings changes, changers against non-changers | Published effects lose about 58% after publication (McLean & Pontiff 2016) |
+| **Rating and screen backtests** (only with WRDS) | Leans above / No clear edge / Leans below SPY; and how the user's Discover screen would have done had its passes been bought each year | A score from many published signals (Open Source Asset Pricing) and the screen's rules on survivorship-free CRSP prices, with first-reported fundamentals | Rating: rank correlation with later returns (IC) by month, ranked probability score against "a third each". Screen: returns against SPY with costs stated, bootstrap by year, the number of screens tried | Without survivorship-free prices neither is shown: Yahoo has no prices for companies that later failed |
+
+**Timing, records and tests** (every part)
+- **Cutoff and windows:** a day's close counts from `PRICE_CLOSE_AVAILABLE_HOUR` (18:00 New York). Anchor = the next session's close; end = 5 or 20 sessions later on the XNYS calendar (`exchange_calendars`). A record saved after its anchor is "missed", never moved.
+- **Returns:** dividend-adjusted closes, the stock and SPY from the same provider (§10 provider rule 6). Ties count as 0; an unmeasurable window (delisted, missing close) is unresolved, never 0.
+- **Records:** values, the IDs of their inputs, model and data versions, issue time. Immutable. Outcomes go in a separate file. The live log is append-only and each line carries the hash of the one before.
+- **Splits:** by date across all companies; training rows whose window crosses the test start are dropped (purge); calibration uses an earlier block than the test; one final period stays untouched until the model is frozen. Every configuration tried goes in a trial log and is counted in the results (PBO, Deflated Sharpe in §10).
+- **Uncertainty:** bootstrap by date block or year, never by row.
+- **Status:** available, unavailable (with the reason), missed, pending or resolved, kept apart from report support (§1).
+
+**Horizons:** 5 and 20 sessions for the risk and direction forecasts. One session only for results-day moves. No hourly forecasts: Yahoo keeps 730 days of hourly bars and 8 days of minute bars, and any edge is below trading costs. No yearly price forecast: 16 independent windows, where survivorship bias is worst. The outside view is yearly because fundamentals are.
+
+**Showing it** (§9)
+- **Simple view:** counts, not percentages ("52 of 100 comparable windows"), with icons for a chance ("15 of 100 dots"). Fixed words for chances, adapted from the IPCC scale: very unlikely below 10%, unlikely 10-33%, about as likely as not 33-66%, likely 66-90%, very likely above 90%. So words never sound surer than the number.
+- **Details view:** error bars, the reliability plot with counts, coverage by year, the exact target and window, and a model card (sample, period, survivorship note, data source, version, number of trials).
+- **Always:** "statistical, not advice", backtests labelled "hypothetical", and other people's views (analyst consensus, the option-implied range) labelled with their source and date.
+
+**LLM-based predictions** are tested only live. An LLM already knows what happened after a historical date, and telling it to ignore that doesn't work (§5, §10 papers). Optional later: log the agent's stated view next to the statistical records and the analyst consensus, scored the same way, and call it a pilot until many windows have resolved.
+
+**Not built, on purpose:** a "buy" signal, or a rating or screen backtest on survivor-only data (coin-flip skill, biased history, reads as advice); trade execution and portfolio optimisation (out of scope); searching many rules or factors for the best backtest (every extra trial inflates the best result, §5); hourly or yearly price forecasts (above); probabilities stated by an LLM (overconfident and untestable on history); ready-made forecasting models such as Chronos, TimesFM and Kronos (negative R² on daily returns as-is, and their training data covers our test years); 8-K event averages presented as forecasts (every event differs and the spread swamps the average).
 
 ## 7. Evaluation protocol
 
@@ -198,9 +235,9 @@ How this was checked: the five awesome lists were read section by section, and e
 | Eval harness | **pytest + JSON** | LLM judge for triage only. [inspect_ai](https://pypi.org/project/inspect-ai/) later if needed. | — |
 | Eval cases | **Draw from public sets** | ~15 from the FinanceBench open sample (re-derive gold from SEC data: FinanceBench uses as-filed PDFs, companyfacts holds restated values). ~8–10 from the Vals Finance Agent public set that are answerable from 10-K/XBRL. ~5 FinRetrieval-style fiscal-period traps. The rest hand-built: injection, bank, foreign filer, unknown ticker, restatement. | Some Vals questions need web search; take only those our tools can answer |
 | MCP server (later) | **Adopt** the [`mcp` SDK](https://pypi.org/project/mcp/) v2 (MIT) | Pin the version: older tutorials use the v1 `FastMCP` API. | — |
-| Outlook (parked) | scikit-learn + exchange_calendars + Ken French CSV, as an `outlook` extra | Hand-roll purge and embargo; use [purgedcv](https://pypi.org/project/purgedcv/) (MIT, young) as a cross-check. | — |
+| Outlook (Phase 6, §6) | **Build** on numpy (already installed through yfinance; pin the installed `==2.5.4`) and **adopt** [`exchange_calendars`](https://github.com/gerrymanoim/exchange_calendars) `==4.13.2` for sessions (checked on PyPI 4 Nov 2026) | Base-rate counts, HAR by least squares, quantiles of standardised moves, the conformal update (~5 lines, [Gibbs & Candès 2021](https://arxiv.org/abs/2106.00170)), factor regressions and the logistic direction model are short. Hand-roll purge and embargo; [purgedcv](https://pypi.org/project/purgedcv/) 0.1.11, `arch` 8.0.0 (GARCH), MAPIE 1.6.0 (conformal) and scikit-learn 1.9.1 (calibration and Brier helpers) are dev-only cross-checks. Saved models are JSON, never pickle. Ken French CSVs and SEC companyfacts are cached on disk like other sources. | Restated values (use first-reported), XBRL only from 2009-2011, Yahoo history only for today's tickers |
 
-**Dependencies:** keep the core light, with no pandas or numpy before the Outlook. The exception is edgartools, which brings pandas and pyarrow. Accept that cost for section parsing, the hardest piece to hand-write.
+**Dependencies:** keep the core light. edgartools brings pandas and pyarrow; accept that cost for section parsing, the hardest piece to hand-write. The Outlook adds numpy, which yfinance already installs.
 
 **Supply chain:** pin every version. LiteLLM 1.82.7 and 1.82.8 on PyPI were credential stealers (24 Mar 2026, [incident note](https://docs.litellm.ai/blog/security-update-march-2026)).
 
@@ -237,7 +274,7 @@ Every kind of data has a few options, so nothing depends on one vendor. These ru
 | Short interest | **Next (6)**: crowded-short risk. Daily short-sale volume: **no**, mostly market makers hedging | **[FINRA API](https://developer.finra.org/)** `consolidatedShortInterest` (✓ no key; twice a month); [daily short-volume files](https://www.finra.org/finra-data/browse-catalog/short-sale-volume-data/daily-short-sale-volume-files) (from Aug 2018 ✓); SEC fails-to-deliver | — | S3, Ortex | Yes, if dated by publication (about two weeks after settlement) | FINRA |
 | Fund holdings (13F) | **Later**: needs CUSIP mapping; data is 45 days old | [SEC 13F data sets](https://www.sec.gov/dera/data/form-13f) (quarterly, from 2013 ✓) | — (Finnhub ownership is paid) | WhaleWisdom, Quiver, FactSet | Yes, 45 days late | — |
 | Activists and 5% holders (13D/G) | **Later**: quick win is listing them in `list_filings` | SEC EDGAR (XML since 18 Dec 2024 ✓) | — | sec-api | Yes | — |
-| Options, implied volatility | **Later**: the move priced in for results day | yfinance chains (today only); VIX via FRED `VIXCLS`; CBOE delayed JSON (Cloudflare-blocked ✓) | Market Data free (100 credits/day, 1 year, 24-hour delay ✓); Tradier (needs a brokerage account) | Cheap: Market Data Starter ($12 billed yearly, 5 years ✓). Paid: Massive options, ORATS, OptionMetrics via WRDS | Paid history only | — |
+| Options, implied volatility | **Phase 6**: the range and results-day move today's option prices imply, compared live with the risk forecast (yfinance on 5 Nov 2026: 22 Apple expiries with implied volatility) | yfinance chains (today only); VIX via FRED `VIXCLS`; CBOE delayed JSON (Cloudflare-blocked ✓) | Market Data free (100 credits/day, 1 year, 24-hour delay ✓); Tradier (needs a brokerage account) | Cheap: Market Data Starter ($12 billed yearly, 5 years ✓). Paid: Massive options, ORATS, OptionMetrics via WRDS | Paid history only | — |
 | Prediction markets | **Later**: macro context only (rate-cut odds); few single-stock markets. Read [Kalshi's](https://docs.kalshi.com/) data terms before storing | **[Polymarket](https://docs.polymarket.com/)** Gamma + `prices-history` (✓ no auth, minute data); **Kalshi** market data (✓ no key) | — | Aggregators (Dino.markets) | Yes (timestamped) | — |
 | Exchange rates | **In use** (`get_financials`, decided 7 Nov 2026): converts a foreign filer's figures (BABA's CNY, TSMC's IFRS figures in TWD) to USD, income and cash flow at the fiscal year's average daily rate and balances at the year-end rate (§5). A rate must reach within `FX_WINDOW_SLACK_DAYS` of both ends of its period, or the next provider is tried; the source is labelled, "(fallback)" when FRED was skipped. Setup page card "Exchange rates" | [Frankfurter](https://frankfurter.dev/) (✓ ECB reference rates crossed to USD, about 30 currencies including CNY and HKD, **not TWD**) | **FRED H.10** (22 currencies including TWD, e.g. `DEXCHUS`, `DEXTAUS`; the same `FRED_API_KEY` and client as macro) | — | Yes (rates aren't revised) | FRED H.10 if keyed → Frankfurter |
 | Commodities | **Later**: nearly free once FRED is in | FRED (WTI, Brent), [CFTC COT](https://publicreporting.cftc.gov/) (✓), yfinance futures | EIA, Alpha Vantage | Barchart | Yes | — |
@@ -246,7 +283,7 @@ Every kind of data has a few options, so nothing depends on one vendor. These ru
 | Wikipedia pageviews | **Later**: attention context, weak signal | [Wikimedia pageviews](https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/) (✓; daily from Jul 2015) | — | — | Yes | — |
 | Non-US markets (e.g. HKEX) | **Later**: outside the US-listed scope. HKEXnews: **no**, its [terms](https://www.hkex.com.hk/Global/Exchange/Terms-of-Use) ban scraping and text mining without written permission ✓ | yfinance (`0700.HK`); SEC 20-F/6-K (in use); [filings.xbrl.org](https://filings.xbrl.org/) (EU) | EDINET (Japan), DART (Korea), Companies House (UK) | Cheap: EODHD All World (~$20). Paid: EODHD fundamentals (~$60), HKEX licences | Varies | — |
 | Other asset classes as context | **Later** via FRED; crypto **no** unless asked | Treasury/FRED yields, [CoinGecko](https://docs.coingecko.com/) (✓), CFTC, VIX | CoinGecko demo key (30/min) | FINRA TRACE bonds, CME | Yes | — |
-| Factors | **Later** (Outlook, not wired) | **Ken French library** | — | — | Yes | Ken French |
+| Factors | **Phase 6**: factor exposures and the strategy lab (§6); five factors and momentum daily, sorted portfolios monthly; built from CRSP, so survivorship-free | **[Ken French library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)** (CRSP's new CIZ files from the January 2025 release, so older downloads differ slightly) | — | — | Yes | Ken French |
 | Other | **Later** | Credit-rating histories (SEC NRSRO XBRL), Federal Register, CourtListener (litigation, key) | — | Earnings-call transcripts (Finnhub, FMP) | — | — |
 | Politicians' trades | **No**: up to 45 days late, amounts as ranges, studies find no reliable edge; the law bans commercial use (5 U.S.C. §13107) | House Clerk PTRs, Senate eFD | Veridion, CongressInvests (unvetted) | Quiver (~$30), Unusual Whales, Finnhub | 45-day lag | — |
 | Social sentiment (Reddit, X, StockTwits) | **No**: closed or costly, bot-heavy, posts get deleted, not citable as fact | ApeWisdom Reddit counts (✓) | Reddit closed new API requests on 31 Oct 2026; StockTwits unclear | X pay-per-use (~$0.005 per post read) | No | — |
@@ -296,8 +333,8 @@ Sources read on 4 Nov 2026: [World Monitor](https://www.worldmonitor.app/docs/da
 | [EODHD](https://eodhd.com/pricing) | — | Skip | Free tier 1 year / 20 calls/day |
 | [Massive (Polygon)](https://massive.com/pricing) | — | Skip | Free tier 2 years, 5 calls/min, "adjusted" = splits only |
 | Stooq CSV, [pandas-datareader](https://github.com/pydata/pandas-datareader), Nasdaq Data Link | — | Skip | Stooq needs an API key since March 2026; Nasdaq's free WIKI set has been frozen since 2018 |
-| [Damodaran datasets](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html) | Equity risk premium, industry betas for an illustrative DCF | Later | Annual |
-| [exchange_calendars](https://github.com/gerrymanoim/exchange_calendars), [NYSE hours](https://www.nyse.com/markets/hours-calendars) | Trading-session maths for the outlook | Later (Outlook) | |
+| [Damodaran datasets](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html) | Equity risk premium (and industry betas) for the implied-growth reverse DCF | Phase 6 | Annual; state the year used |
+| [exchange_calendars](https://github.com/gerrymanoim/exchange_calendars), [NYSE hours](https://www.nyse.com/markets/hours-calendars) | Trading-session maths for the outlook (anchor and end sessions) | Phase 6 (`==4.13.2`) | [pandas_market_calendars](https://github.com/rsheftel/pandas_market_calendars) 5.6.0 does the same; one is enough |
 | [ML4T Data](https://github.com/ml4t/data) | Multi-feed download/storage helpers | Skip for now | No SEC; its Yahoo adapter returns adjusted prices without corporate actions |
 | [FRED/ALFRED](https://fred.stlouisfed.org/docs/api/fred/realtime_period.html) | Risk-free rate and macro context (`get_macro`) | **Now** (see [Data providers by kind](#data-providers-by-kind-options-and-order)) | Key needed; reads the vintage published on the cutoff day |
 | [OpenBB](https://github.com/openbq-org/OpenBB) ([licence](https://github.com/openbq-org/OpenBB/blob/develop/LICENSE); [old repo](https://github.com/OpenBB-finance/OpenBB); [wind-down note](https://openbb.co/blog/openbb-belongs-to-everyone/); [OpenBQ](https://openbq.org/)) | One SDK over many data providers | Later, if we need 3+ providers | Apache-2.0; project stewardship changed |
@@ -305,18 +342,54 @@ Sources read on 4 Nov 2026: [World Monitor](https://www.worldmonitor.app/docs/da
 ### Quant, factors and forecasting
 | Resource | Use for | When | Caveat |
 |---|---|---|---|
-| scikit-learn: [logistic regression](https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression), [calibration](https://scikit-learn.org/stable/modules/calibration.html), [TimeSeriesSplit](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html), [Brier](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.brier_score_loss.html) | Outlook model | Later (Outlook) | TimeSeriesSplit has `gap` but doesn't purge overlapping labels and isn't panel-aware. With under ~1,000 samples use sigmoid calibration. |
+| scikit-learn: [logistic regression](https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression), [calibration](https://scikit-learn.org/stable/modules/calibration.html), [TimeSeriesSplit](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html), [Brier](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.brier_score_loss.html) | Cross-checks for the direction forecast and the walk-forward tables | Phase 6 (dev-only, 1.9.1) | TimeSeriesSplit has `gap` but doesn't purge overlapping labels and isn't panel-aware. With under ~1,000 samples use sigmoid calibration. |
+| [HAR volatility](https://statmath.wu.ac.at/~hauser/LVs/FinEtricsQF/References/Corsi2009JFinEtrics_LMmodelRealizedVola.pdf) (Corsi 2009) | The risk forecast: next weeks' volatility from daily, weekly and monthly components, fitted by least squares | Phase 6 | Usually beats GARCH on realised volatility ([comparison](https://repository.essex.ac.uk/26581/1/An%20International%20Comparison%20of%20Implied%2C%20Realized%20and%20GARCH%20Volatility%20Forecasts.pdf)); fit on daily returns, not intraday |
+| [arch](https://github.com/bashtage/arch) 8.0.0 | GARCH as a rival to HAR and EWMA in the coverage table | Phase 6 (dev-only) | Moved out of "skipped": now on target |
+| [Adaptive conformal inference](https://arxiv.org/abs/2106.00170) (Gibbs & Candès 2021); [MAPIE](https://pypi.org/project/MAPIE/) 1.6.0 | Keeps an 80% range near 80% as markets change (one update per window) | Phase 6 (the update hand-written; MAPIE dev-only) | Long-run coverage only, not every window |
+| VaR coverage tests: Kupiec (count of misses), Christoffersen (misses clustering) ([overview](https://www.mathworks.com/help/risk/overview-of-var-backtesting.html)) | Testing the risk forecast's ranges | Phase 6 | Weak on small samples |
+| [Ranked probability score](https://climpred.readthedocs.io/en/latest/api/climpred.metrics._rps.html) | Scoring a three-way rating against "a third each" | With WRDS only | Depends on how the groups are defined |
+| [Tidy Finance](https://www.tidy-finance.org/) (Python) | Tested code for factor regressions, beta and momentum; a method check for the report | Ref | Its data chapters use WRDS |
+| [Open Source Asset Pricing](https://github.com/mk0417/open-asset-pricing-download) (`openassetpricing` 0.1.0) | About 200 published stock signals for a rating | With WRDS only | CRSP-linked signals need a WRDS account |
 | [SciPy bootstrap](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html) | Confidence intervals in the evaluation | **Now** (Phase 8) | Resample by case, not by claim |
 | Python [`statistics`](https://docs.python.org/3.12/library/statistics.html) | Volatility, beta (`linear_regression`), Sharpe, drawdown | **Now** | Stdlib, no pandas |
 | [QuantStats](https://github.com/ranaroussi/quantstats), [empyrical-reloaded](https://github.com/stefan-jansen/empyrical-reloaded) | Dev-only test oracles for our risk stats | **Now** (tests only) | Too heavy at runtime (QuantStats pulls matplotlib, seaborn, scipy, pandas) |
 | [TA-Lib](https://github.com/TA-Lib/ta-lib-python) | Technical indicators | Later, only if needed | Windows wheels now bundle the C library |
 | [purgedcv](https://pypi.org/project/purgedcv/), [statsmodels](https://pypi.org/project/statsmodels/) | Purged/embargoed CV cross-check; OLS with HAC errors | Later (Outlook) | purgedcv: MIT, one author, first release May 2026 |
-| [Fama–French data](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html) | Factor exposure, beta vs factors | Later | |
-| [Qlib](https://github.com/microsoft/qlib), [ML4T Engineer](https://github.com/ml4t/engineer) | Feature engineering for outlook experiments | Later | Bring your own data |
+| [Fama–French data](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html) | Factor exposures and the strategy lab | Phase 6 | Updated with a lag of about a month |
+| [Qlib](https://github.com/microsoft/qlib), [ML4T Engineer](https://github.com/ml4t/engineer) | Feature-engineering ideas | Ref | Bring your own data; no direction model beyond the simple one is planned (§6) |
 | [vnpy](https://github.com/vnpy/vnpy), [QUANTAXIS](https://github.com/yutiansut/QUANTAXIS) | Factor-research references | Ref | Trading frameworks; out of scope |
 | [quant-trading](https://github.com/je-suis-tm/quant-trading) | Educational strategy examples | Ref | Ignores fees and slippage |
 | [FinceptTerminal](https://github.com/Fincept-Corporation/FinceptTerminal) | Desktop terminal UI ideas | Ref | A desktop app, not a library |
 | Lists: [awesome-quant](https://github.com/wilsonfreitas/awesome-quant), [awesome-systematic-trading](https://github.com/paperswithbacktest/awesome-systematic-trading), [awesome-ai-in-finance](https://github.com/georgezouq/awesome-ai-in-finance), [Quant-Developers-Resources](https://github.com/cybergeekgyan/Quant-Developers-Resources), [Intro to Quant Finance](https://github.com/Barca0412/Introduction-to-Quantitative-Finance) ([arXiv list](https://barca0412.github.io/Introduction-to-Quantitative-Finance/arxiv/)) | Finding a tool when a concrete gap appears | Ref | [public-apis](https://github.com/public-apis/public-apis) (Finance and Government sections) is also useful, because its **Auth** column shows which APIs need no key. Many entries are new and unvetted, and some are dead (IEX Cloud closed in 2024). Mined on 2 Nov 2026 (results are in this section) and again on 4 Nov 2026 for every data kind ([Data providers by kind](#data-providers-by-kind-options-and-order)); go back when a new gap appears. Being listed doesn't mean quality. |
+
+### Outlook evidence (papers)
+Read on 4-8 Nov 2026 for the Phase 6 decision (§6). Summaries for some came from secondary pages; check the paper before quoting a number in the report.
+
+| Paper | Finding | How we use it |
+|---|---|---|
+| [Gu, Kelly & Xiu 2020](https://dachxiu.chicagobooth.edu/download/ML.pdf) (RFS, Table 1) | Monthly stock-level R² 0.33-0.40% with neural nets on 920 signals, 0.16% for size, value and momentum alone, −3.46% for unregularised OLS; 0.52-0.70% for the largest 1,000 stocks | Why direction doesn't lead and why a big model wouldn't help |
+| [Bessembinder 2018](https://econpapers.repec.org/RePEc:eee:jfinec:v:129:y:2018:i:3:p:440-457) (JFE) | 47.8% of monthly stock returns beat one-month T-bills; a few big winners drive the market | Base rates below 50%; survivors inflate ours |
+| [Grinold's fundamental law](https://www.cfainstitute.org/insights/professional-learning/refresher-readings/2025/analysis-active-portfolio-management) (CFA reading) | Skill pays only across many independent bets; typical forecast ICs are 0.02-0.10 | Why a weak signal is no verdict on one stock |
+| [The Base Rate Book](https://hedgefundalpha.com/education/michael-mauboussin-the-base-rate-book/) (Mauboussin, Callahan & Majd, Credit Suisse 2016) | Sales growth barely persists; base rates for growth, margins and returns by size | The business forecast's method |
+| [Chan, Karceski & Lakonishok 2003](https://www.nber.org/papers/W8282) (JF) | No persistence in long-term growth beyond chance; analysts' growth forecasts too optimistic | The critic's base-rate check |
+| [Fama & French 2000](https://econpapers.repec.org/RePEc:ucp:jnlbus:v:73:y:2000:i:2:p:161-75) (JB) | Profitability reverts to the mean about 38% a year, faster when far from it | Margin buckets in the outside view |
+| [Expectations Investing](https://expectationsinvesting.com/) (Mauboussin & Rappaport, revised 2021) | Read the expectations in the price with a reverse DCF instead of forecasting the price | The implied-growth part |
+| [Lazy Prices](https://www.nber.org/papers/w25084) (Cohen, Malloy & Nguyen 2020, JF) | Firms that change their 10-K text, especially risk factors, did worse: up to 188 bp a month long-short, 1995-2014 | Filing-change alerts (second stage) |
+| [McLean & Pontiff 2016](https://ivey.uwo.ca/media/3775549/pontiff.pdf) (JF) | 97 predictors: returns 26% lower out of sample, 58% lower after publication | Expect published effects to shrink; the strategy lab shows it |
+| [Barber, Lehavy, McNichols & Trueman 2001](https://econpapers.repec.org/RePEc:bla:jfinan:v:56:y:2001:i:2:p:531-563) (JF) | Top consensus ratings beat the market by over 4% a year before costs, 1986-96, but not after | Why analysts' ratings are context, not our signal |
+| [Martineau 2022](https://nowpublishers.com/article/Details/CFR-0122) (CFR), [disputed in 2025](https://anderson-review.ucla.edu/is-post-earnings-announcement-drift-a-thing-again/) | Drift after earnings has been gone for large stocks since about 2006 | Results-day moves are risk, not a signal |
+| [Lopez-Lira, Tang & Zhu 2025](https://arxiv.org/abs/2504.14765) | LLMs recall exact pre-cutoff market values; telling them to ignore the future doesn't work | LLM predictions only live (§5) |
+| [Glasserman & Lin 2023](https://arxiv.org/abs/2309.17322) | GPT sentiment backtests mix look-ahead and a "distraction" effect; anonymising names changes results | Same |
+| [Lopez-Lira & Tang 2023](https://arxiv.org/abs/2304.07619) | ChatGPT headline scores predicted next-day returns; later versions add post-cutoff headlines | Example of a study that had to address contamination |
+| [Profit Mirage 2025](https://arxiv.org/abs/2510.07920) | Published LLM trading agents stop beating a random baseline after their training cutoff (FinLake-Bench) | Same |
+| [FINSABER 2025](https://arxiv.org/abs/2505.07078) | Reported LLM investing advantages fade over 20 years and 100+ stocks | Same |
+| [He, Lv, Manela & Wu 2025](https://arxiv.org/abs/2502.21206) (ChronoBERT/ChronoGPT) | Models trained only on text available at each date: the clean way to backtest an LLM | Why we don't backtest ours |
+| [LiveTradeBench](https://arxiv.org/abs/2511.03628), [Agent Market Arena](https://arxiv.org/abs/2510.11695), [ForecastBench](https://www.forecastbench.org) | Live or prospective evaluation of LLM forecasts and agents, scored by Brier or returns | The live log's design |
+| [Xiong et al. 2024](https://arxiv.org/abs/2306.13063) (ICLR) | LLMs' stated confidence is highly overconfident | No LLM-stated probabilities |
+| [Kim, Muhn & Nikolaev 2024](https://arxiv.org/abs/2407.17866) | GPT-4 predicted earnings direction from anonymised statements about as well as a trained model; memorisation doubts remain | A possible live test of the agent against the outside view |
+| [Rahimikia, Ni & Wang 2025](https://arxiv.org/abs/2511.18578); [Kronos](https://arxiv.org/abs/2508.02739) | Off-the-shelf time-series foundation models had negative R² on daily excess returns; Kronos claims gains in its own tests | Ready-made forecasting models skipped |
+| [Natural frequencies](https://pmc.ncbi.nlm.nih.gov/articles/PMC4504147) (Gigerenzer & Hoffrage), [IPCC likelihood scale](https://www.ipcc.ch/site/assets/uploads/2017/08/AR5_Uncertainty_Guidance_Note.pdf), [model cards](https://arxiv.org/abs/1810.03993), [SEC marketing rule on hypothetical performance](https://www.troutman.com/insights/the-secs-new-marketing-rule-practically-speaking-hypothetical-performance/) | Counts read easier than percentages (evidence mixed); fixed words for chances; a model's sample, limits and version on one card; backtests shown to ordinary investors are restricted | The Simple and Details views |
+| [DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash-20260910) | Released 10 Sep 2026; training cutoff not published | Every past date is suspect for our model |
 
 ### Other people's agent designs (what we borrow)
 | Project | Borrow | Don't borrow |
@@ -354,7 +427,7 @@ Sources read on 4 Nov 2026: [World Monitor](https://www.worldmonitor.app/docs/da
 | [AgentDojo](https://arxiv.org/abs/2406.13352) | Template for prompt-injection test cases | **Now** (Phase 8) |
 | [Du et al. 2024, multi-agent debate](https://proceedings.mlr.press/v235/du24e.html) | Motivation for critic/review | Report |
 | [Kaesberg et al. 2025](https://aclanthology.org/2025.findings-acl.606/) | Evidence that more rounds can hurt → stop early | Report |
-| [Backtest overfitting (PBO)](https://arxiv.org/abs/1407.0340), [Deflated Sharpe](https://ssrn.com/abstract=2460551) | Outlook / any strategy claims | Later |
+| [Backtest overfitting (PBO)](https://arxiv.org/abs/1407.0340), [Deflated Sharpe](https://ssrn.com/abstract=2460551) | The outlook's trial log and any strategy claim (§6) | Phase 6 |
 
 ### Engineering references
 | Resource | Use for |
@@ -377,6 +450,10 @@ So nobody re-researches these. Reconsider one only if its reason stops being tru
 | SEC parsing | sec-parser, sec-parsers (unmaintained); doc2dict (generic); datamule (vendor-shaped); sec-edgar-downloader, secedgar (download only); sec-edgar-api (stale since 2023); py-xbrl (a full engine; Arelle covers it); python-xbrl (dead); finagg (old pins) | edgartools plus our own code cover the need. [edgar-crawler](https://github.com/nlpaueb/edgar-crawler) is a script, not a library, but its Item regexes are a usable fallback. |
 | SEC MCP servers | sec-edgar-mcp, edgartools' bundled MCP | Our agents call tools in-process |
 | Prices | defeatbeta-api | Yahoo mirror; stale; adjustment not documented |
-| Quant libraries | numpy-financial (1.1.0 needs Python 3.13), ffn, fincore, pandas-ta (unclear maintenance), skfolio, mlfinlab (paid), mlfinpy, timeseriescv, arch, getfactormodels (pre-alpha) | Heavy, dead, paid or off-target; a few lines of our own (or purgedcv) do the job |
+| Quant libraries | numpy-financial (1.1.0 needs Python 3.13), ffn, fincore, pandas-ta (unclear maintenance), skfolio, mlfinlab (paid), mlfinpy, timeseriescv, getfactormodels (pre-alpha) | Heavy, dead, paid or off-target; a few lines of our own (or purgedcv) do the job. `arch` moved to Phase 6 as a dev-only GARCH check |
+| Forecasting add-ons (8 Nov 2026) | Chronos 2.3.2, TimesFM 3.0.2, Kronos; LightGBM, statsforecast, skforecast; LLM factor mining (AlphaAgent, RD-Agent, AlphaGen) | Foundation models had negative R² on returns as-is and were trained on our test years; bigger models need far more data than ~15 years of about 500 stocks (Gu, Kelly & Xiu); factor mining searches for the best backtest |
+| Backtesting and factor tools (8 Nov 2026) | zipline-reloaded, backtrader, vectorbt, Lean, bt, Backtesting.py; alphalens-reloaded 0.5.1; QuantConnect's free cloud | We don't trade; alphalens only helps a factor score, i.e. with WRDS; QuantConnect's data stays in its cloud |
+| Research-audit tools (8 Nov 2026) | falsification-ledger, Evidence Deflator, lookahead-free, backtest-bias, NoEdge-Bench, thesis-ci (all in awesome-quant) | Weeks old and unvetted. Ideas taken: a hash-chained log, checking LLM backtests against training cutoffs, survivor-only checks |
+| Intraday data (8 Nov 2026) | Hourly and minute bars | Yahoo keeps 730 days of hourly and 8 days of minute bars; no horizon here needs them (§6) |
 
 Origin of the whole plan: [original ChatGPT planning conversation](https://chatgpt.com/share/6ad4955b-b618-83ea-afcc-303b0e8e8767).

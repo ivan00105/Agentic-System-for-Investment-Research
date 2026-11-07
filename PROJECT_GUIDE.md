@@ -1,6 +1,6 @@
 # Project Guide
 
-**The one page to read.** It covers what we're building, where we are and what to do next. Details (rules, finance cautions, evaluation protocol, forecast spec, every external link) live in [docs/REFERENCE.md](docs/REFERENCE.md). Everything older is history.
+**The one page to read.** It covers what we're building, where we are and what to do next. Details (rules, finance cautions, evaluation protocol, outlook spec, every external link) live in [docs/REFERENCE.md](docs/REFERENCE.md). Everything older is history.
 
 Revised 2 November 2026 after reviewing the code, the course guideline and every old doc.
 
@@ -9,11 +9,11 @@ Revised 2 November 2026 after reviewing the code, the course guideline and every
 ## TL;DR
 
 - **Product:** an AI **equity research team** for US stocks. You can **Check** a stock ("is this a good business, what are the risks, what's the outlook?") or **Discover** stocks that match what you want, with every number traced to a source.
-- **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical model gives the outlook.
+- **Agentic core:** a coordinator plans the work and sends it to specialist analysts (fundamentals, filings & events, market & valuation). They use real tools. A critic challenges the draft and the team fixes what it can. A separate statistical outlook gives forecasts with their track records; no LLM writes its numbers.
 - **Where we are:** the data plumbing, the Phase 1 tools (`tools/`, 8 tools), the Phase 2 single agent (condition B), the Phase 3 analyst team (C), the Phase 4 critic with its revision loop (D) and Phase 5 Discover over a declared universe are built, in the CLI and in the web app (Phase 7): one question box that runs B, C or D (default D), Find for Discover, History and a Setup & status page. The old fixed pipeline (baseline A) has no page: it is only the no-AI control in the Phase 8 evaluation (`eval/baseline_a.py`). The Phase 8 evaluation runner works; the rest of the case set and the full A–D run are next.
 - **Approach:** don't rewrite. Build `tools/` and `agents/` **next to** the existing code. The old pipeline becomes evaluation baseline **A**. Remove old scaffolding only where it blocks the new work.
 - **AI is always on.** It was "optional" only because it wasn't built. A no-LLM mode remains only as baseline A, the evaluation's control. With no API key, a question starts nothing and says what to set in `.env`, and the Setup page shows it.
-- **Outlook (forecast) is parked.** It gets built after the core works; its spec is kept in REFERENCE §6, so nothing is lost.
+- **Outlook (Phase 6, decided 8 Nov 2026):** forecasts you can check. A risk forecast (how much the stock may move), a business forecast (how often companies like it kept growing, from SEC data) and what today's price already assumes lead; the direction forecast comes last with its measured skill, which is close to a coin flip. Quant analysis (factor exposures, a strategy lab, shortlist risk) sits beside it. Spec in REFERENCE §6.
 - **Lesson from the Codex budget-cap mess:** no hidden token, cost or universe caps. Every limit lives in one config file, is generous by default, and finishes gracefully instead of failing (see §5).
 
 ---
@@ -30,7 +30,7 @@ Most of the idea holds up. Three parts need adjusting so the result is professio
 |---|---|---|
 | **Check** any stock | ✅ Keep. "Any" means any US company that files with the SEC (about 6,000+), not 5 hard-coded tickers. | Fundamentals come from SEC filings. |
 | Any **asset** (ETF, crypto, FX…) | ⚠️ Stocks get full analysis. ETFs could later get price-only analysis. Crypto and FX are out of scope. | They have no filings, so the fundamentals and risk-factor tools don't apply. They would need a different system. |
-| **Forecast** | ⚠️ Keep as an **Outlook**: a statistical probability that the stock beats SPY over about a month, scored honestly. Not an LLM guess or a price target. **Parked until the core works.** | Short-horizon returns are close to a coin flip. An LLM can't be backtested fairly because it already "knows" the future of historical dates. A calibrated probability that we evaluate is defensible; "the stock will go up" isn't. |
+| **Forecast** | ⚠️ Keep as an **Outlook** of statistical forecasts, each shown with its track record: how much the stock may move, how its revenue and margins usually develop for companies like it, what today's price assumes, and last, whether it beats SPY. Not an LLM guess or a price target. Phase 6. | Over a month, beating SPY is close to a coin flip (our test: 52% of windows, best simple signal AUC 0.512), but risk and business base rates can be forecast and tested. An LLM can't be backtested fairly because it already "knows" the future of historical dates. A forecast we evaluate is defensible; "the stock will go up" isn't. |
 | **Discover** stocks | ✅ Keep. Plain-English criteria → visible screen → research the top candidates → shortlist with reasons. | This is the strongest agentic demo: planning, tools, replacing candidates that fail. |
 | Help users **trade/invest the best way** | ⚠️ Reframe as **decision support**. The user states preferences (horizon, risk appetite, style); the system gives a shortlist, a thesis, risks and what would change the view. No personal buy/sell advice. | "Best" can't be proven or evaluated in a course, and personalised investment advice is regulated. Decision support is honest, evaluable and still useful. |
 
@@ -75,7 +75,7 @@ flowchart TD
     CO --> FA[Fundamentals analyst]
     CO --> FE[Filings & events analyst]
     CO --> MV[Market & valuation analyst]
-    CO --> OM[Outlook model<br/>statistical, not LLM]
+    CO --> OM[Outlook<br/>risk, business and direction forecasts<br/>statistical, not LLM]
     FA & FE & MV & OM -->|findings with IDs| DR[Draft report]
     DR --> CK[Checker: deterministic<br/>every number/citation resolves]
     CK --> CR[Critic: objections per claim]
@@ -96,7 +96,7 @@ flowchart TD
 | `get_prices` | daily raw + adjusted prices (Tiingo, yfinance backup; swappable, source always labelled) | new |
 | `screen` | pass / fail / unknown over a universe, ranked by a stated rule | fix `screening.py` |
 | `verify_against_filing` | cross-check a number against the 10-K's tagged financial data | **reuse the existing XBRL code as a critic tool** |
-| `get_outlook` | statistical probability from the outlook model | later phase |
+| `get_outlook`, `get_base_rates`, `get_factor_exposures` | risk and direction forecasts, events and the option-implied range; next-year base rates for growth and margins; factor betas (REFERENCE §6) | Phase 6 |
 
 Role contracts, objection outcomes, discover rules and security rules: [REFERENCE §2–4, §8](docs/REFERENCE.md).
 
@@ -118,7 +118,7 @@ The last column says whether the earlier choice was good practice. Where it wasn
 | Events | 8-K event specialist | None | `list_filings` in the filings & events analyst; news later | |
 | Valuation & risk | Not covered | None | **Added** | A good business can be a bad investment at its price |
 | Discover ranking | By forecast probability `p0` | Alphabetical | By the user's stated criteria. The outlook is shown, never used to rank. | `p0` is close to a coin flip; ranking on it is noise. Alphabetical is a bug. |
-| Forecast | Required for completion | Stub that says "unavailable" | **Parked** Outlook component; spec kept in REFERENCE §6 | Optional add-on; don't block the core on it |
+| Forecast | Required for completion | Stub that says "unavailable" | Outlook of tested forecasts plus quant analysis (Phase 6, REFERENCE §6) | A lone direction probability is a coin flip; risk and base rates can be forecast and checked |
 | Run modes | Fresh / frozen / replay | Shown to the user as choices | **Internal**: evidence cache (for evaluation) + "open saved run". The user just asks. | Implementation detail leaked into the UI |
 | Cutoff date | Required | Required; defaults to yesterday | Defaults to **now**; a historical cutoff is an advanced option | Most users want today's view |
 | LLM API | Responses API mandated | Responses API | Chat Completions + tools (works with OpenRouter, DeepSeek, Azure/HKU) | Portability. Responses is fine if staying on OpenAI. |
@@ -266,7 +266,7 @@ src/research_assistant/
   tools/           # one file per tool + registry.py (name, schema, function)
   agents/          # loop.py (generic tool loop), roles.py, runner.py (one run, B and C), team.py (coordinator + analysts), critic.py
     prompts/       # one .md per role
-  outlook/         # statistical model: train offline, predict as a tool
+  outlook/         # forecasts and the live log; maths in finance/, served as tools
   pipeline.py      # today's deterministic flow = baseline A
   store.py         # baseline A's SQLite runs (agent runs are trace files in data/traces/)
   api/             # FastAPI routes only
@@ -316,7 +316,7 @@ flowchart LR
     P2 --> P3[3 Analyst team]
     P3 --> P4[4 Critic + revise]
     P4 --> P5[5 Discover]
-    P1 --> P6[6 Outlook model]
+    P1 --> P6[6 Outlook + quant]
     P3 -. thin web path .-> P7[7 UI]
     P4 --> P7
     P5 --> P7
@@ -399,8 +399,24 @@ Licences don't matter here (it's an academic project): calling a library and cop
   - Fixed during the check: a 200 reply whose body wasn't JSON crashed the whole process. It is now retried (`AGENT_BAD_REPLY_RETRIES`, 2), then fails like any other model error; a research run that still raises counts as a failed candidate and is replaced. Told only its screen rank (5), a research run wrote that Microsoft falls outside the top 3; the brief now says it is pick 3 and why the names above it are out. The screener no longer claims share classes can take two slots, and growth periods no longer read as two-year spans.
   - Known gaps, from all three runs (unknown never passes, so these companies are rejected): Meta has no share count in companyfacts (two share classes), VeriSign no `NetIncomeLoss` fact, and Broadcom no net income for its latest year. The host's price check for Microsoft and NVIDIA used a series cached earlier that day without the 2026-11-02 close, so it used 2026-10-30. Microsoft's research fetched a fresh series, so it shows P/E 28.2x where the check shows 29.0x. Fixed after the runs: a cached series whose last day has a blank close is now refetched after 30 minutes, not 24 hours (Yahoo still listed 2026-11-02 blank at 21:23 New York time).
 
-### Phase 6: Outlook model (parked)
-Don't design it in detail now. When someone has capacity after Phase 4, start from [REFERENCE §6](docs/REFERENCE.md#6-outlook-forecast-specification). A price-based statistical model can be tested on history with proper walk-forward splits. Anything that uses an LLM can't, because the model already knows what happened later; for that, only a prospective log (predictions saved now, scored later) is a clean test, so start it early.
+### Phase 6: Outlook (forecasts you can check) and quant analysis
+Decided 8 Nov 2026 ([REFERENCE §6](docs/REFERENCE.md#6-outlook-specification)): the outlook forecasts **what can be forecast, each with its track record**, and doesn't lead with a price direction. Whether one stock beats SPY over a month is close to a coin flip (52% of 20-session windows on today's tech members beat it, and the best simple signal reached an AUC of only 0.512 ± 0.016, where 0.5 is no skill). How much a stock may move, and how often companies like it keep growing, can be predicted and tested. So the card leads with a risk forecast, a business forecast and what today's price already assumes; the direction forecast is there too, with its measured skill next to it. No LLM writes an outlook number: each one is a host-made record, tested on history when the model is statistical and logged before the outcome when it isn't. Maths goes in `finance/` (no I/O), assembly and the log in `outlook/`, and the tools in `tools/`. Each tested slice keeps its experiment in the repo (data pull, splits, scores) so its table can be re-run, and fixes its training, calibration and final test years (REFERENCE §6 splits) before the first score; the probe numbers below came from throwaway scripts and only show the slice is worth building. One slice per item, in this order:
+- [ ] **Business forecast, the outside view** (`get_base_rates`): for the company's latest year, the next-year spread (10th, 50th and 90th percentile, and the chance above a few thresholds) of revenue growth and operating-margin change among comparable company-years (by size, growth or margin). The sample is every SEC filer above a revenue floor each year, dead and acquired ones included, using first-reported 10-K values filed before the cutoff, so it has no survivorship or look-ahead. Test: walk-forward by year (learn on earlier years, score the next), Brier skill against one base rate, reliability by bucket with counts, and how often the 10-90% band holds.
+  - Probe on the 82 companies in the SEC cache (8 Nov 2026, survivors only): P(next-year growth above 10%), learned on years up to 2016 and scored on 2017 on, had Brier skill +11.5%; the buckets said 59, 70 and 76% and came true 60, 71 and 77% of the time.
+- [ ] **The critic checks stories against base rates**: the critic and the fundamentals analyst get `get_base_rates`. A claim that needs growth or margins outside the band for its reference class (rarer than 10 in 100 comparable cases) is a "misleading certainty" objection citing the record. Add 2-3 eval cases with an over-optimistic bull case.
+- [ ] **What's priced in** (`calculate` formula `implied_growth`): a reverse DCF that solves for the yearly revenue growth today's market cap needs over the next 10 years, at a stated margin, reinvestment rate and discount rate (T-bill from `get_macro` plus Damodaran's equity risk premium), shown as a small sensitivity table, then placed on the spread of real 10-year revenue growth among comparable companies ("N of 100 comparable companies did that"), not the one-year spread compounded. SEC XBRL starts in 2009-2011, so only a few 10-year cohorts exist; the card says how many. The base-rate part is tested; the arithmetic is shown, not scored.
+- [ ] **Risk forecast** (`get_outlook`): an 80% range and the chance of trailing SPY by more than 10% over 5 and 20 sessions. Volatility from HAR (daily, weekly and monthly components), ranges from the stock's own fat-tailed quantiles rather than a bell curve, an earnings jump when results fall inside the window (from past results-day moves), and an adaptive conformal update that keeps coverage on target. Also a beta from down days only and a replay of past selloffs. Sessions come from `exchange_calendars`. Test: walk-forward coverage by year, with and without earnings in the window, calm and nervous markets (VIX); interval score against EWMA (78.4% coverage in the probe) and a constant range.
+- [ ] **Events and the market's view**: the next earnings date (Finnhub, else yfinance), the ex-dividend date, the typical results-day move, and the range today's option prices imply (yfinance chains; there's no free history, so it is compared live only).
+- [ ] **Direction forecast** (in `get_outlook`): P(beat SPY) over 5 and 20 sessions from a regularised logistic regression on a few price features (past returns against SPY, volatility, distance from a moving average), next to the base rate and the model's walk-forward skill. While that skill is under 1% or its interval includes zero, the card says "no reliable edge" in words and shows the numbers only in Details.
+- [ ] **Outlook section** in Check and Compare reports, built by the host from those records; agents cite them by placeholder and can't change them. Four blocks (risk, business forecast, priced in, events), then the direction line, e.g. "Direction: no reliable edge (model 53%, base rate 52 of 100)". Simple view in counts and fixed likelihood words, Details view with error bars, the reliability plot and a model card (REFERENCE §6). Compare puts risk and base rates side by side and never says one stock will beat the other. Discover may filter on them (priced-in growth inside the outside-view band, drop chance below X%) but never ranks by predicted return.
+- [ ] **Live log**: every outlook number for the bundled universe, each trading day, saved before the anchor close in an append-only file where each line hashes the one before; outcomes go in a separate file when windows end. Discover shortlists are logged too and scored against the rest of their universe. Start it as soon as the risk forecast exists.
+- [ ] **Quant analysis: factor exposures** (`get_factor_exposures`, market analyst and critic): the stock's betas to the market, size, value, profitability, investment and momentum factors from the Ken French library (built from CRSP, so survivorship-free), with intervals, in plain words ("moves like a large, profitable growth stock"). Test: how well last year's betas explain next year's returns (out-of-sample R²).
+- [ ] **Quant analysis: strategy lab**: the well-known strategies (value, momentum, profitability, investment, size, low volatility) from Ken French's factor portfolios: long-run and last-10-year returns, worst drawdowns and losing years, and how far each fell after it was published (McLean & Pontiff 2016). Each Check report says which of them the stock leans toward (from its exposures). It is research context, not a signal: no trades, no rules searched for the best backtest.
+- [ ] **Quant analysis: shortlist risk** (Discover and Compare): the picks' correlations, the volatility of an equal-weight basket against its parts, and how the basket did in past selloffs. Not portfolio optimisation: no weights are chosen.
+- [ ] Second stage, **filing-change alerts** ("Lazy Prices"): how much of Item 1A and Item 7 is new against last year's 10-K, by plain text similarity (no LLM in the number), tested on history by filing date; the filings analyst explains what changed, with citations. Needs several years of 10-Ks (a few GB, free from SEC).
+- [ ] Optional, only with WRDS access (ask the HKU library): survivorship-free CRSP prices make two more things honest. (1) A rating (leans above / no clear edge / leans below SPY) from many published signals, judged by its rank correlation with later returns (IC). (2) A backtest of the user's own Discover screen: had you bought what passed it each year, how would it have done against SPY. Without WRDS neither is shown, because Yahoo has no prices for companies that later failed.
+- **Not built, on purpose** (reasons in REFERENCE §6): a "buy" signal or a rating built on survivor-only data, hourly or yearly price forecasts, probabilities stated by an LLM, ready-made forecasting models (Chronos, TimesFM, Kronos), 8-K event averages presented as forecasts, trade execution, portfolio optimisation, and searching many rules for the best backtest.
+- **Done when:** a Check report shows the Outlook section from frozen records, the same in B, C and D; the business, risk and direction forecasts each have a walk-forward table (skill or coverage with intervals, reliability with counts, the number of trials) whose result is stated even if it's negative; the report shows the stock's factor exposures and the strategy lab; the critic raises a base-rate objection on a seeded over-optimistic case; and the live log has run every trading day since it started, with every ended window scored.
 
 ### Phase 7: UI
 - [x] **Start right after Phase 3:** a thin web path. Question → agent run → cited report → saved → reopened from History, on the existing page. This is mostly backend work (API, storage, cancel), so give it one owner. The full layout and Discover screen come later.
@@ -451,7 +467,7 @@ Don't design it in detail now. When someone has capacity after Phase 4, start fr
 - [ ] Report: problem → design → tools/agents → evaluation → failure cases → limitations and trade-offs.
 - [ ] Demo: one Discover question live, one injected-error correction, one honest "not available"; cached runs as fallback.
 
-**Out of scope** (list as future work): crypto/FX, news feeds beyond SEC 8-K (free options are listed in REFERENCE §10), trading or portfolio optimisation, factor mining, fine-tuning. Vector DB, MCP, memory and other add-ons follow the triggers in §7. Every resource from the earlier research is catalogued with a Now/Later/Ref verdict in [REFERENCE §10](docs/REFERENCE.md#10-resource-catalogue).
+**Out of scope** (list as future work): crypto/FX, news feeds beyond SEC 8-K (free options are listed in REFERENCE §10), trade execution, portfolio optimisation, factor or strategy mining (published factors are analysed in Phase 6, never searched for the best backtest), fine-tuning. Vector DB, MCP, memory and other add-ons follow the triggers in §7. Every resource from the earlier research is catalogued with a Now/Later/Ref verdict in [REFERENCE §10](docs/REFERENCE.md#10-resource-catalogue).
 
 ---
 
@@ -477,7 +493,8 @@ With 3 people: merge Data + Outlook, merge UI + Evaluation/report, and keep Agen
 | LLM | Keep OpenRouter with a cheap tool-calling model. Freeze the model ID before the evaluation. Check whether the HKU ITS quota supports function calling. |
 | Framework | Plain Python loop. LangGraph only if the team already knows it. |
 | Discover universe | Decided in Phase 5: a declared YAML list, stated as a survivorship-biased snapshot. Bundled: `sp500` (the whole S&P 500, the default) and `sp500_tech` (its Information Technology and Communication Services members); add others as files. `sec_all` (every SEC filer with a ticker, about 8,000) is built from SEC's ticker list on the day; costs and caveats in REFERENCE §4. |
-| Outlook in the final demo? | Decide after Phase 4. If built, show it as a clearly labelled statistical card, never used for ranking. |
+| Outlook in the final demo? | Yes, once built: the Outlook section on one Check report, with its walk-forward table and the live log, labelled statistical and never used for ranking. |
+| WRDS access | Ask the HKU library. With CRSP, the backtests become survivorship-free, and a rating and Discover screen backtests become possible (Phase 6). Without it, those two aren't shown. |
 
 ---
 
@@ -487,7 +504,7 @@ With 3 people: merge Data + Outlook, merge UI + Evaluation/report, and keep Agen
 |---|---|
 | `README.md` | What it is, how to run it |
 | `PROJECT_GUIDE.md` | This file: vision, status, plan. **The only status doc.** |
-| `docs/REFERENCE.md` | Rules, finance cautions, evaluation, forecast spec, resources, and the **adopt-or-build table** (check it before writing a tool or adding a dependency) |
+| `docs/REFERENCE.md` | Rules, finance cautions, evaluation, outlook spec, resources, and the **adopt-or-build table** (check it before writing a tool or adding a dependency) |
 | `AGENTS.md` / `CLAUDE.md` | Rules for humans and AI coding tools (Phase 0). `CLAUDE.md` only imports `AGENTS.md`. |
 | `docs/archive/` | Old plans and records, kept for history; never the current instruction |
 | `.archify/`, `graphify-out/` | Local visual aids, git-ignored; regenerate after the architecture changes |
