@@ -64,3 +64,66 @@ test('Compare these files the comparison under its Discover run', async ({page})
   await page.getByRole('button', {name: 'Research this question →'}).click()
   await expect.poll(() => body.parent_run_id).toBe(RUN)
 })
+
+// History's server for the manage tests: PATCH and DELETE change the list it serves next, as the real one does.
+async function manageable(page: Page) {
+  let items = structuredClone(TREE) as {run_id: string; title: string; label?: string | null; archived: boolean; children: {run_id: string}[]}[]
+  const sent: {method: string; url: string; body: unknown}[] = []
+  await page.route('**/api/agent-runs?archived=*', route => route.fulfill({json: {items: items.filter(i => i.archived === route.request().url().endsWith('true'))}}))
+  await page.route('**/api/agent-runs/*', route => {
+    const request = route.request(), url = new URL(request.url()), id = url.pathname.split('/').pop()!
+    if (request.method() === 'GET') return route.continue()
+    sent.push({method: request.method(), url: url.pathname + url.search, body: request.postDataJSON()})
+    const found = items.find(i => i.run_id === id)!
+    if (request.method() === 'PATCH') { Object.assign(found, request.postDataJSON()); if ('label' in request.postDataJSON()) found.title = found.label ?? LONG }
+    else items = items.filter(i => i.run_id !== id)
+    return route.fulfill({json: request.method() === 'PATCH' ? found : {deleted: [id]}})
+  })
+  return sent
+}
+
+test('a run can be renamed, archived and restored; the filter shows archived runs apart', async ({page}) => {
+  const sent = await manageable(page)
+  await page.goto('/?view=history')
+  const discover = page.locator(`.history-entry[data-run-id="${DISCOVER}"]`)
+  await discover.locator('.history-actions').first().getByRole('button', {name: 'Add label'}).click()
+  await discover.getByLabel('Label').fill('Tech screen')
+  await discover.getByRole('button', {name: 'Save'}).click()
+  await expect(discover.locator('.agent-history-question').first()).toHaveText('Tech screen')
+  expect(sent.at(-1)).toEqual({method: 'PATCH', url: `/api/agent-runs/${DISCOVER}`, body: {label: 'Tech screen'}})
+  await expect(discover.locator('li').first().getByRole('button', {name: 'Archive'})).toHaveCount(0) // a pick goes with its parent
+  await discover.locator('.history-actions').first().getByRole('button', {name: 'Archive'}).click()
+  await expect(page.locator('.agent-history .history-list > .history-entry')).toHaveCount(1)
+  await page.getByLabel('Show').selectOption('archived')
+  const archived = page.locator(`.history-entry[data-run-id="${DISCOVER}"]`)
+  await expect(archived.locator('.run-children summary')).toHaveText('3 picks · 1 comparison')
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+  await archived.locator('.history-actions').first().getByRole('button', {name: 'Restore'}).click()
+  await expect(page.getByText('No archived runs.', {exact: false})).toBeVisible()
+  expect(sent.at(-1)).toEqual({method: 'PATCH', url: `/api/agent-runs/${DISCOVER}`, body: {archived: false}})
+})
+
+test('delete asks first, says it can\'t be undone, and offers to delete a parent\'s children too', async ({page}) => {
+  const sent = await manageable(page)
+  await page.goto('/?view=history')
+  const other = page.locator('.history-entry[data-run-id="20261106-090000-ffffff"]')
+  await other.getByRole('button', {name: 'Delete'}).click()
+  await expect(other.getByRole('group', {name: 'Confirm delete'})).toContainText("This can't be undone")
+  await other.getByRole('button', {name: 'Cancel'}).click()
+  expect(sent).toEqual([])
+  const discover = page.locator(`.history-entry[data-run-id="${DISCOVER}"]`)
+  await discover.locator('.history-actions').first().getByRole('button', {name: 'Delete'}).click()
+  const confirm = discover.getByRole('group', {name: 'Confirm delete'})
+  await expect(confirm).toContainText('It started 3 picks · 1 comparison.')
+  await expect(confirm.getByRole('button', {name: 'Delete only this run'})).toBeVisible()
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
+  await confirm.getByRole('button', {name: 'Delete it and its 4 runs'}).click()
+  await expect(discover).toHaveCount(0)
+  expect(sent).toEqual([{method: 'DELETE', url: `/api/agent-runs/${DISCOVER}?children=true`, body: null}])
+})
+
+test('a run still going cannot be deleted from History', async ({page}) => {
+  await mockHistory(page, [run(RUN, 'How profitable is Acme?', {status: 'running'})])
+  await page.goto('/?view=history')
+  await expect(page.locator(`.history-entry[data-run-id="${RUN}"]`).getByRole('button', {name: 'Delete'})).toBeDisabled()
+})

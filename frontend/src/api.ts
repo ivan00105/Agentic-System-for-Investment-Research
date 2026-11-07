@@ -103,6 +103,8 @@ const run = (id: string) => `/agent-runs/${encodeURIComponent(id)}`
 export const agentApi = {
   start: (body: StartAgentRun) => request<AgentRunSummary>('/agent-runs', post(body)),
   list: (archived = false) => request<{items: AgentRunSummary[]}>(`/agent-runs?archived=${archived}`),
+  update: (id: string, change: {label?: string | null; archived?: boolean}) => request<AgentRunSummary>(run(id), {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(change)}),
+  remove: (id: string, children: boolean) => request<{deleted: string[]}>(`${run(id)}?children=${children}`, {method: 'DELETE'}),
   get: (id: string) => request<AgentProgress>(run(id)),
   cancel: (id: string) => request<AgentRunSummary>(`${run(id)}/cancel`, post({})),
   answer: (id: string, answers: Record<string, string>, spec?: unknown) => request<AgentRunSummary>(`${run(id)}/answers`, post({answers, ...(spec !== undefined && {spec})})),

@@ -54,6 +54,12 @@ class StartRun(BaseModel):
     parent_run_id: Annotated[str, StringConstraints(pattern=saved.RUN_ID.pattern)] | None = None
 
 
+class RunPatch(BaseModel):
+    """History's rename and archive. A label of null or "" clears it."""
+    label: Annotated[str, StringConstraints(strip_whitespace=True, max_length=config.RUN_LABEL_MAX)] | None = None
+    archived: bool | None = None
+
+
 class Answers(BaseModel):
     answers: dict[str, str]  # term -> the user's definition; "" accepts the proposal
     spec: dict | None = None  # the drafted spec as the user edited it; used as it is
@@ -147,6 +153,18 @@ class AgentRuns:
         return [_status(found | {"children": [_status(child, active) for child in found["children"]]}, active)
                 for found in saved.runs(self.folder, archived)]
 
+    def delete(self, run_id: str, children: bool) -> list[str]:
+        """Remove a saved run, and with `children` the runs it started. A run still going here is refused."""
+        going = self.view(run_id)["status"] in ("running", "stopping", "waiting")  # also a pick of a running parent
+        found = next((run for run in saved.tree(self.folder) if run["run_id"] == run_id), None)
+        run_ids = [run_id, *(child["run_id"] for child in found["children"] if children)] if found else [run_id]
+        with self.lock:
+            if going or any(i in self.active or i in self.waiting for i in run_ids):
+                raise DomainError("This run is still going. Cancel it and wait for it to stop, then delete it.",
+                                  "running", 409)
+            saved.delete(self.folder, run_ids)
+        return run_ids
+
     def _active(self) -> dict[str, threading.Event | None]:
         # Read before the trace: a run writes run_end before it leaves `active`, so it never looks incomplete.
         with self.lock:
@@ -184,7 +202,10 @@ class Waiter:
 
 def _status(found: dict, active: dict[str, threading.Event | None]) -> dict:
     if found["status"] is None:
-        run_id = found["run_id"]
+        run_id, parent = found["run_id"], found.get("parent_run_id")
+        if run_id not in active and parent in active:  # a Discover pick runs on its parent's thread
+            found["status"] = "stopping" if active[parent] and active[parent].is_set() else "running"
+            return found
         # incomplete: no run_end and not running here (a CLI run still going, or a server stopped mid-run)
         found["status"] = ("incomplete" if run_id not in active else "waiting" if active[run_id] is None
                            else "stopping" if active[run_id].is_set() else "running")
@@ -224,6 +245,24 @@ def start(body: StartRun, request: Request):
 @router.get("")
 def history(request: Request, archived: bool = False):
     return {"items": runs(request).history(archived)}
+
+
+@router.patch("/{run_id}")
+def update(run_id: str, body: RunPatch, request: Request):
+    """Rename or archive a saved run. Labels live in labels.json beside the traces, which stay untouched."""
+    runs(request).view(run_id)
+    try:
+        saved.mark(runs(request).folder, run_id, body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise DomainError(f"Nothing was changed: {saved.LABELS} in the traces folder isn't valid JSON. Fix or delete "
+                          "it, then retry.", "bad_labels", 409) from exc
+    return runs(request).view(run_id)
+
+
+@router.delete("/{run_id}")
+def delete(run_id: str, request: Request, children: bool = False):
+    """Delete a saved run's trace, and with ?children=true the runs it started. This can't be undone."""
+    return {"deleted": runs(request).delete(run_id, children)}
 
 
 @router.get("/{run_id}")

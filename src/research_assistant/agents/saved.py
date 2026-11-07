@@ -4,6 +4,7 @@ frozen evidence, so the user's labels and archived flags live apart, in labels.j
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 from . import preferences
@@ -19,6 +20,7 @@ from .sources import GROUPS, chip, detail
 
 RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")  # the IDs Trace.new gives; any other file is not a run
 LABELS = "labels.json"
+_lock = threading.Lock()  # one change to labels.json or the trace files at a time
 
 
 def runs(folder: Path, archived: bool = False) -> list[dict]:
@@ -96,12 +98,41 @@ def labels(folder: Path) -> dict[str, dict]:
         return {}
 
 
+def mark(folder: Path, run_id: str, changes: dict):
+    """Set a run's label (None or "" clears it) or archived flag. Its trace is never touched."""
+    with _lock:
+        marks = _marks(folder)
+        entry = {key: value for key, value in (marks.get(run_id, {}) | changes).items() if value}
+        if entry:
+            marks[run_id] = entry
+        else:
+            marks.pop(run_id, None)
+        _save(folder, marks)
+
+
+def delete(folder: Path, run_ids: list[str]):
+    """Remove the runs' trace files and their labels. This can't be undone."""
+    with _lock:
+        for run_id in run_ids:
+            (folder / f"{run_id}.jsonl").unlink(missing_ok=True)
+        marks = labels(folder)
+        if any(run_id in marks for run_id in run_ids):
+            _save(folder, {key: value for key, value in marks.items() if key not in run_ids})
+
+
 def _marks(folder: Path) -> dict[str, dict]:
+    """Raises ValueError if the file isn't a JSON object, so a change never overwrites labels it couldn't read."""
     path = folder / LABELS
     found = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     if not isinstance(found, dict):
         raise ValueError(f"{path} is not a JSON object")
     return found
+
+
+def _save(folder: Path, marks: dict):
+    temporary = folder / f"{LABELS}.tmp"  # written whole, then swapped in, so a crash never leaves half a file
+    temporary.write_text(json.dumps(marks, indent=1, sort_keys=True, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, folder / LABELS)
 
 
 def progress(path: Path) -> list[dict]:

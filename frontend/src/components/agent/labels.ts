@@ -1,5 +1,5 @@
 // Words the agent pages share: run statuses and roles in plain English.
-import type { Condition } from '../../api'
+import type { AgentRunSummary, Condition } from '../../api'
 
 export const CONDITIONS: Record<Condition, string> = {D: 'Analyst team with critic', C: 'Analyst team', B: 'Single agent'}
 export const STATUS: Record<string, string> = {
@@ -8,6 +8,12 @@ export const STATUS: Record<string, string> = {
   incomplete: 'No end recorded: still running elsewhere, or interrupted',
 }
 export const tone = (status: string) => ['cited', 'finished', 'pass', 'picked'].includes(status) ? 'green' : ['abstained', 'running', 'waiting'].includes(status) ? '' : 'amber'
+const count = (n: number, word: string) => n ? `${n} ${word}${n === 1 ? '' : 's'}` : ''
+// The runs a Discover run started, as History counts them: "3 picks · 1 comparison".
+export const childCount = (children: AgentRunSummary[]) => {
+  const picks = children.filter(c => c.kind === 'pick').length
+  return [count(picks, 'pick'), count(children.length - picks, 'comparison')].filter(Boolean).join(' · ')
+}
 export const clock = (at: string) => new Date(at).toISOString().slice(11, 19) + ' UTC'
 
 export const ROLES: Record<string, string> = {

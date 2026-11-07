@@ -76,6 +76,30 @@ def test_a_run_whose_parent_is_gone_or_newer_is_listed_on_its_own(tmp_path):
         (COMPARISON, [OTHER]), (DISCOVER, [])]
 
 
+def test_a_label_titles_a_run_and_archiving_moves_its_children_too(tmp_path):
+    write(tmp_path, DISCOVER, start("Find tech."))
+    write(tmp_path, PICK, start(BRIEF, DISCOVER))
+    trace = (tmp_path / f"{DISCOVER}.jsonl").read_bytes()
+    saved.mark(tmp_path, DISCOVER, {"label": "Tech screen"})
+    saved.mark(tmp_path, DISCOVER, {"archived": True})
+    assert saved.runs(tmp_path) == []
+    [found] = saved.runs(tmp_path, archived=True)
+    assert (found["title"], found["label"], found["question"]) == ("Tech screen", "Tech screen", "Find tech.")
+    assert [c["run_id"] for c in found["children"]] == [PICK]
+    assert (tmp_path / f"{DISCOVER}.jsonl").read_bytes() == trace  # traces are frozen evidence
+    saved.mark(tmp_path, DISCOVER, {"label": "", "archived": False})
+    assert saved.labels(tmp_path) == {} and saved.runs(tmp_path)[0]["title"] == "Find tech."
+
+
+def test_delete_removes_the_traces_and_their_labels(tmp_path):
+    write(tmp_path, DISCOVER, start("Find tech."))
+    write(tmp_path, OTHER, start("Who is Apple?"))
+    saved.mark(tmp_path, DISCOVER, {"label": "Mine"})
+    saved.mark(tmp_path, OTHER, {"label": "Keep"})
+    saved.delete(tmp_path, [DISCOVER])
+    assert not (tmp_path / f"{DISCOVER}.jsonl").exists() and saved.labels(tmp_path) == {OTHER: {"label": "Keep"}}
+
+
 def test_a_pick_title_is_short_and_any_other_question_is_its_own_title():
     assert pick_title(BRIEF) == "Pick 2 of 5: Apple Inc. (AAPL)"
     assert pick_title(OLD_BRIEF) == "Pick: ADOBE INC. (ADBE)"  # saved before briefs gave the pick number
