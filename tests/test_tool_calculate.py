@@ -1,8 +1,11 @@
 from decimal import Decimal
 
+import httpx
 import pytest
+from fx_rates import Frankfurter
 from sec_files import make_context
 
+from research_assistant.data import fx_frankfurter
 from research_assistant.tools.calculate import CalculateInput, run
 from research_assistant.tools.get_financials import GetFinancialsInput
 from research_assistant.tools.get_financials import run as get_financials
@@ -341,3 +344,13 @@ def test_a_10k_share_count_refuses_an_ads_ratio(apple, baba):
     series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
     cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"], ads_ratio=ratio["id"])
     assert cap.status == "invalid" and "drop ads_ratio" in cap.warnings[0]
+
+
+def test_converted_inputs_are_named_and_growth_says_it_includes_currency_moves(tmp_path, monkeypatch):
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(Frankfurter()))
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1577552", years=2, metrics=["revenue"]), context)
+    latest, prior = result.data["metrics"]["revenue"]["values"]
+    growth = calc(context, "growth", current=latest["id"], previous=prior["id"])
+    assert growth.status == "ok" and any("converted from CNY at 7.200000" in n for n in growth.data["notes"])
+    assert any("includes exchange-rate moves" in n for n in growth.data["notes"])

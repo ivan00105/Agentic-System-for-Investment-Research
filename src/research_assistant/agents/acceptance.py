@@ -69,7 +69,7 @@ class Acceptance:
     def check(self, cik: str, tickers: list[str], criteria: list) -> Verdict:
         """`criteria` are the spec's filters and price checks (metric, op, value)."""
         self.cik, self.tickers, self.done = cik, tickers, {}
-        self.facts, self.reasons, self.ends, self.missing, self.currency = {}, {}, [], None, {}
+        self.facts, self.reasons, self.ends, self.missing, self.currency, self.converted = {}, {}, [], None, {}, {}
         needed = sorted({leaf for c in criteria for leaf in _leaves(c.metric)} - {"prices", *INSIDER})
         if needed:
             result = self.call("get_financials", {"cik": cik, "metrics": needed, "years": 2})
@@ -80,6 +80,9 @@ class Acceptance:
                 # USD figures next to another currency are probably convenience translations; each line says so.
                 self.currency = {name: w for w in result.warnings for name in needed
                                  if w.startswith(f"{name} is also reported in ")}
+                self.converted = {name: f"{name} converted from {m['values'][0]['reported_unit']} at "
+                                        f"{m['values'][0]['fx_source']} rates" for name, m in result.data["metrics"].items()
+                                  if m["status"] == "ok" and m["values"][0].get("reported_unit")}
             else:
                 self.missing = f"get_financials came back {result.status}: {' '.join(result.warnings)}"
         lines = [self._line(c) for c in criteria]
@@ -104,8 +107,10 @@ class Acceptance:
             period = f"{record['start']} to {record['end']}"
         else:
             period = f"at {record.get('end')}"
-        notes = [self.currency[leaf].rstrip(".") for leaf in sorted(_leaves(criterion.metric)) if leaf in self.currency]
-        basis = f". Basis: USD as filed ({'; '.join(notes)})." if notes else ""
+        leaves = sorted(_leaves(criterion.metric))
+        notes = [self.currency[leaf].rstrip(".") for leaf in leaves if leaf in self.currency]
+        converted = [self.converted[leaf] for leaf in leaves if leaf in self.converted]
+        basis = (f". Basis: USD as filed ({'; '.join(notes)})." if notes else "") +             (f". Basis: converted to USD ({'; '.join(converted)})." if converted else "")
         return Line("pass" if passed else "fail", f"{rule}: {format_value(record)} ({period}){basis}", [record["id"]])
 
     def _resolve(self, name: str) -> str:

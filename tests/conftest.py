@@ -1,3 +1,4 @@
+import httpx
 import pytest
 from fake_llm import FakeClient
 from fastapi.testclient import TestClient
@@ -5,6 +6,7 @@ from sec_files import make_context
 
 from research_assistant import cli
 from research_assistant.api import create_app
+from research_assistant.data import fx_frankfurter
 
 
 @pytest.fixture(autouse=True)
@@ -15,11 +17,17 @@ def isolate_configuration(monkeypatch):
         "SEC_USER_AGENT", "RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL",
         "OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL",
         "OPENAI_ORG_ID", "OPENAI_PROJECT_ID", "RESEARCH_DATA_DIR", "TIINGO_API_KEY", "PRICE_PROVIDERS",
-        "FRED_API_KEY", "MACRO_PROVIDERS",
+        "FRED_API_KEY", "MACRO_PROVIDERS", "FX_PROVIDERS",
     ):
         # Track absent keys too: load_dotenv writes directly into os.environ.
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
+
+
+@pytest.fixture(autouse=True)
+def no_exchange_rates(monkeypatch):
+    """Frankfurter needs no key, so tests block it: no rates unless a test mocks some."""
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(lambda request: httpx.Response(404)))
 
 
 @pytest.fixture

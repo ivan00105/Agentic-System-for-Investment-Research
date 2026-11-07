@@ -1,9 +1,14 @@
 import json
 from datetime import datetime, timezone
 
+from decimal import Decimal
+
 import httpx
+import pytest
+from fx_rates import Frankfurter
 from sec_files import FIXTURES, SecFiles, make_context
 
+from research_assistant.data import fx_frankfurter
 from research_assistant.tools.get_financials import GetFinancialsInput, run
 
 APPLE_FACTS = "/api/xbrl/companyfacts/CIK0000320193.json"
@@ -226,3 +231,45 @@ def test_a_ratio_whose_filing_is_missing_is_unsupported_not_fatal(tmp_path):
 def test_a_10k_share_count_needs_no_ads_ratio(tmp_path):
     result, _ = financials(tmp_path, metrics=["shares_outstanding"])
     assert "ordinary_shares_per_ads" not in result.data["metrics"]
+
+
+@pytest.fixture
+def ecb(monkeypatch):
+    mock = Frankfurter()
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(mock))
+    return mock
+
+
+def test_figures_in_another_currency_convert_at_the_years_average_and_year_end_rates(tmp_path, ecb):
+    result, context = financials(tmp_path, cik="1577552", metrics=["revenue", "total_assets", "eps_diluted"], years=2)
+    revenue = result.data["metrics"]["revenue"]
+    assert revenue["unit"] == "USD" and [(v["end"], v["fx_rate"]) for v in revenue["values"]] == [
+        ("2026-03-31", "7.200000"), ("2025-03-31", "7.000000")]
+    latest = revenue["values"][0]
+    assert latest["value"] == str((Decimal(1023670000000) / Decimal("7.2")).quantize(Decimal(1)))
+    assert (latest["reported_value"], latest["reported_unit"], latest["fx_basis"]) == ("1023670000000", "CNY", "average")
+    assert latest["fx_first"] == "2025-04-01" and latest["fx_last"] == "2026-03-31"
+    assert "at 7.200000 CNY per US dollar, the average of" in latest["notes"][0]
+    assert context.records[latest["id"]]["unit"] == "USD" and latest["id"] in result.ids
+    assets = result.data["metrics"]["total_assets"]["values"][0]
+    assert assets["fx_basis"] == "year_end" and assets["fx_last"] == "2026-03-31"
+    eps = result.data["metrics"]["eps_diluted"]["values"][0]
+    assert context.records[eps["id"]]["unit"] == "USD/shares" and eps["value"] == "0.7639"  # 5.50 CNY / 7.2
+    assert result.source == "SEC companyfacts; exchange rates: Frankfurter (ECB reference rates) (fallback)"
+    assert any(w.startswith("Converted to USD from CNY at Frankfurter") for w in result.warnings)
+    assert any("FRED_API_KEY" in w for w in result.warnings)
+    assert not any("convenience translations at one exchange rate per filing" in w for w in result.warnings)
+
+
+def test_without_a_rate_the_filings_own_dollars_are_shown_and_say_so(tmp_path):
+    result, _ = financials(tmp_path, cik="1577552", metrics=["revenue"], years=1)  # tests block Frankfurter
+    assert values(result, "revenue") == [("2026-03-31", "148401000000")]
+    assert any(w.startswith("revenue: no CNY exchange rate") for w in result.warnings)
+    assert any("convenience translations" in w for w in result.warnings)
+
+
+def test_a_filer_reporting_only_another_currency_converts_when_a_rate_exists(tmp_path, ecb):
+    result, _ = financials(tmp_path, metrics=["revenue"], years=1, files=foreign_variant("CNY"))
+    (latest,) = result.data["metrics"]["revenue"]["values"]
+    assert result.status == "ok" and latest["reported_unit"] == "CNY"
+    assert Decimal("7.0") < Decimal(latest["fx_rate"]) < Decimal("7.2")  # the year spans the mocked change of rate

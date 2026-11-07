@@ -11,7 +11,7 @@ from typing import Callable
 
 from ..contracts import DomainError
 from ..model_access import check_model, load_model_settings
-from . import macro, prices, prices_tiingo, prices_yfinance
+from . import fx, macro, prices, prices_tiingo, prices_yfinance
 from .errors import DataError
 from .sec import SecClient
 
@@ -23,6 +23,8 @@ KINDS = {
     "prices": ("Daily prices", "Closing prices for market cap, valuation ratios and risk."),
     "macro": ("Rates, inflation and release dates", "The risk-free rate for Sharpe ratios, Treasury yields, inflation "
               "and unemployment as context, and the dates of major US data releases."),
+    "fx": ("Exchange rates", "Converts figures a foreign company reports in another currency (such as CNY or TWD) "
+           "into US dollars: each year's average rate for income and cash flow, the year-end rate for balances."),
     "insiders": ("Insider trades", "Insiders' open-market purchases and sales from their SEC Form 4 filings."),
     "peers": ("Peers and sector", "Peers by SIC industry code and size, and the sector ETF to compare against (its "
               "prices come from the daily prices card)."),
@@ -86,6 +88,8 @@ def all_providers() -> list[Provider]:
     price_adapters += [a for a in (prices_tiingo, prices_yfinance) if a not in price_adapters]
     macro_adapters = [macro.ADAPTERS[name] for name in macro.provider_order()]
     macro_adapters += [a for a in macro.ADAPTERS.values() if a not in macro_adapters]
+    fx_adapters = [fx.ADAPTERS[name] for name in fx.provider_order()]
+    fx_adapters += [a for a in fx.ADAPTERS.values() if a not in fx_adapters]
     return [
         Provider("sec_archives", "filings", "SEC EDGAR filings", **sec),
         Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
@@ -94,6 +98,9 @@ def all_providers() -> list[Provider]:
         Provider("sec_sic", "peers", "SEC company list by SIC code", **sec),
         *[Provider(a.NAME, "prices", a.LABEL, a.TIER, a.ENV, a.configured, a.check) for a in price_adapters],
         *[Provider(a.NAME, "macro", a.LABEL, a.TIER, a.ENV, a.configured, a.check, note=a.NOTE) for a in macro_adapters],
+        # Names are unique across cards, so FRED's exchange rates are "fred_fx".
+        *[Provider(f"{a.NAME}_fx" if a.NAME in macro.ADAPTERS else a.NAME, "fx", a.LABEL, a.TIER, a.ENV, a.configured,
+                   a.check, note=a.NOTE) for a in fx_adapters],
         _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),
         _model_provider("openai", "OpenAI", 2, ("RESEARCH_MODEL", "OPENAI_API_KEY")),
         _model_provider("compatible", "OpenAI-compatible endpoint (e.g. local Ollama)", 0,

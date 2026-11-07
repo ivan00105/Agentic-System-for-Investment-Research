@@ -6,13 +6,14 @@ import openai
 import pandas as pd
 import pytest
 from fake_llm import FakeClient, reply, resubmit
+from fx_rates import Frankfurter
 from sec_files import SecFiles, make_context
 
 from research_assistant.agents import discover, single_agent
 from research_assistant.agents.acceptance import Acceptance
 from research_assistant.agents.discover_spec import PriceCheck
 from research_assistant.agents.trace import Trace
-from research_assistant.data import prices_yfinance, universe
+from research_assistant.data import fx_frankfurter, prices_yfinance, universe
 from research_assistant.model_access import ModelSettings
 from research_assistant.tools.result import ToolResult
 from research_assistant.tools.screen import Filter
@@ -369,3 +370,12 @@ def test_an_ads_price_check_uses_the_ratio_from_the_share_counts_filing(tmp_path
     record = context.records[line.ids[0]]
     assert line.state == "pass" and record["value"] == str(20 * 18580374278)  # $160 per ADS / 8 x ordinary shares
     assert context.records[record["inputs"]["ads_ratio"]]["value"] == "8"
+
+
+def test_a_check_on_converted_figures_says_its_rate_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(Frankfurter()))
+    context = make_context(tmp_path)
+    (line,) = Acceptance(context, Trace.new(tmp_path / "traces")).check(
+        "0001577552", ["BABA"], [Filter(metric="revenue_growth", op=">", value=0)]).lines
+    assert line.state == "fail" and line.text.endswith(  # 1,023.67bn CNY / 7.2 against 996.35bn CNY / 7.0
+        ". Basis: converted to USD (revenue converted from CNY at Frankfurter (ECB reference rates) (fallback) rates).")

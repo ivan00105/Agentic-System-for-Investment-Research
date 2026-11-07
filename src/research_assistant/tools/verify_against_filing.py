@@ -30,9 +30,11 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
             "The filing has no inline XBRL (SEC required it from 2019), so it can't be checked this way."])
     tagged = [f for f in found if f["concept"] == fact["tag"] and f["end"] == fact["end"]
               and (f["start"] or None) == fact["start"]]
-    same = [f for f in tagged if f["unit"] == fact["unit"]]  # USD only ever checks against USD
+    unit = fact.get("reported_unit") or fact["unit"]  # a converted figure is checked in the currency it was filed in
+    same = [f for f in tagged if f["unit"] == unit]  # USD only ever checks against USD
     readable = [f for f in same if f["value"] is not None]
-    expected = fact.get("tagged_value") or fact["value"]  # a count the page prints in full is checked against its tag
+    # A count the page prints in full is checked against its tag; a converted figure against the filed value.
+    expected = fact.get("tagged_value") or fact.get("reported_value") or fact["value"]
     matches = [f for f in readable if Decimal(f["value"]) == Decimal(expected)]
     # A number we can't read is "unverified", never a mismatch.
     verdict = "match" if matches else "mismatch" if readable else "unverified" if same else "not_in_filing"
@@ -53,7 +55,7 @@ def run(args: VerifyInput, context: ToolContext) -> ToolResult:
                         "be read, so it was not checked.")
     elif tagged and not same:
         units = sorted({f["unit"] or "an unreadable unit" for f in tagged})
-        warnings.append(f"{fact['tag']} for this period is tagged only in {', '.join(units)}, not {fact['unit']}.")
+        warnings.append(f"{fact['tag']} for this period is tagged only in {', '.join(units)}, not {unit}.")
     elif verdict == "not_in_filing":
         warnings.append(f"{fact['tag']} for this period is not tagged in {filing.accession}; companyfacts may come "
                         "from a different filing or a dimensioned (segment) fact.")

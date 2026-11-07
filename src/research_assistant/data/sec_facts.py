@@ -3,6 +3,7 @@
 Never "the last value in the array" and never the `fy` field: a period is identified by its start and
 end dates, and a value only counts once its filing was public before the cutoff.
 """
+import re
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -79,10 +80,10 @@ def taxonomies(payload: dict) -> set[str]:
     return set(payload.get("facts", {}))
 
 
-def _rows(payload: dict, concept: Concept, cutoff: datetime):
+def _rows(payload: dict, concept: Concept, cutoff: datetime, unit: str | None = None):
     for priority, tag in enumerate(concept.tags):
         taxonomy, name = tag.split(":")
-        rows = payload.get("facts", {}).get(taxonomy, {}).get(name, {}).get("units", {}).get(concept.unit, [])
+        rows = payload.get("facts", {}).get(taxonomy, {}).get(name, {}).get("units", {}).get(unit or concept.unit, [])
         for row in rows:
             try:
                 end, filed = date.fromisoformat(row["end"]), date.fromisoformat(row["filed"])
@@ -98,7 +99,7 @@ def _rows(payload: dict, concept: Concept, cutoff: datetime):
                 continue
             if concept.kind == "cover" and form not in COVER_FORMS:
                 continue
-            yield priority, tag, Fact(concept.metric, tag, concept.unit, value, start, end, accession, form, filed)
+            yield priority, tag, Fact(concept.metric, tag, unit or concept.unit, value, start, end, accession, form, filed)
 
 
 def other_units(payload: dict, concept: Concept) -> list[str]:
@@ -110,14 +111,31 @@ def other_units(payload: dict, concept: Concept) -> list[str]:
     return sorted(found - {concept.unit})
 
 
+def reporting_unit(payload: dict, concept: Concept) -> str:
+    """The currency most of a money concept's annual rows are in. A foreign filer reporting in CNY tags three years
+    in CNY per 20-F and only the latest in USD (a convenience translation), so CNY wins; ties keep USD."""
+    if concept.unit not in ("USD", "USD/shares"):
+        return concept.unit
+    shape = re.compile(r"[A-Z]{3}" + concept.unit[3:])  # "CNY" or "CNY/shares"
+    counts: dict[str, int] = {}
+    for tag in concept.tags:
+        taxonomy, name = tag.split(":")
+        for unit, rows in payload.get("facts", {}).get(taxonomy, {}).get(name, {}).get("units", {}).items():
+            if shape.fullmatch(unit):
+                counts[unit] = counts.get(unit, 0) + sum(1 for r in rows if r.get("form") in ANNUAL_FORMS)
+    return max(counts, key=lambda u: (counts[u], u == concept.unit)) if counts else concept.unit
+
+
 def fiscal_year_ends(payload: dict, cutoff: datetime) -> set[date]:
-    return {f.end for metric in FISCAL_YEAR_METRICS for _, _, f in _rows(payload, CONCEPTS[metric], cutoff)}
+    return {f.end for metric in FISCAL_YEAR_METRICS
+            for _, _, f in _rows(payload, CONCEPTS[metric], cutoff, reporting_unit(payload, CONCEPTS[metric]))}
 
 
-def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[date]) -> tuple[list[Fact], list[str]]:
-    """One fact per period, newest period first, plus warnings about conflicts."""
+def select(payload: dict, concept: Concept, cutoff: datetime, year_ends: set[date],
+           unit: str | None = None) -> tuple[list[Fact], list[str]]:
+    """One fact per period in `unit` (default: the concept's), newest period first, plus warnings about conflicts."""
     periods: dict[tuple, list] = {}
-    for priority, tag, fact in _rows(payload, concept, cutoff):
+    for priority, tag, fact in _rows(payload, concept, cutoff, unit):
         if concept.kind == "instant" and fact.end not in year_ends:
             continue
         periods.setdefault((fact.start, fact.end), []).append((priority, tag, fact))

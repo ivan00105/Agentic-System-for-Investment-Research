@@ -289,6 +289,11 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
     except Rejected as exc:
         return ToolResult(status="invalid", source="calculate", warnings=[str(exc)])
     notes += company_notes
+    converted = [r for r in records.values() if r.get("reported_unit")]
+    notes += [f"{r['id']} ({_label(r)}) is converted from {r['reported_unit']} at {r.get('fx_rate')} per US dollar "
+              f"({r.get('fx_source')})." for r in converted]
+    if args.formula in ("growth", "cagr", "change_pp") and converted:
+        notes.append("The inputs are converted at each year's own rates, so the change includes exchange-rate moves.")
     unit = UNITS[args.formula]
     record = {"id": make_id("calc", args.formula, *(f"{role}={args.inputs[role]}" for role in roles)), "kind": "calc",
               "cik": cik, "formula": args.formula, "inputs": {role: args.inputs[role] for role in roles},

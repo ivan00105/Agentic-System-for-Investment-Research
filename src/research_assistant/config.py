@@ -130,6 +130,18 @@ MACRO_RELEASES = (10, 50, 53, 54, 101)
 # FRED's terms set no published number; 120 a minute per key is the commonly cited limit, and a 429 is retried.
 FRED_MAX_REQUESTS_PER_MINUTE = 120
 
+# --- Exchange rates: another currency into US dollars (REFERENCE §10) ------------------------
+
+# Provider order, best first; FX_PROVIDERS in .env overrides it. FRED's H.10 rates (free key) include TWD; Frankfurter
+# (ECB reference rates, no key) has about 30 currencies, including CNY and HKD but not TWD.
+FX_PROVIDERS = ("fred", "frankfurter")
+# A year's average needs rates within this many days of both ends of the year, and a year-end rate one within this
+# many days before the date: markets close for holidays (Lunar New Year, Christmas) and FRED posts H.10 a week late.
+FX_WINDOW_SLACK_DAYS = 10
+# Rates for a period that ended this long ago are complete and cached for good; newer ones refresh after the max age.
+FX_FINAL_AFTER_DAYS = 14
+FX_CACHE_MAX_AGE_HOURS = 12
+
 # --- Peers and sector benchmark -----------------------------------------------------------
 
 # Peers returned when the agent doesn't ask: enough to set margins and returns side by side. The agent can ask for more.
