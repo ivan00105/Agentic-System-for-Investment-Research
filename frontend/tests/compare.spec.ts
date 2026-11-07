@@ -140,3 +140,13 @@ test('a shortlist shows a pick\'s warnings and citations, and why the search end
   await expect(page.getByText('Stopped at the research limit: 3 research runs.')).toBeVisible()
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
 })
+
+test('removing every company clears the question built from them', async ({page}) => {
+  await page.goto('/')
+  await pickCompanies(page, ['AAPL'])
+  const question = page.getByLabel('Your question')
+  await expect(question).toHaveValue(/^For Apple Inc\. \(AAPL\), explain/)
+  await page.getByRole('button', {name: 'Remove Apple Inc.'}).click()
+  await expect(question).toHaveValue('')
+  await expect(page.getByRole('button', {name: 'Research this question →'})).toBeDisabled()
+})

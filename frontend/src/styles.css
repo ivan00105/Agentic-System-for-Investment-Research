@@ -225,7 +225,8 @@ nav{flex-direction:row;flex-wrap:wrap;margin-top:17px;gap:6px}
 nav button{flex:1 1 40%;justify-content:center;padding:9px 6px;min-height:44px;font-size:12px;gap:7px}
 nav button span{font-size:17px}
 .workspace{margin:0}
-.topbar{height:40px;padding:0 20px;font-size:9px}
+.topbar{height:auto;min-height:40px;padding:6px 16px;gap:10px;font-size:9px}
+.level-picker select{min-width:0;max-width:130px}
 main{padding:25px 18px 0}
 .page-heading{margin-bottom:23px}
 .eyebrow{font-size:9px;letter-spacing:1.2px}
@@ -414,6 +415,7 @@ h2{font-size:19px}
 }
 /* Detail level, glossary, raw figures, exports and the spec editor */
 .level-picker{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.level-picker label{flex:none;min-width:0;white-space:nowrap}
 .level-picker select{min-height:34px;padding:4px 8px;font-size:12px;letter-spacing:0;text-transform:none;border:1px solid #c9d2c6;border-radius:4px;background:#fffefa;color:var(--ink)}
 .glossary dl{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0}
 .glossary dt{font-weight:650;font-size:13px;color:var(--ink)}

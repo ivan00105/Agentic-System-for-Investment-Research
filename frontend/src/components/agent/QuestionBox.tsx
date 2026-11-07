@@ -48,7 +48,7 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
   const find = kind === 'find'
   const universe = universes.find(u => u.id === among)
   const built = buildQuestion(kind, companies, topics, {count, among: universe ? `among ${universe.name}` : 'from my list', sector})
-  useEffect(() => { if (!edited && built) setQuestion(built) }, [built, edited])
+  useEffect(() => { if (!edited) setQuestion(built) }, [built, edited]) // empty too, so no stale question stays
   const topK = Number.isInteger(Number(count)) && Number(count) >= 1 ? Number(count) : null // sent, not only written
   // A question not built from the choices may not name the list or count, so say what will actually run.
   const willScreen = find && question.trim() !== built.trim() ? `Will screen: ${among === 'mine' ? `your ${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}` : universe?.name ?? among}, return ${topK ?? 'as many as the question asks'}.` : ''
