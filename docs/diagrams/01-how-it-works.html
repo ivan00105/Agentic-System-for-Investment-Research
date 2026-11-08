@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How it works, by example</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #5a6580;
+      --color-rule: rgba(45,49,66,0.12); --color-accent: #bf4520; --color-link: #2e5aa8;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+           min-height: 100vh; padding: 3rem 2rem; }
+    .frame { max-width: 1280px; width: 100%; margin: 0 auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+         letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.75rem; }
+    .subtitle { max-width: 72ch; font-size: 0.9375rem; line-height: 1.6; color: var(--color-muted); margin-bottom: 1.75rem; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .diagram-container:focus-visible { outline: 2px solid var(--color-muted); outline-offset: 4px; }
+    svg { width: 100%; display: block; }
+    .notes { margin-top: 1.75rem; max-width: 80ch; border-top: 1px solid var(--color-rule); padding-top: 1rem; }
+    .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    .notes li { font-size: 0.875rem; line-height: 1.6; margin-left: 1.1rem; color: var(--color-ink); }
+    .notes code, .subtitle code { font-family: var(--font-mono); font-size: 0.85em; }
+    .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1rem;
+             border-top: 1px solid var(--color-rule); font-family: var(--font-mono); font-size: 0.75rem; }
+    .pager a { color: var(--color-link); text-decoration: none; }
+    .pager a:hover { text-decoration: underline; }
+    .scroll-hint { display: none; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--color-muted); }
+    @media (max-width: 700px) { body { padding: 2rem 1rem; } .scroll-hint { display: block; } }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0 !important; } .pager { display: none; } }
+
+    svg { min-width: 1280px; }
+    @media print { svg { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">Level 0 · Worked example · input to output</p>
+    <h1>How it works, by example</h1>
+    <p class="subtitle">One real run, start to finish. You ask about a company; a coordinator and three analysts gather evidence with tools; code checks every number; a critic catches a mistake and the team fixes it; you get a report where each number links to its source.</p>
+    <div class="diagram-container" role="region" aria-label="How it works, by example diagram; scroll sideways on narrow screens" tabindex="0">
+      <svg viewBox="0 0 1280 704" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="01-how-it-works-title 01-how-it-works-desc">
+        <title id="01-how-it-works-title">How it works, by example</title>
+        <desc id="01-how-it-works-desc">A real NVIDIA question built from one company and four topics goes through planning, evidence gathering with 120 tool calls, a checked draft, a critic review that corrects a wrong operating-margin range, and comes out as a cited report plus a trace file, with net margin traced to two 10-K facts.</desc>
+        <defs>
+  <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+  <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+  <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+</defs>
+        <rect width="1280" height="704" fill="#f5f5f5"/>
+<text x="24" y="36" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">1 · INPUT</text>
+<text x="416" y="36" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">2 · WHAT RAN (CONDITION D)</text>
+<text x="888" y="36" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">3 · OUTPUT</text>
+<path d="M 344 88 L 416 88" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="368" y="70" width="24" height="12" rx="2" fill="#f5f5f5"/><text x="380" y="79" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">ASK</text>
+<path d="M 616 120 L 616 148" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 616 212 L 616 240" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 616 304 L 616 332" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 616 412 L 616 440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 816 460 L 840 460 Q 848 460 848 452 L 848 248 Q 848 240 856 240 L 888 240" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 816 484 L 860 484 Q 868 484 868 492 L 868 588 Q 868 596 876 596 L 888 596" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 1216 432 L 1216 468" fill="none" stroke="#2e5aa8" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-link)"/>
+<rect x="1146" y="444" width="62" height="12" rx="2" fill="#f5f5f5"/><text x="1204" y="453" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end" letter-spacing="0.06em">SOURCE [2]</text>
+<rect x="24" y="56" width="320" height="272" rx="6" fill="rgba(79,93,117,0.10)" stroke="#5a6580"/>
+<text x="40" y="78" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">THE QUESTION BOX</text>
+<text x="40" y="102" fill="#2d3142" font-size="13" font-family="'Geist', system-ui, sans-serif">“For Nvidia Corp (NVDA), explain how</text>
+<text x="40" y="120" fill="#2d3142" font-size="13" font-family="'Geist', system-ui, sans-serif">profitable it is, how fast it is growing,</text>
+<text x="40" y="138" fill="#2d3142" font-size="13" font-family="'Geist', system-ui, sans-serif">whether its valuation looks high or low</text>
+<text x="40" y="156" fill="#2d3142" font-size="13" font-family="'Geist', system-ui, sans-serif">and its main risks.”</text>
+<text x="40" y="188" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.1em">BUILT FROM ONE COMPANY + FOUR TOPIC CHIPS</text>
+<rect x="40" y="198" width="34" height="18" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/><text x="46" y="211" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">NVDA</text>
+<rect x="80" y="198" width="85" height="18" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/><text x="86" y="211" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">profitability</text>
+<rect x="171" y="198" width="45" height="18" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/><text x="177" y="211" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">growth</text>
+<rect x="40" y="222" width="62" height="18" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/><text x="46" y="235" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">valuation</text>
+<rect x="108" y="222" width="40" height="18" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="0.8"/><text x="114" y="235" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">risks</text>
+<text x="40" y="266" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.1em">RUN OPTIONS (DEFAULTS)</text>
+<text x="40" y="282" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">condition D: team + critic</text>
+<text x="40" y="296" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">cutoff: now (3 Nov 2026)</text>
+<text x="40" y="316" fill="#5a6580" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">Find instead runs Discover (diagram 5)</text>
+<rect x="416" y="56" width="400" height="64" rx="6" fill="#f5f5f5"/>
+<rect x="416" y="56" width="400" height="64" rx="6" fill="#ffffff" stroke="#2d3142"/>
+<text x="432" y="78" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">1</text>
+<text x="456" y="78" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600">Plan</text>
+<text x="456" y="94" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">coordinator · 1 model call, no tools</text>
+<text x="456" y="108" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">decides to ask fundamentals, market and filings</text>
+<rect x="416" y="148" width="400" height="64" rx="6" fill="#f5f5f5"/>
+<rect x="416" y="148" width="400" height="64" rx="6" fill="#ffffff" stroke="#2d3142"/>
+<text x="432" y="170" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">2</text>
+<text x="456" y="170" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600">Gather evidence</text>
+<text x="456" y="186" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">3 analysts · 120 tool calls, e.g. 79 calculate,</text>
+<text x="456" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">28 filing sections, 9 price series; each result gets an ID</text>
+<rect x="416" y="240" width="400" height="64" rx="6" fill="#f5f5f5"/>
+<rect x="416" y="240" width="400" height="64" rx="6" fill="#ffffff" stroke="#2d3142"/>
+<text x="432" y="262" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">3</text>
+<text x="456" y="262" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600">Draft + check</text>
+<text x="456" y="278" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">the coordinator writes {calc:ID} slots, never digits</text>
+<text x="456" y="292" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">checker: every slot resolves (0 flags) · 1 self-review</text>
+<rect x="416" y="332" width="400" height="80" rx="6" fill="#f5f5f5"/>
+<rect x="416" y="332" width="400" height="80" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520"/>
+<text x="432" y="354" fill="#bf4520" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">4</text>
+<text x="456" y="354" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600">Critic review</text>
+<text x="456" y="370" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">round 1: “operating margin ranged 15.7–60.4%”, but</text>
+<text x="456" y="384" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">FY2025&#x27;s was 62.4% → fundamentals rechecks → corrected</text>
+<text x="456" y="398" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">round 2: only a minor point → not sent back, loop ends</text>
+<rect x="416" y="440" width="400" height="64" rx="6" fill="#f5f5f5"/>
+<rect x="416" y="440" width="400" height="64" rx="6" fill="#ffffff" stroke="#2d3142"/>
+<text x="432" y="462" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">5</text>
+<text x="456" y="462" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600">Fill in and save</text>
+<text x="456" y="478" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">the host puts each record&#x27;s value into its slot</text>
+<text x="456" y="492" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">50 model calls · 143 tool calls · $0.13 · 18 min</text>
+<rect x="888" y="56" width="368" height="376" rx="6" fill="#ffffff" stroke="#2d3142"/>
+<text x="904" y="78" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">THE REPORT · ANSWER FIRST</text>
+<text x="904" y="100" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Summary</text>
+<text x="1240" y="100" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="end" letter-spacing="0.1em">CITED</text>
+<text x="904" y="115" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">Extremely profitable and still growing fast, but the</text>
+<text x="904" y="129" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">shares are priced for much of that growth to continue.</text>
+<path d="M 904 146 H 1240" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="904" y="160" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Key numbers</text>
+<text x="1240" y="160" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="end" letter-spacing="0.1em">CITED</text>
+<text x="904" y="176" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">Revenue, FY to 25 Jan 2026</text>
+<text x="1204" y="176" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">$215.9 bn</text>
+<text x="1240" y="176" fill="#2e5aa8" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">[11]</text>
+<text x="904" y="190" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">Net margin, same year</text>
+<text x="1204" y="190" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="600" text-anchor="end">55.6%</text>
+<text x="1240" y="190" fill="#2e5aa8" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" font-weight="600" text-anchor="end">[2]</text>
+<text x="904" y="204" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">Revenue growth vs FY2025</text>
+<text x="1204" y="204" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">65.5%</text>
+<text x="1240" y="204" fill="#2e5aa8" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">[3]</text>
+<text x="904" y="218" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">P/E on 2 Nov 2026</text>
+<text x="1204" y="218" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">40.6x</text>
+<text x="1240" y="218" fill="#2e5aa8" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">[4]</text>
+<path d="M 904 238 H 1240" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="904" y="252" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Bull case · Bear case</text>
+<text x="1240" y="252" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="end" letter-spacing="0.1em">QUALIFIED · CITED</text>
+<text x="904" y="267" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">Both sides of the argument, every line cited.</text>
+<path d="M 904 282 H 1240" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="904" y="296" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Risks</text>
+<text x="1240" y="296" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="end" letter-spacing="0.1em">CITED</text>
+<text x="904" y="311" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">Suppliers in Asia, China export rules, a few big buyers.</text>
+<path d="M 904 326 H 1240" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="904" y="340" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">What would change the view</text>
+<text x="1240" y="340" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" text-anchor="end" letter-spacing="0.1em">CITED</text>
+<text x="904" y="355" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">e.g. quarterly growth falling below 65.5%.</text>
+<path d="M 904 370 H 1240" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="904" y="384" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Review · Sources</text>
+<text x="904" y="399" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">2 objections corrected, 1 minor left open · 144 records.</text>
+<rect x="888" y="468" width="368" height="76" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+<text x="904" y="488" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.1em">RECORD [2] · CALC-7E568B6795F4</text>
+<text x="904" y="506" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">ratio(net income, revenue) = 55.6%</text>
+<text x="904" y="520" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">inputs: $120.1 bn ÷ $215.9 bn, FY to 25 Jan 2026</text>
+<text x="904" y="534" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">both facts from the 10-K filed 25 Feb 2026 (SEC)</text>
+<rect x="888" y="568" width="368" height="56" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+<text x="904" y="588" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">TRACE FILE</text>
+<text x="904" y="604" fill="#2d3142" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">data/traces/20261103-172540-c7feca.jsonl</text>
+<text x="904" y="617" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">every call and result · History · --recheck</text>
+<line x1="24" y1="656" x2="1256" y2="656" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="24" y="680" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="670" width="20" height="14" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580"/>
+<text x="126" y="680" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">what you give it</text>
+<rect x="248" y="670" width="20" height="14" rx="3" fill="rgba(191,69,32,0.08)" stroke="#bf4520"/>
+<text x="278" y="680" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">where it corrects itself</text>
+<rect x="444" y="670" width="20" height="14" rx="3" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+<text x="474" y="680" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">saved evidence</text>
+<path d="M 584 677 H 602" stroke="#2e5aa8" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-link)"/>
+<text x="614" y="680" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">every number traces back</text>
+<text x="1256" y="680" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">real run 20261103-172540-c7feca, deepseek-v4.1-flash</text>
+      </svg>
+    </div>
+    <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+    <section class="notes"><h2>How to read it</h2><ul><li>Every figure on this page comes from the saved trace of that run (3 Nov 2026, NVIDIA, condition D), not from a mock-up.</li><li><b>Why numbers can be trusted:</b> the LLM never types a figure. It cites a record ID, and the host fills in the value from that record. Click a [n] in the app to see the record, e.g. [2] above.</li><li><b>Statuses:</b> a section is <i>cited</i> when every citation resolves and nothing is flagged, <i>qualified</i> when a line still carries a flag (from the checker, or an open material objection), and <i>abstained</i> when it has no claims. Whether a source really supports a line is judged in the evaluation, not by the checker.</li><li><b>The correction</b> in step 4 is the critic doing its job: the draft said the five-year operating margin peaked at 60.4%, the critic pointed to FY2025's 62.4%, and the fundamentals analyst rechecked and fixed the claim.</li><li>Diagram 4 shows the same run as roles and hand-offs; diagram 5 shows what Find does instead.</li></ul></section>
+    <nav class="pager"><span></span><a href="index.html">All diagrams</a><a href="02-today-vs-target.html">Today vs target →</a></nav>
+  </main>
+</body>
+</html>

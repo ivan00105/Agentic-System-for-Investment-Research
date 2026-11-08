@@ -506,5 +506,6 @@ With 3 people: merge Data + Outlook, merge UI + Evaluation/report, and keep Agen
 | `PROJECT_GUIDE.md` | This file: vision, status, plan. **The only status doc.** |
 | `docs/REFERENCE.md` | Rules, finance cautions, evaluation, outlook spec, resources, and the **adopt-or-build table** (check it before writing a tool or adding a dependency) |
 | `AGENTS.md` / `CLAUDE.md` | Rules for humans and AI coding tools (Phase 0). `CLAUDE.md` only imports `AGENTS.md`. |
+| `docs/diagrams/` | Six diagrams from overview to detail, built vs planned (open `index.html`); redraw when the architecture changes |
 | `docs/archive/` | Old plans and records, kept for history; never the current instruction |
 | `.archify/`, `graphify-out/` | Local visual aids, git-ignored; regenerate after the architecture changes |

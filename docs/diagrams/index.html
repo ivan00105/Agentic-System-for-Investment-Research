@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project diagrams</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #5a6580;
+      --color-rule: rgba(45,49,66,0.12); --color-accent: #bf4520; --color-link: #2e5aa8;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+           min-height: 100vh; padding: 3rem 2rem; }
+    .frame { max-width: 1280px; width: 100%; margin: 0 auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+         letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.75rem; }
+    .subtitle { max-width: 72ch; font-size: 0.9375rem; line-height: 1.6; color: var(--color-muted); margin-bottom: 1.75rem; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .diagram-container:focus-visible { outline: 2px solid var(--color-muted); outline-offset: 4px; }
+    svg { width: 100%; display: block; }
+    .notes { margin-top: 1.75rem; max-width: 80ch; border-top: 1px solid var(--color-rule); padding-top: 1rem; }
+    .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    .notes li { font-size: 0.875rem; line-height: 1.6; margin-left: 1.1rem; color: var(--color-ink); }
+    .notes code, .subtitle code { font-family: var(--font-mono); font-size: 0.85em; }
+    .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1rem;
+             border-top: 1px solid var(--color-rule); font-family: var(--font-mono); font-size: 0.75rem; }
+    .pager a { color: var(--color-link); text-decoration: none; }
+    .pager a:hover { text-decoration: underline; }
+    .scroll-hint { display: none; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--color-muted); }
+    @media (max-width: 700px) { body { padding: 2rem 1rem; } .scroll-hint { display: block; } }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0 !important; } .pager { display: none; } }
+
+    .frame { max-width: 880px; }
+    ol { list-style: none; margin-top: 0.5rem; }
+    li.card { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: 1rem 0;
+               border-top: 1px solid var(--color-rule); }
+    .lvl { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--color-muted); padding-top: 0.2rem; }
+    .lvl span { display: block; margin-top: 0.2rem; color: var(--color-soft); }
+    li.card a { font-weight: 600; color: var(--color-ink); text-decoration: none; font-size: 1.05rem; }
+    li.card a:hover { color: var(--color-link); }
+    li.card p { margin-top: 0.25rem; font-size: 0.9rem; line-height: 1.55; color: var(--color-muted); }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">stock_research · diagrams</p>
+    <h1>Project diagrams</h1>
+    <p class="subtitle">Start at the top and zoom in. Each level opens up one box from the level above, in the
+    spirit of the C4 model (context, then containers, then components). Planned parts are dashed, except in
+    "Today vs target", which puts them in its own Target panel. Checked against the code and PROJECT_GUIDE.md; redraw them when the
+    architecture changes.</p>
+    <ol>
+      <li class="card"><div class="lvl">Level 0<span>Example</span></div><div><a href="01-how-it-works.html">How it works, by example</a><p>One real NVIDIA question from input to output: what ran, how a mistake got caught, and the cited report.</p></div></li>
+      <li class="card"><div class="lvl">Level 0<span>Overview</span></div><div><a href="02-today-vs-target.html">Today vs target</a><p>The whole system on one page: what is built now, the finished plan, and every difference between them.</p></div></li>
+      <li class="card"><div class="lvl">Level 1<span>Code</span></div><div><a href="03-code-layers.html">Code layers</a><p>How the code is split into six layers, and the rule that each layer only calls the ones below it.</p></div></li>
+      <li class="card"><div class="lvl">Level 2<span>Flow</span></div><div><a href="04-check-run.html">One Check run (condition D)</a><p>Coordinator, analysts, critic and the code checker: who does what, in order, during one research run.</p></div></li>
+      <li class="card"><div class="lvl">Level 2<span>Flow</span></div><div><a href="05-discover-run.html">One Discover run</a><p>From your criteria to a shortlist: the spec, the screen, the 10-K check, the research runs and when it stops.</p></div></li>
+      <li class="card"><div class="lvl">Level 3<span>Detail</span></div><div><a href="06-roles-tools-data.html">Roles, tools and data</a><p>Which role may run which tool, and where each tool's data comes from, built and planned.</p></div></li>
+    </ol>
+  </main>
+</body>
+</html>
