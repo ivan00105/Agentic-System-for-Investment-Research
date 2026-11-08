@@ -10,7 +10,7 @@ from .draft import SECTIONS, Claim, Draft
 # Tolerates spaces and a dash instead of the colon: {fact:fact-1a2b}, {fact: 1a2b}, {calc-1a2b}.
 PLACEHOLDER = re.compile(r"\{\s*(fact|calc)\s*[:-]\s*([A-Za-z0-9_.-]+?)\s*\}")
 ALLOWED_NUMBERS = re.compile("|".join(config.CHECKER_ALLOWED_NUMBER_PATTERNS))
-KINDS = "fact|calc|chunk|filing|company|prices|check|screen|claim"
+KINDS = "fact|calc|chunk|filing|company|prices|check|screen|claim|calendar|insider|peers"
 # A citation as models write it: fact-1a2b, fact:1a2b, {calc:1a2b} or {chunk: 0000-...}.
 CITATION = re.compile(rf"\{{?\s*({KINDS})\s*:\s*([A-Za-z0-9_.-]+?)\s*\}}?")
 # A record ID written in the text is a misplaced citation, not a typed figure.
@@ -162,6 +162,8 @@ def format_value(record: dict) -> str:
         return ("-" if value < 0 else "") + f"${_fixed(abs(value), 2)} per share"
     if unit == "shares":
         return f"{_scaled(value)} shares"
+    if unit == "insiders":  # get_insider_trades' count of buyers
+        return f"{_fixed(value, 0)} insider{'' if value == 1 else 's'}"
     return f"{value} {unit or ''}".strip()
 
 

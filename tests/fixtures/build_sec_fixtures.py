@@ -18,7 +18,7 @@ load_dotenv(ROOT / ".env", override=False, interpolate=False, encoding="utf-8-si
 from research_assistant.data.companies import ALL_NAMES_URL, TICKERS_URL  # noqa: E402
 from research_assistant.data.sec import SecClient  # noqa: E402
 
-CIKS = {"AAPL": 320193, "JPM": 19617, "TSM": 1046179}
+CIKS = {"AAPL": 320193, "JPM": 19617, "TSM": 1046179, "BABA": 1577552, "CHKP": 1015922}
 TICKERS = {"AAPL", "MSFT", "GOOG", "GOOGL", "JPM", "TSM", "BRK-B", "APLE", "NVDA"}
 NAMES = ("APPLE INC:", "LEHMAN BROTHERS HOLDINGS INC:")
 CONCEPTS = {"dei": ["EntityCommonStockSharesOutstanding"],
@@ -26,13 +26,30 @@ CONCEPTS = {"dei": ["EntityCommonStockSharesOutstanding"],
                         "OperatingIncomeLoss", "NetIncomeLoss", "NetCashProvidedByUsedInOperatingActivities",
                         "PaymentsToAcquirePropertyPlantAndEquipment", "Assets", "StockholdersEquity",
                         "EarningsPerShareDiluted", "CommonStockSharesOutstanding"],
-            "ifrs-full": ["Revenue", "ProfitLoss"]}
+            "ifrs-full": ["Revenue", "RevenueFromContractsWithCustomers", "ProfitLoss",
+                          "ProfitLossAttributableToOwnersOfParent", "CashFlowsFromUsedInOperatingActivities",
+                          "DilutedEarningsLossPerShare", "Assets", "LongtermBorrowings"]}
 FRAMES = [("RevenueFromContractWithCustomerExcludingAssessedTax", 2024), ("RevenueFromContractWithCustomerExcludingAssessedTax", 2023),
           ("Revenues", 2024), ("Revenues", 2023), ("OperatingIncomeLoss", 2024), ("NetIncomeLoss", 2024)]
 FRAME_CIKS = {320193, 19617, 789019, 1045810, 1652044}
 FILING = "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
 KEEP_FACTS = ("us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:OperatingIncomeLoss")
 XHTML, IX = "http://www.w3.org/1999/xhtml", "http://www.xbrl.org/2013/inlineXBRL"
+# 20-F covers: BABA's ADS of eight ordinary shares (and its cut-off share-count tag), Check Point's direct listing,
+# TSMC's "Common Shares" with the passages that say they trade as ADSs of five (its cover footnote and Item 6), and the
+# statement rows of a few FY2025 facts companyfacts lacks (its NET REVENUE row uses the IFRS 15 tag). Each passage is
+# (headings written before it, phrase).
+COVERS = {"https://www.sec.gov/Archives/edgar/data/1577552/000119312526231755/baba-20260331.htm": ((), ()),
+          "https://www.sec.gov/Archives/edgar/data/1015922/000117891326001932/zk2634942.htm": ((), ()),
+          "https://www.sec.gov/Archives/edgar/data/1046179/000162828026025362/tsm-20251231.htm": ((
+              ((), "Not for trading, but only in connection with the listing on the New York Stock Exchange, Inc. of "
+                   "American Depositary Shares"),
+              (("PART I", "ITEM 6. DIRECTORS, SENIOR MANAGEMENT AND EMPLOYEES"),
+               "shares held in the form of ADSs (each ADS represents five (5) common shares)")), (
+              "ifrs-full:RevenueFromContractsWithCustomers", "ifrs-full:ProfitLossAttributableToOwnersOfParent",
+              "ifrs-full:DilutedEarningsLossPerShare", "ifrs-full:Assets"))}
+XBRLI = "http://www.xbrl.org/2003/instance"
+COVER_END = re.compile(r"registrant\s+is\s+a\s+shell\s+company", re.I)
 
 
 def write(name, payload):
@@ -92,6 +109,52 @@ def trim_filing(raw: bytes) -> str:
     for i, child in reversed(list(enumerate(children))):
         if i and i not in keep:
             body.remove(child)
+    for element in root.iter():
+        if isinstance(element.tag, str):
+            element.attrib.pop("style", None)
+    return etree.tostring(root, encoding="unicode")
+
+
+def trim_cover(raw: bytes, keep: tuple = (), facts: tuple[str, ...] = ()) -> str:
+    """A 20-F cut to its cover: everything up to the shell-company question that ends it, and the XBRL contexts and
+    units the cover's tags use. Hidden facts, scripts and styles are dropped; the cover's tags and text stay as filed.
+    The innermost paragraph, div or cell holding each `keep` phrase is copied after the cover, after its headings
+    (so the cover ends where the filing's does), and so is the first table row tagging each of `facts` for the whole
+    company (no dimensions), inside one table."""
+    import copy
+
+    from lxml import etree
+
+    root = etree.fromstring(raw, etree.XMLParser(huge_tree=True))
+    header = next(root.iter(f"{{{IX}}}header"))
+    for element in [*header.iter(f"{{{IX}}}hidden"), *root.iter(f"{{{XHTML}}}script")]:
+        element.getparent().remove(element)
+    blocks = {f"{{{XHTML}}}{tag}" for tag in ("p", "div", "td")}
+    extra = []
+    for headings, phrase in keep:
+        for text in headings:
+            heading = etree.SubElement(etree.Element(f"{{{XHTML}}}div"), f"{{{XHTML}}}span")
+            heading.text = text
+            extra.append(heading.getparent())
+        extra.append(copy.deepcopy([e for e in root.iter(*blocks) if phrase in " ".join("".join(e.itertext()).split())][-1]))
+    whole = {c.get("id") for c in header.iter(f"{{{XBRLI}}}context") if c.find(f".//{{{XBRLI}}}segment") is None}
+    if facts:
+        table = etree.Element(f"{{{XHTML}}}table")
+        for name in facts:
+            table.append(copy.deepcopy(next(row for node in root.iter(f"{{{IX}}}nonFraction")
+                                            if node.get("name") == name and node.get("contextRef") in whole
+                                            for row in node.iterancestors(f"{{{XHTML}}}tr"))))
+        extra.append(table)
+    node = [e for e in root.iter() if isinstance(e.tag, str) and COVER_END.search(" ".join("".join(e.itertext()).split()))][-1]
+    while node.tag != f"{{{XHTML}}}body":
+        for sibling in list(node.itersiblings()):
+            node.getparent().remove(sibling)
+        node = node.getparent()
+    node.extend(extra)
+    used = set(re.findall(rb'(?:contextRef|unitRef)="([^"]+)"', etree.tostring(root)))
+    for element in [*header.iter("{http://www.xbrl.org/2003/instance}context"), *header.iter("{http://www.xbrl.org/2003/instance}unit")]:
+        if element.get("id").encode() not in used:
+            element.getparent().remove(element)
     for element in root.iter():
         if isinstance(element.tag, str):
             element.attrib.pop("style", None)
@@ -189,6 +252,8 @@ def main():
             keep = ([i for i, f in enumerate(old_forms) if f == "10-K"][:1] + [i for i, f in enumerate(old_forms) if f == "8-K"][:2])
             write(older[0]["name"], {key: [values[i] for i in sorted(keep)] for key, values in page.items()})
     write("aapl-20250927.htm", trim_filing(sec.get(FILING).body))
+    for url, (keep, facts) in COVERS.items():
+        write(url.rsplit("/", 1)[-1], trim_cover(sec.get(url).body, keep, facts))
     for tag, year in FRAMES:
         frame = sec.get(f"https://data.sec.gov/api/xbrl/frames/us-gaap/{tag}/USD/CY{year}.json").json()
         frame["data"] = [row for row in frame["data"] if row["cik"] in FRAME_CIKS]

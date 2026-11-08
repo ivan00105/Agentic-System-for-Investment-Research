@@ -1,9 +1,12 @@
 from decimal import Decimal
 
+import httpx
 import pytest
+from fx_rates import Frankfurter
 from sec_files import SecFiles, make_context
+from test_tool_get_financials import foreign_variant
 
-from research_assistant.data import ixbrl
+from research_assistant.data import fx_frankfurter, ixbrl
 from research_assistant.filings import Document
 from research_assistant.tools.get_financials import GetFinancialsInput
 from research_assistant.tools.get_financials import run as get_financials
@@ -93,3 +96,29 @@ def test_an_unreadable_number_is_unverified_not_a_mismatch(apple, monkeypatch):
     monkeypatch.setattr(ixbrl, "_number", lambda node: None)
     result = verify(context, ids["2025-09-27", "revenue"])
     assert result.data["verdict"] == "unverified" and "could not be read" in result.warnings[0]
+
+
+def test_a_cover_count_the_tag_cuts_off_is_checked_against_the_tag(tmp_path):
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1577552", metrics=["shares_outstanding"], years=1), context)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    check = verify(context, shares["id"])
+    assert check.data["verdict"] == "match" and check.data["expected"] == "1858037427"
+    assert "The fact uses 18580374278, not the tag's 1858037427; its notes say why." in check.warnings
+
+
+def test_a_converted_figure_is_checked_in_the_currency_it_was_filed_in(tmp_path, monkeypatch):
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(Frankfurter()))
+    files = foreign_variant("CNY")
+    context = make_context(tmp_path, files=files)
+    result = get_financials(GetFinancialsInput(cik="320193", metrics=["revenue"], years=1), context)
+    fact = result.data["metrics"]["revenue"]["values"][0]
+    files.overrides[FILING] = httpx.Response(200, text=f'''<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"
+        xmlns:xbrli="http://www.xbrl.org/2003/instance"><body><xbrli:context id="fy"><xbrli:entity>
+        <xbrli:identifier scheme="http://www.sec.gov/CIK">0000320193</xbrli:identifier></xbrli:entity><xbrli:period>
+        <xbrli:startDate>{fact["start"]}</xbrli:startDate><xbrli:endDate>{fact["end"]}</xbrli:endDate></xbrli:period>
+        </xbrli:context><xbrli:unit id="cny"><xbrli:measure>iso4217:CNY</xbrli:measure></xbrli:unit>
+        <table><tr><td>Net sales</td><td><ix:nonFraction id="r1" name="{fact["tag"]}" contextRef="fy" unitRef="cny"
+        decimals="0" scale="0">{int(fact["reported_value"]):,}</ix:nonFraction></td></tr></table></body></html>''')
+    check = verify(context, fact["id"])
+    assert check.data["verdict"] == "match" and check.data["expected"] == fact["reported_value"] != fact["value"]

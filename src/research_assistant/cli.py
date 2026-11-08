@@ -13,7 +13,9 @@ from openai import OpenAI
 from . import config
 from .agents import critic, discover, evidence, isolated_review, single_agent, team
 from .agents.progress import describe
+from .agents.tool_lines import Seen
 from .data import universe
+from .data.errors import DataError
 from .data.sec import SecClient
 from .model_access import load_model_settings
 from .tools.result import ToolContext
@@ -23,6 +25,7 @@ sec_client = SecClient
 # Evaluation conditions the CLI can run (REFERENCE §7); A is the web app's fixed pipeline.
 CONDITIONS = {"B": single_agent.run, "C": team.run, "D": critic.run}
 LABELS = {"B": single_agent.CONDITION, "C": team.CONDITION, "D": critic.CONDITION}
+SEEN = Seen()  # records and company names the progress lines have seen; IDs are content hashes, so runs never clash
 
 
 def model_client(settings):
@@ -45,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="With --review: first plant a labelled test defect in the saved draft.")
     parser.add_argument("--universe", metavar="NAME_OR_FILE",
                         help="Discover: screen this declared universe (bundled: " + ", ".join(universe.bundled())
-                             + "; or a YAML file), then research the top candidates with --condition.")
+                             + f"; {universe.ALL_FILERS} for every SEC filer with a ticker; or a YAML file), then "
+                             "research the top candidates with --condition.")
     parser.add_argument("--define", action="append", default=[], metavar="TERM=MEANING",
                         help="With --universe: define a vague term up front, e.g. 'reasonable valuation=P/E below "
                              "40'. Terms left open are asked about when the terminal is interactive.")
@@ -111,14 +115,19 @@ def ask(question: str, cutoff_day: date | None, condition: str = "B") -> int:
 
 
 def find(question: str, name: str, condition: str, defined: dict[str, str], replacements: int) -> int:
-    try:
-        declared = universe.load(name)
+    try:  # a bad name fails before anything else; every SEC filer needs the SEC client first
+        declared = None if name == universe.ALL_FILERS else universe.load(name)
     except universe.UniverseError as exc:
         print(exc, file=sys.stderr)
         return 2
     if (settings := model_settings()) is None:
         return 2
     with sec_client() as sec, model_client(settings) as client:
+        try:
+            declared = declared or universe.load(name, sec)
+        except (universe.UniverseError, DataError) as exc:
+            print(exc, file=sys.stderr)
+            return 2
         if not sec.configured:
             print("SEC_USER_AGENT is not set: SEC tools answer 'unavailable' except for cached data.", file=sys.stderr)
         result = discover.run(question, client, settings, ToolContext(cutoff=datetime.now(timezone.utc), sec=sec),
@@ -128,14 +137,27 @@ def find(question: str, name: str, condition: str, defined: dict[str, str], repl
 
 
 def ask_user(term) -> str | None:
-    """A vague term's question on the terminal: an answer sets it, Enter accepts the proposal. None when no one can
-    be asked (no terminal, or its input is empty), so the proposal stands labelled "assumed"."""
+    """A vague term's question on the terminal: an option's number or a definition sets it, Enter accepts the
+    proposal. None when no one can be asked (no terminal, or its input is empty), so the proposal stands labelled
+    "assumed"."""
     if not sys.stdin.isatty():  # on Windows the NUL device counts as a terminal; input() then hits EOF below
         return None
-    print(f"\n{term.question}\n  Proposed: {term.definition}\n  Your definition (Enter accepts): ", end="",
-          file=sys.stderr, flush=True)
+    options = getattr(term, "options", None) or []
+    choices = "".join(f"\n  {n}. {o.definition}" + (" (recommended)" if o.recommended else "")
+                      for n, o in enumerate(options, 1))
+    print(f"\n{term.question}" + (f"{choices}\n  Type a number or your own definition (Enter accepts the "
+                                   "recommended one): " if options else
+                                   f"\n  Proposed: {term.definition}\n  Your definition (Enter accepts): "),
+          end="", file=sys.stderr, flush=True)
     try:
-        return input()
+        while True:
+            answer = input()
+            if not (options and answer.strip().isdigit()):
+                return answer
+            if 1 <= int(answer) <= len(options):
+                chosen = options[int(answer) - 1]
+                return "" if chosen.recommended else chosen.definition
+            print(f"  Pick 1 to {len(options)}, or type a definition: ", end="", file=sys.stderr, flush=True)
     except EOFError:
         print("(no answer)", file=sys.stderr)
         return None
@@ -168,8 +190,8 @@ def recheck(path: Path) -> int:
 
 
 def progress(event: dict):
-    """One line per step on stderr, so a run of a few minutes isn't silent."""
-    if line := describe(event):
+    """One line per event on stderr, so a run of a few minutes isn't silent."""
+    if line := describe(event, SEEN):
         print(line, file=sys.stderr, flush=True)
 
 

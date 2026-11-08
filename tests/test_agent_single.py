@@ -164,3 +164,13 @@ def test_cancelling_during_the_self_review_keeps_the_draft(tmp_path):
     assert result.status == "stopped" and "## Summary (cited)" in result.markdown
     assert "The self-review pass ended without a new report (stopped)" in result.markdown
     assert events[-1]["status"] == "stopped"
+
+
+def test_a_run_cancelled_before_it_plans_makes_no_model_call(tmp_path):
+    # Codex review: a cancel that came before the plan request still sent it.
+    context, client = make_context(tmp_path), FakeClient(PLAN)
+    context.stop.set()
+    result = single_agent.run("Is Apple profitable?", client, SETTINGS, context, trace_dir=tmp_path / "traces")
+    assert result.status == "stopped" and result.error is None and client.requests == []
+    events = [json.loads(line) for line in result.trace_path.read_text(encoding="utf-8").splitlines()]
+    assert [e["kind"] for e in events] == ["run_start", "run_end"] and events[-1]["status"] == "stopped"

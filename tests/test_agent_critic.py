@@ -227,7 +227,7 @@ def test_outcomes_follow_the_ledger_and_what_is_open_at_the_guard_is_unresolved(
     assert "  - Outcome: withdrawn in round 1: It was an opinion. [1]" in result.markdown
 
 
-def test_a_missing_risk_is_corrected_by_adding_a_claim(tmp_path):
+def missing_risk_run(tmp_path, risk_cites, outcome_cites):
     def critic_round_1(messages):
         return calls(("submit_objections", {"objections": [
             objection(*claim_in(messages[1]["content"], "summary[0]"), "missing_material_risk")]}))
@@ -235,18 +235,33 @@ def test_a_missing_risk_is_corrected_by_adding_a_claim(tmp_path):
     def add_a_risk(messages):
         request = messages[-1]["content"]
         draft = json.loads(request[request.index("{"):])
-        draft["risks"] = [{"text": "Apple depends on a few suppliers.", "citations": [COMPANY]}]
+        draft["risks"] = [{"text": "Apple depends on a few suppliers.", "citations": risk_cites}]
         return calls(("submit_revision", {**draft, "outcomes": [{
             "objection": re.search(r"- (objection-\w+) on", request)[1], "outcome": "corrected",
-            "explanation": "Added the supplier risk.", "citations": [COMPANY]}]}))
+            "explanation": "Added the supplier risk.", "citations": outcome_cites}]}))
 
-    result, _, events = run_d(tmp_path, PLAN, calls(("find_company", {"query": "AAPL"})), calls((
+    return run_d(tmp_path, PLAN, calls(("find_company", {"query": "AAPL"})), calls((
         "submit_report", {"summary": [{"text": "Apple Inc. files annual reports with the SEC.",
-                                       "citations": [COMPANY]}]})), resubmit, critic_round_1, add_a_risk, CLEAN)
+                                       "citations": [COMPANY]}]})), resubmit, critic_round_1, add_a_risk, CLEAN,
+        critic_rounds=2)
+
+
+def test_a_missing_risk_is_corrected_by_adding_a_claim(tmp_path):
+    result, _, events = missing_risk_run(tmp_path, [COMPANY], [COMPANY])
     [o] = events[-1]["objections"]
     risk, summary = result.report.sections["risks"][0], result.report.sections["summary"][0]
     assert (o["outcome"], o["new_version"], o["new_claims"], summary.version) == ("corrected", None, [risk.id], 1)
     assert f"  - Outcome: corrected by adding `{risk.id}` in round 1: Added the supplier risk. [1]" in result.markdown
+
+
+@pytest.mark.parametrize("risk_cites,outcome_cites", [([COMPANY], []), ([], [COMPANY])])
+def test_an_added_risk_without_evidence_does_not_close_the_objection(tmp_path, risk_cites, outcome_cites):
+    # Second review: an added claim closed a missing-risk objection as corrected with no citation at all.
+    _, _, events = missing_risk_run(tmp_path, risk_cites, outcome_cites)
+    [o] = events[-1]["objections"]
+    assert (o["outcome"], o["new_claims"]) == ("unresolved", [])
+    assert ("Round 1: a claim was added, but it stays open: that needs a new Risks claim and an outcome that each "
+            "cite a tool record.") in o["notes"]
 
 
 def saved_run(tmp_path, historical=False):
@@ -354,7 +369,7 @@ def test_a_review_of_a_historical_run_stays_historical(tmp_path, monkeypatch, ca
 
 @pytest.mark.parametrize("outcomes,why", [
     ([], "no outcome was given"),
-    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without a citation"),
+    ([{"outcome": "corrected", "citations": [], "explanation": "Fixed it."}], "corrected without evidence"),
 ])
 def test_a_new_version_alone_does_not_close_an_objection_as_corrected(tmp_path, outcomes, why):
     # Codex review: any new claim version closed its objection as corrected, with no outcome or evidence.
@@ -394,3 +409,18 @@ def test_a_claim_citing_one_with_an_unresolved_objection_is_flagged_one_level_on
     assert [f.problem for f in b.flags] == ["It cites claim-a, which has unresolved objection objection-1 (wrong "
                                             "period)."]
     assert c.flags == [] and len(report.flags) == 2
+
+
+def test_an_unresolved_objection_follows_its_claim_to_a_new_version():
+    # Second review: changing only the wording or materiality left the objection open on v1 and v2 clean.
+    report = CheckedReport({"summary": [
+        CheckedClaim("Reworded.", "interpretation", [], [], "supporting", "claim-a", 2),
+        CheckedClaim("Cites a.", "interpretation", ["claim-a"], [], "central", "claim-b", 1)]}, [], [], [])
+    review = critic.Critic(QUESTION, None, SETTINGS, None, None, ClaimLedger(), None, 1, 1)
+    review.raised = [critic.Raised("objection-1", 1, "claim-a", 1, "summary[0]", "coordinator", "wrong_period", True,
+                                   "Wrong year.", [], "Check it.", outcome="unresolved")]
+    review._qualify(report)
+    a, b = report.sections["summary"]
+    assert [f.problem for f in a.flags] == ["Objection objection-1 (wrong period) is unresolved: Wrong year."]
+    assert [f.problem for f in b.flags] == ["It cites claim-a, which has unresolved objection objection-1 (wrong "
+                                            "period)."]

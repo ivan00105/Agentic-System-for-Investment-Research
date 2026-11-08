@@ -191,3 +191,18 @@ def test_cancelling_stops_before_the_next_model_call_and_skips_the_steps_other_t
     logged = events(trace)
     assert [e["kind"] for e in logged] == ["model_call", "tool_call", "cancelled"]
     assert logged[1]["result"]["warnings"] == ["Not run: the run was cancelled."]
+
+
+def test_a_cancel_at_the_step_limit_makes_no_final_model_call(tmp_path):
+    # Second review: the step guard's partial-report call ran even after the user cancelled.
+    context = make_context(tmp_path)
+
+    def cancel_while_asking(messages):
+        context.stop.set()
+        return reply(tool_calls=[("find_company", {"query": "AAPL"})])
+
+    trace = Trace(tmp_path / "trace.jsonl", "run-1")
+    client = FakeClient(cancel_while_asking, reply(tool_calls=[("submit_answer", {"cik": "0000320193"})]))
+    result = run_loop(client, "fake-model", {}, [{"role": "user", "content": "?"}], context, FINISH, trace, max_steps=1)
+    assert result.status == "stopped" and len(client.requests) == 1
+    assert [e["kind"] for e in events(trace)] == ["model_call", "tool_call", "cancelled"]

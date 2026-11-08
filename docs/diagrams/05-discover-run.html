@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>One Discover run</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #5a6580;
+      --color-rule: rgba(45,49,66,0.12); --color-accent: #bf4520; --color-link: #2e5aa8;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+           min-height: 100vh; padding: 3rem 2rem; }
+    .frame { max-width: 1280px; width: 100%; margin: 0 auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+         letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.75rem; }
+    .subtitle { max-width: 72ch; font-size: 0.9375rem; line-height: 1.6; color: var(--color-muted); margin-bottom: 1.75rem; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .diagram-container:focus-visible { outline: 2px solid var(--color-muted); outline-offset: 4px; }
+    svg { width: 100%; display: block; }
+    .notes { margin-top: 1.75rem; max-width: 80ch; border-top: 1px solid var(--color-rule); padding-top: 1rem; }
+    .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    .notes li { font-size: 0.875rem; line-height: 1.6; margin-left: 1.1rem; color: var(--color-ink); }
+    .notes code, .subtitle code { font-family: var(--font-mono); font-size: 0.85em; }
+    .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1rem;
+             border-top: 1px solid var(--color-rule); font-family: var(--font-mono); font-size: 0.75rem; }
+    .pager a { color: var(--color-link); text-decoration: none; }
+    .pager a:hover { text-decoration: underline; }
+    .scroll-hint { display: none; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--color-muted); }
+    @media (max-width: 700px) { body { padding: 2rem 1rem; } .scroll-hint { display: block; } }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0 !important; } .pager { display: none; } }
+
+    svg { min-width: 960px; }
+    @media print { svg { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">Level 2 · Flowchart · one Discover run</p>
+    <h1>One Discover run</h1>
+    <p class="subtitle">What <b>Find companies</b> does with criteria such as "large US tech, operating margin above 25%, reasonable valuation". It shows its reading of your words first, then walks the ranking until it has k good picks, runs out of research runs, or runs out of candidates.</p>
+    <div class="diagram-container" role="region" aria-label="One Discover run diagram; scroll sideways on narrow screens" tabindex="0">
+      <svg viewBox="0 0 960 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="05-discover-run-title 05-discover-run-desc">
+        <title id="05-discover-run-title">One Discover run</title>
+        <desc id="05-discover-run-desc">A Discover run: the screener turns the question into a spec, asks about vague terms and redoes the spec, the host screens a universe into a ranked list, then takes candidates in order, rejects those failing a code-only 10-K and price check, researches the rest, and stops with a shortlist at k picks, at k plus 3 research runs, or when the list ends.</desc>
+        <defs>
+  <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+  <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+  <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+</defs>
+        <rect width="960" height="720" fill="#f5f5f5"/>
+<path d="M 200 68 L 264 68" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 424 68 L 488 68" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 648 68 L 712 68" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="441" y="50" width="30" height="12" rx="2" fill="#f5f5f5"/><text x="456" y="59" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">ASKS</text>
+<rect x="665" y="50" width="30" height="12" rx="2" fill="#f5f5f5"/><text x="680" y="59" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SPEC</text>
+<path d="M 792 96 L 792 144" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="800" y="114" width="68" height="12" rx="2" fill="#f5f5f5"/><text x="804" y="123" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.06em">RANKED LIST</text>
+<path d="M 792 200 L 792 232" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 792 328 L 792 368" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="800" y="342" width="30" height="12" rx="2" fill="#f5f5f5"/><text x="804" y="351" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.06em">PASS</text>
+<path d="M 792 424 L 792 456" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 792 552 L 792 592" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="800" y="566" width="24" height="12" rx="2" fill="#f5f5f5"/><text x="804" y="575" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.06em">YES</text>
+<path d="M 704 280 L 680 280 Q 672 280 672 272 L 672 188 Q 672 180 680 180 L 712 180" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="612" y="226" width="52" height="12" rx="2" fill="#f5f5f5"/><text x="660" y="235" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end" letter-spacing="0.06em">REJECTED</text>
+<path d="M 704 504 L 608 504 Q 600 504 600 496 L 600 172 Q 600 164 608 164 L 712 164" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="573" y="394" width="19" height="12" rx="2" fill="#f5f5f5"/><text x="588" y="403" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end" letter-spacing="0.06em">NO</text>
+<path d="M 872 172 L 912 172 Q 920 172 920 180 L 920 612 Q 920 620 912 620 L 872 620" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="850" y="434" width="62" height="12" rx="2" fill="#f5f5f5"/><text x="908" y="443" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end" letter-spacing="0.06em">LIST ENDED</text>
+<rect x="40" y="40" width="160" height="56" rx="28" fill="#f5f5f5"/>
+<rect x="40" y="40" width="160" height="56" rx="28" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+<text x="120" y="66" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Find question</text>
+<text x="120" y="81" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">criteria + prefs</text>
+<rect x="264" y="40" width="160" height="56" rx="6" fill="#f5f5f5"/>
+<rect x="264" y="40" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="344" y="66" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Screener spec</text>
+<text x="344" y="81" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">LLM · no tools</text>
+<rect x="488" y="40" width="160" height="56" rx="6" fill="#f5f5f5"/>
+<rect x="488" y="40" width="160" height="56" rx="6" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+<text x="568" y="66" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">You answer</text>
+<text x="568" y="81" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">then spec is redone</text>
+<rect x="712" y="40" width="160" height="56" rx="6" fill="#f5f5f5"/>
+<rect x="712" y="40" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="792" y="66" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Screen universe</text>
+<text x="792" y="81" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">SEC frames, ranked</text>
+<rect x="712" y="144" width="160" height="56" rx="6" fill="#f5f5f5"/>
+<rect x="712" y="144" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="792" y="170" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Next candidate</text>
+<text x="792" y="185" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">in ranked order</text>
+<polygon points="792,232 880,280 792,328 704,280" fill="#f5f5f5"/>
+<polygon points="792,232 880,280 792,328 704,280" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1"/>
+<text x="792" y="280" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Passes check?</text>
+<text x="792" y="294" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">10-K + price, no LLM</text>
+<rect x="712" y="368" width="160" height="56" rx="6" fill="#f5f5f5"/>
+<rect x="712" y="368" width="160" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="792" y="394" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Research run</text>
+<text x="792" y="409" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">B on the web, own trace</text>
+<polygon points="792,456 880,504 792,552 704,504" fill="#f5f5f5"/>
+<polygon points="792,456 880,504 792,552 704,504" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="792" y="504" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Stop?</text>
+<text x="792" y="518" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">k picks or k+3 runs</text>
+<rect x="712" y="592" width="160" height="56" rx="28" fill="#f5f5f5"/>
+<rect x="712" y="592" width="160" height="56" rx="28" fill="rgba(79,93,117,0.10)" stroke="#5a6580" stroke-width="1"/>
+<text x="792" y="618" fill="#2d3142" font-size="12" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Shortlist</text>
+<text x="792" y="633" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">counts + Compare these</text>
+<line x1="24" y1="672" x2="936" y2="672" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="24" y="696" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="686" width="20" height="14" rx="7" fill="rgba(79,93,117,0.10)" stroke="#5a6580"/>
+<text x="126" y="696" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">start / end</text>
+<rect x="220" y="686" width="20" height="14" rx="3" fill="rgba(79,93,117,0.10)" stroke="#5a6580"/>
+<text x="250" y="696" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">asks you</text>
+<rect x="327" y="686" width="20" height="14" rx="3" fill="rgba(191,69,32,0.08)" stroke="#bf4520"/>
+<text x="357" y="696" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">the gate: plain code, every line cited</text>
+<path d="M 602 693 H 620" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="632" y="696" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">flow</text>
+      </svg>
+    </div>
+    <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+    <section class="notes"><h2>How to read it</h2><ul><li><b>Screener spec</b>: one LLM role with no tools writes the filters, the ranking rule, k and each vague term with a definition and 2–3 readings. You pick a reading (or type your own); a term you leave is marked "assumed". If you changed any, the screener redoes the spec with your answers. Professional level can edit the spec as JSON instead.</li><li><b>Screen universe</b> is the <code>screen</code> tool run by the host over a declared list (<code>sp500</code> by default, <code>sp500_tech</code>, <code>sec_all</code> or your own tickers), on SEC frames. Unknown never passes. Discover always uses today's data, so it takes no cutoff.</li><li><b>Passes check?</b> repeats every filter on the latest 10-K and every price check (P/E, P/S, market cap…) on the latest close. No model; every line cites its record. A rejection here doesn't use up a run.</li><li><b>Research run</b> is the run from diagram 4, one per candidate, with its own trace, filed under the Discover run in History. The web app uses condition B for these; the CLI takes <code>--condition</code>. A run that fails or ends with no claims is not a pick, but it still counts as a run.</li><li><b>Stop?</b> k comes from the question, else 3. Research runs are capped at k + 3 (<code>DISCOVER_MAX_REPLACEMENTS</code>). Fewer than k picks is fine: the shortlist says why.</li></ul></section>
+    <nav class="pager"><a href="04-check-run.html">← One Check run</a><a href="index.html">All diagrams</a><a href="06-roles-tools-data.html">Roles, tools and data →</a></nav>
+  </main>
+</body>
+</html>

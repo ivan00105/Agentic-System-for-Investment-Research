@@ -1,53 +1,144 @@
 """Saved agent runs, read back from their trace files (PROJECT_GUIDE Phase 7: the files in data/traces/ are the
-store, no database): a summary per run for History, a run's progress lines, and its checked report."""
+store, no database): a summary per run for History, a run's progress lines, and its checked report. Traces are
+frozen evidence, so the user's labels and archived flags live apart, in labels.json in the same folder."""
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
+from . import preferences
 from .checker import PLACEHOLDER, lookup
+from .discover import pick_title
 from .draft import SECTIONS
 from .evidence import load
-from .figures import figures
+from .figures import figures, raw
 from .objections import ISSUES
-from .progress import describe as progress_line
+from .progress import timeline
 from .report import RUN_STATUS, describe
 from .sources import GROUPS, chip, detail
 
 RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")  # the IDs Trace.new gives; any other file is not a run
+LABELS = "labels.json"
+_lock = threading.Lock()  # one change to labels.json or the trace files at a time
 
 
-def runs(folder: Path) -> list[dict]:
-    """Every saved run, newest first (run IDs start with the time)."""
+def runs(folder: Path, archived: bool = False) -> list[dict]:
+    """The top-level runs, newest first (run IDs start with the time), each with the runs it started under
+    `children`, oldest first. Archived runs are listed apart; a child goes wherever its parent is."""
+    return [run for run in tree(folder) if run["archived"] == archived]
+
+
+def tree(folder: Path) -> list[dict]:
+    """Every saved run, nested under the run that started it (see _parents)."""
     paths = sorted(folder.glob("*.jsonl"), reverse=True) if folder.is_dir() else []
-    return [found for path in paths if RUN_ID.fullmatch(path.stem) and (found := summary(path))]
+    marks, found, started = labels(folder), {}, {}
+    for path in paths:
+        if RUN_ID.fullmatch(path.stem) and (read := _summary(path, marks.get(path.stem))):
+            found[path.stem], started[path.stem] = read
+    parents = _parents(found, started)
+    roots = {run_id: _root(run_id, parents) for run_id in found}
+    top = {run_id: run | {"children": []} for run_id, run in found.items() if roots[run_id] == run_id}
+    for run_id in sorted(parents):  # oldest first: pick 1, pick 2, ...
+        child = found[run_id]  # a child that isn't a pick came from "Compare these" on the shortlist
+        top[roots[run_id]]["children"].append(child | {"kind": child["kind"] or "comparison"})
+    return list(top.values())
 
 
-def summary(path: Path) -> dict | None:
-    """What History shows. `status` is None while the trace has no run_end: still running, or cut off by a crash."""
+def _root(run_id: str, parents: dict[str, str]) -> str:
+    while run_id in parents:  # _parents never keeps a link that closes a loop, so this ends
+        run_id = parents[run_id]
+    return run_id
+
+
+def summary(path: Path, mark: dict | None = None) -> dict | None:
+    """What History shows. `status` is None while the trace has no run_end: still running, or cut off by a crash.
+    `mark` is the run's entry in labels.json."""
+    read = _summary(path, mark)
+    return read and read[0]
+
+
+def _summary(path: Path, mark: dict | None) -> tuple[dict, list[str]] | None:
+    """The summary, and the runs a Discover run_end lists as its research runs."""
     first, last = _ends(path)
     if first is None:
         return None
-    end = last if last and last.get("kind") == "run_end" else {}
-    return {"run_id": path.stem, "question": first.get("question"), "condition": first.get("condition"),
-            "cutoff": first.get("cutoff"), "model": first.get("model"), "started_at": first.get("at"),
-            "status": end.get("status"), "ended_at": end.get("at"), "totals": end.get("totals")}
+    end, mark = last if last and last.get("kind") == "run_end" else {}, mark or {}
+    question, note = preferences.split(first.get("question"))
+    pick = pick_title(question)
+    # The title: the user's label, a pick's company, else the question. Lists clamp it; the run page shows it all.
+    return ({"run_id": path.stem, "title": mark.get("label") or pick or question, "label": mark.get("label"),
+             "question": question, "preferences": note, "kind": "pick" if pick else None,
+             "parent_run_id": first.get("parent_run_id"), "archived": bool(mark.get("archived")),
+             "condition": first.get("condition"), "cutoff": first.get("cutoff"), "model": first.get("model"),
+             "started_at": first.get("at"), "status": end.get("status"), "ended_at": end.get("at"),
+             "totals": end.get("totals")},
+            [c["run_id"] for c in end.get("candidates") or [] if isinstance(c, dict) and c.get("run_id")])
+
+
+def _parents(found: dict[str, dict], started: dict[str, list[str]]) -> dict[str, str]:
+    """Each run's parent: the run_start's parent_run_id, or for traces saved before it was written, the Discover
+    run whose run_end lists it. Only a saved run started no later than its child counts (the ID's time part, since
+    runs in the same second have random suffixes), and a link that would close a loop is dropped."""
+    links = {child: run_id for run_id, children in started.items() for child in children}
+    links |= {run_id: run["parent_run_id"] for run_id, run in found.items() if run["parent_run_id"]}
+    parents = {}
+    for child, parent in sorted(links.items()):
+        if (child in found and parent in found and parent != child and parent[:15] <= child[:15]
+                and _root(parent, parents) != child):
+            parents[child] = parent
+    return parents
+
+
+def labels(folder: Path) -> dict[str, dict]:
+    """labels.json: run ID -> {"label": ..., "archived": true}. Unreadable reads as none, so History still lists."""
+    try:
+        return _marks(folder)
+    except ValueError:
+        return {}
+
+
+def mark(folder: Path, run_id: str, changes: dict):
+    """Set a run's label (None or "" clears it) or archived flag. Its trace is never touched."""
+    with _lock:
+        marks = _marks(folder)
+        entry = {key: value for key, value in (marks.get(run_id, {}) | changes).items() if value}
+        if entry:
+            marks[run_id] = entry
+        else:
+            marks.pop(run_id, None)
+        _save(folder, marks)
+
+
+def delete(folder: Path, run_ids: list[str]):
+    """Remove the runs' trace files and their labels. This can't be undone."""
+    with _lock:
+        for run_id in run_ids:
+            (folder / f"{run_id}.jsonl").unlink(missing_ok=True)
+        marks = labels(folder)
+        if any(run_id in marks for run_id in run_ids):
+            _save(folder, {key: value for key, value in marks.items() if key not in run_ids})
+
+
+def _marks(folder: Path) -> dict[str, dict]:
+    """Raises ValueError if the file isn't a JSON object, so a change never overwrites labels it couldn't read."""
+    path = folder / LABELS
+    found = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    if not isinstance(found, dict):
+        raise ValueError(f"{path} is not a JSON object")
+    return found
+
+
+def _save(folder: Path, marks: dict):
+    temporary = folder / f"{LABELS}.tmp"  # written whole, then swapped in, so a crash never leaves half a file
+    temporary.write_text(json.dumps(marks, indent=1, sort_keys=True, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, folder / LABELS)
 
 
 def progress(path: Path) -> list[dict]:
-    """One line per step worth showing, the same lines the CLI prints, with the role that took it (the CLI's
-    "[role] " prefix) and the event kind, so the page can group the lines by role."""
-    lines = []
-    for event in read_events(path):
-        try:
-            text = progress_line(event)
-        except (KeyError, TypeError):  # traces from before a field was added
-            text = event.get("kind")
-        if text:
-            role = event.get("agent")
-            lines.append({"seq": event.get("seq"), "at": event.get("at"), "kind": event.get("kind"), "role": role,
-                          "text": text.removeprefix(f"[{role}] ") if role else text})
-    return lines
+    """The run's timeline: one entry per model step (its tool calls folded under it) or other event worth a line,
+    with the role that wrote it and the event kind, so the page can group the entries by role."""
+    return timeline(read_events(path))
 
 
 def read_events(path: Path) -> list[dict]:
@@ -79,6 +170,7 @@ def report(path: Path) -> dict | None:
             "objections": [_objection(o) for o in end.get("objections") or []],
             "sources": [_source(n, i, run.records) for i, n in number.items()],
             "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
+            "raw": raw(checked["sources"], run.records) if checked else [],
             "discover": _discover(run, path.parent) if "candidates" in end else None,
             "markdown": end.get("markdown") or ""}
 
@@ -86,27 +178,42 @@ def report(path: Path) -> dict | None:
 def questions(path: Path) -> dict | None:
     """What a Discover run waiting for the user asks: its draft spec as shown, and each vague term's question."""
     found = next((e for e in reversed(read_events(path)) if e.get("kind") == "questions"), None)
-    return found and {"terms": found["terms"], "shown": found["shown"]}
+    return found and {"terms": found["terms"], "shown": found["shown"], "spec": found.get("spec")}
 
 
 def _discover(run, folder: Path) -> dict:
-    """A Discover run's shortlist: the spec as shown, the counts, and each checked candidate with its check's
-    lines and, for a researched one, its own run and that report's answer."""
+    """A Discover run's shortlist: the spec as shown, the counts, why the search ended, and each checked candidate
+    with its check's lines and, for a researched one, its own run with that report's answer, flags and status."""
     spec = next((e for e in reversed(run.events) if e["kind"] == "screen_spec"), None)
     checks = {e["rank"]: e for e in run.events if e["kind"] == "candidate"}
+    ends = {e["rank"]: e for e in run.events if e["kind"] == "research_end"}
+    screens = [r for r in run.records.values() if r.get("kind") == "screen"]  # its rows hold each company's tickers
+    tickers = {row["cik"]: row.get("tickers") or [] for r in screens for row in r.get("rows", [])}
     candidates = [{key: c.get(key) for key in ("rank", "cik", "name", "outcome", "verdict", "run_id")}
-                  | {"lines": (checks.get(c["rank"]) or {}).get("lines", []), "answer": _answer(folder, c.get("run_id"))}
+                  | {"tickers": tickers.get(c["cik"], []), "lines": (checks.get(c["rank"]) or {}).get("lines", [])}
+                  | _answer(folder, c.get("run_id"), ends.get(c["rank"]))
                   for c in run.end["candidates"]]
-    return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates}
+    return {"spec": spec and spec["shown"], "counts": run.end.get("counts") or {}, "candidates": candidates,
+            "notes": run.end.get("notes") or []}
 
 
-def _answer(folder: Path, run_id: str | None) -> str | None:
-    """The first summary statement of a pick's own report: its answer."""
+def _answer(folder: Path, run_id: str | None, research_end: dict | None) -> dict:
+    """A researched candidate's answer (the first summary statement of its own report) with that claim's
+    citations, its run's status, and warnings: the claim's flags, the report's other flags and an unfinished run."""
     path = folder / f"{run_id}.jsonl" if run_id and RUN_ID.fullmatch(run_id) else None
-    if path is None or not path.is_file():
-        return None
-    claims = ((_ends(path)[1] or {}).get("report") or {}).get("sections", {}).get("summary") or []
-    return claims[0]["text"] if claims else None
+    end = _ends(path)[1] if path and path.is_file() else None
+    checked = (end or {}).get("report") or {}
+    claim = next(iter(checked.get("sections", {}).get("summary") or []), None)
+    status = (end or research_end or {}).get("status")
+    warnings = [flag["problem"] for flag in claim["flags"]] if claim else []
+    if (others := len(checked.get("flags") or []) - len(warnings)) > 0:
+        warnings.append(f"Its report has {others} more flagged statement{'s' if others > 1 else ''}; open it to see them.")
+    if research_end and research_end.get("error"):
+        warnings.append(research_end["error"])
+    if status and status != "finished":
+        warnings.append(f"Its research run {RUN_STATUS.get(status, status)}.")
+    return {"answer": claim and claim["text"], "citations": claim["citations"] if claim else [], "warnings": warnings,
+            "run_status": status}
 
 
 def record(path: Path, record_id: str) -> dict | None:

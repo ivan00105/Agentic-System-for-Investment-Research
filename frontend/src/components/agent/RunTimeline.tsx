@@ -1,6 +1,7 @@
 // The live trace, grouped by the role that did each step: plan, analysts' work, draft, the critic's review, revisions.
+// Each model step is one line with its time; what its tool calls did folds under it.
 import type { ProgressLine } from '../../api'
-import { clock, plain, ROLE_JOBS, ROLES } from './labels'
+import { clock, ROLE_JOBS, ROLES } from './labels'
 
 const OPENERS = ['plan', 'analyst_start', 'critic_start', 'revision_start', 'questions', 'screen_spec', 'research_start']
 
@@ -14,6 +15,14 @@ function groups(lines: ProgressLine[]) {
   return out
 }
 
+function Line({line, live}: {line: ProgressLine; live: boolean}) {
+  const time = line.at ? <time dateTime={line.at}>{clock(line.at)}</time> : <span />
+  if (!line.details?.length) return <li>{time}<span>{line.text}</span></li>
+  return <li>{time}<details open={live}><summary>{line.text}</summary>
+    <ol>{line.details.map((detail, i) => <li key={detail.seq ?? i} className={detail.status && detail.status !== 'ok' ? 'timeline-problem' : undefined}>{detail.text}</li>)}</ol>
+  </details></li>
+}
+
 export function RunTimeline({lines, running}: {lines: ProgressLine[]; running: boolean}) {
   const all = groups(lines)
   if (!all.length) return <p className="muted" role="status">{running ? 'Starting: the first step appears here in a moment.' : 'No steps were recorded.'}</p>
@@ -21,13 +30,14 @@ export function RunTimeline({lines, running}: {lines: ProgressLine[]; running: b
     const role = group.role ?? ''
     const first = group.lines[0], last = group.lines[group.lines.length - 1]
     const live = running && i === all.length - 1
+    const steps = group.lines.filter(line => line.kind === 'model_call').length || group.lines.length
     return <li key={`${i}-${first.seq}`} className={live ? 'live' : ''}>
       <details open={live}>
         <summary><strong>{ROLES[role] ?? 'Run'}</strong>{ROLE_JOBS[role] && <span className="muted"> · {ROLE_JOBS[role]}</span>}
-          <span className="timeline-lead">{plain(first.text).split('\n')[0]}</span>
-          <small>{group.lines.length} step{group.lines.length === 1 ? '' : 's'}{first.at && last.at && ` · ${clock(first.at)}–${clock(last.at)}`}</small>
+          <span className="timeline-lead">{first.text.split('\n')[0]}</span>
+          <small>{steps} step{steps === 1 ? '' : 's'}{first.at && last.at && ` · ${clock(first.at)}–${clock(last.at)}`}</small>
         </summary>
-        <ol>{group.lines.map((line, j) => <li key={line.seq ?? j}>{line.at ? <time dateTime={line.at}>{clock(line.at)}</time> : <span />}<span>{plain(line.text)}</span></li>)}</ol>
+        <ol>{group.lines.map((line, j) => <Line key={line.seq ?? j} line={line} live={live && j === group.lines.length - 1} />)}</ol>
       </details>
     </li>
   })}</ol>

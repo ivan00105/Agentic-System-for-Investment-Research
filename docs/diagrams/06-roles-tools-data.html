@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roles, tools and data</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #5a6580;
+      --color-rule: rgba(45,49,66,0.12); --color-accent: #bf4520; --color-link: #2e5aa8;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+           min-height: 100vh; padding: 3rem 2rem; }
+    .frame { max-width: 1280px; width: 100%; margin: 0 auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+               text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+         letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.75rem; }
+    .subtitle { max-width: 72ch; font-size: 0.9375rem; line-height: 1.6; color: var(--color-muted); margin-bottom: 1.75rem; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .diagram-container:focus-visible { outline: 2px solid var(--color-muted); outline-offset: 4px; }
+    svg { width: 100%; display: block; }
+    .notes { margin-top: 1.75rem; max-width: 80ch; border-top: 1px solid var(--color-rule); padding-top: 1rem; }
+    .notes h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+                text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    .notes li { font-size: 0.875rem; line-height: 1.6; margin-left: 1.1rem; color: var(--color-ink); }
+    .notes code, .subtitle code { font-family: var(--font-mono); font-size: 0.85em; }
+    .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 1rem;
+             border-top: 1px solid var(--color-rule); font-family: var(--font-mono); font-size: 0.75rem; }
+    .pager a { color: var(--color-link); text-decoration: none; }
+    .pager a:hover { text-decoration: underline; }
+    .scroll-hint { display: none; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--color-muted); }
+    @media (max-width: 700px) { body { padding: 2rem 1rem; } .scroll-hint { display: block; } }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0 !important; } .pager { display: none; } }
+
+    svg { min-width: 1192px; }
+    @media print { svg { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <p class="eyebrow">Level 3 · Access matrix · tools and data</p>
+    <h1>Roles, tools and data</h1>
+    <p class="subtitle">Who may run which tool, and where each tool gets its data. The loop enforces this table: a role that asks for a tool outside its row gets an "invalid" result instead of a run.</p>
+    <div class="diagram-container" role="region" aria-label="Roles, tools and data diagram; scroll sideways on narrow screens" tabindex="0">
+      <svg viewBox="0 0 1192 728" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="06-roles-tools-data-title 06-roles-tools-data-desc">
+        <title id="06-roles-tools-data-title">Roles, tools and data</title>
+        <desc id="06-roles-tools-data-desc">A matrix of eleven built and three planned tools against six agent roles, showing which roles may run each tool and each tool&#x27;s data source, with the critic&#x27;s use of verify_against_filing highlighted.</desc>
+        <defs>
+  <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+  <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+  <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+</defs>
+        <rect width="1192" height="728" fill="#f5f5f5"/>
+<rect x="24" y="16" width="352" height="52" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="38" fill="#2d3142" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600">Tool</text>
+<text x="364" y="38" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">where its data comes from</text>
+<text x="36" y="55" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">11 built + 3 planned</text>
+<rect x="388" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="448" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Single agent</text>
+<text x="448" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">B · every tool</text>
+<rect x="520" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="580" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Coordinator</text>
+<text x="580" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">C, D · lead</text>
+<rect x="652" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="712" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Fundamentals</text>
+<text x="712" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">C, D · analyst</text>
+<rect x="784" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="844" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Filings</text>
+<text x="844" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">C, D · analyst</text>
+<rect x="916" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="976" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Market</text>
+<text x="976" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">C, D · analyst</text>
+<rect x="1048" y="16" width="120" height="52" rx="6" fill="#2d3142"/>
+<text x="1108" y="38" fill="#ffffff" font-size="11" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">Critic</text>
+<text x="1108" y="54" fill="#ffffff" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" fill-opacity="0.85">D · read-only</text>
+<rect x="24" y="84" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="106" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">find_company</text>
+<text x="364" y="106" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC company tickers</text>
+<rect x="388" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="652" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="784" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="916" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="84" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="106" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="124" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="146" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_financials</text>
+<text x="364" y="146" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC companyfacts · inline XBRL</text>
+<rect x="388" y="124" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="146" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="124" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="146" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="124" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="146" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="784" y="124" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="146" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="124" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="146" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="124" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="146" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="164" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="186" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">calculate</text>
+<text x="364" y="186" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">finance/ maths · no I/O</text>
+<rect x="388" y="164" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="186" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="164" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="186" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="652" y="164" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="186" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="784" y="164" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="186" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="164" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="186" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="164" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="186" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="204" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="226" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">verify_against_filing</text>
+<text x="364" y="226" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">the filing&#x27;s inline XBRL</text>
+<rect x="388" y="204" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="226" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="204" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="226" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="204" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="226" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="784" y="204" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="226" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="204" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="226" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="204" width="120" height="36" rx="4" fill="rgba(191,69,32,0.07)" stroke="#bf4520" stroke-width="1.4"/><text x="1108" y="220" fill="#bf4520" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text><text x="1108" y="233" fill="#bf4520" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">rechecks the 10-K</text>
+<rect x="24" y="244" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="266" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">read_filing_section</text>
+<text x="364" y="266" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC EDGAR · edgartools</text>
+<rect x="388" y="244" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="266" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="244" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="266" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="244" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="266" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="244" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="266" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="916" y="244" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="266" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="244" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="266" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="284" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="306" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">list_filings</text>
+<text x="364" y="306" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC submissions · 8-K</text>
+<rect x="388" y="284" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="306" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="284" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="306" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="284" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="306" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="284" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="306" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="916" y="284" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="306" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="284" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="306" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="324" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="346" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_insider_trades</text>
+<text x="364" y="346" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC Form 4</text>
+<rect x="388" y="324" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="346" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="324" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="346" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="324" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="346" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="324" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="346" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="916" y="324" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="346" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="324" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="346" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="364" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="386" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_prices</text>
+<text x="364" y="386" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">Tiingo, else yfinance</text>
+<rect x="388" y="364" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="386" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="364" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="386" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="364" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="386" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="364" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="386" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="364" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="386" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="364" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="386" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="404" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="426" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_macro</text>
+<text x="364" y="426" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">FRED, else US Treasury</text>
+<rect x="388" y="404" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="426" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="404" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="426" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="404" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="426" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="404" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="426" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="404" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="426" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="404" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="426" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="444" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="466" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_peers</text>
+<text x="364" y="466" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC SIC list + frames · ETF</text>
+<rect x="388" y="444" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="466" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="444" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="466" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="652" y="444" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="466" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="444" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="466" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="444" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="466" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="1048" y="444" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="466" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="24" y="484" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="36" y="506" fill="#2d3142" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">screen</text>
+<text x="364" y="506" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC frames · universe list</text>
+<rect x="388" y="484" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="448" y="506" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="520" y="484" width="120" height="36" rx="4" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="506" fill="#2d3142" font-size="10" font-family="'Geist', system-ui, sans-serif" font-weight="600" text-anchor="middle">uses</text>
+<rect x="652" y="484" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="506" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="484" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="506" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="484" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="506" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="484" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="506" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<path d="M 24 540 H 1168" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<rect x="24" y="534" width="150" height="12" fill="#f5f5f5"/>
+<text x="24" y="544" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500" letter-spacing="0.14em">PLANNED · PHASE 6</text>
+<rect x="24" y="556" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="36" y="578" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_outlook</text>
+<text x="364" y="578" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">prices · HAR volatility model</text>
+<rect x="388" y="556" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="448" y="578" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="520" y="556" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="578" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="556" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="578" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="556" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="578" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="556" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="578" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="556" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="1108" y="578" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="24" y="596" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="36" y="618" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_base_rates</text>
+<text x="364" y="618" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">SEC facts, every filer</text>
+<rect x="388" y="596" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="448" y="618" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="520" y="596" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="618" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="596" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="712" y="618" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="784" y="596" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="618" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="596" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="976" y="618" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="1048" y="596" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="1108" y="618" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="24" y="636" width="352" height="36" rx="4" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="36" y="658" fill="#4f5d75" font-size="11" font-family="'Geist Mono', ui-monospace, monospace" font-weight="500">get_factor_exposures</text>
+<text x="364" y="658" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">Ken French factor library</text>
+<rect x="388" y="636" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="448" y="658" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="520" y="636" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="580" y="658" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="652" y="636" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="712" y="658" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="784" y="636" width="120" height="36" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)" stroke-width="0.6"/><text x="844" y="658" fill="#5a6580" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">—</text>
+<rect x="916" y="636" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="976" y="658" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<rect x="1048" y="636" width="120" height="36" rx="4" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" stroke-dasharray="4,3"/><text x="1108" y="658" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">planned</text>
+<path d="M 24 688 H 1168" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+<text x="24" y="712" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">LEGEND</text>
+<rect x="96" y="702" width="20" height="14" rx="2" fill="rgba(45,49,66,0.08)" stroke="rgba(45,49,66,0.12)"/>
+<text x="126" y="713" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">may run it</text>
+<rect x="214" y="702" width="20" height="14" rx="2" fill="rgba(79,93,117,0.08)" stroke="rgba(45,49,66,0.40)" stroke-dasharray="4,3"/>
+<text x="244" y="713" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">will get it (Phase 6)</text>
+<rect x="394" y="702" width="20" height="14" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+<text x="424" y="713" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">refused by the loop</text>
+<rect x="562" y="702" width="20" height="14" rx="2" fill="rgba(191,69,32,0.07)" stroke="#bf4520"/>
+<text x="592" y="713" fill="#4f5d75" font-size="10" font-family="'Geist', system-ui, sans-serif">the check behind the critic</text>
+<text x="1168" y="713" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">source: agents/roles.py</text>
+      </svg>
+    </div>
+    <p class="scroll-hint">Scroll the diagram sideways to see all of it.</p>
+    <section class="notes"><h2>How to read it</h2><ul><li><b>Single agent</b> (condition B) has every tool, and every one of them belongs to some role in the team, so B vs C tests specialisation, not tool access.</li><li>The <b>coordinator</b> also has an <code>ask_&lt;analyst&gt;</code> tool per analyst; those are how it dispatches work, so they are not rows here.</li><li>The <b>critic</b> gets every read-only tool plus <code>verify_against_filing</code>, but not <code>screen</code>: reviewing one report never needs a ranking.</li><li><b>Data sources</b> fall back in a fixed order and every result says which one it used. A provider without its key is skipped and shown as "not configured" on the Setup page.</li><li>Not in the table: Discover's <b>screener</b> has no tools (it only writes the spec), and the <b>host</b> code runs <code>screen</code> and the 10-K check itself (diagram 5).</li><li><b>Planned</b> rows follow PROJECT_GUIDE §9 Phase 6. B gets them automatically: its role has no tool list, so it sees every registered tool.</li></ul></section>
+    <nav class="pager"><a href="05-discover-run.html">← One Discover run</a><a href="index.html">All diagrams</a><span></span></nav>
+  </main>
+</body>
+</html>

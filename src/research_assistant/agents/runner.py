@@ -80,6 +80,9 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
 def _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps, passes) -> Work:
     work, cutoff = Work(), context.cutoff.isoformat()
     kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
+    if context.stop.is_set():  # cancelled before the plan: no model call at all
+        work.status = "stopped"
+        return work
     try:
         work.plan = _plan(question, client, settings.model, kwargs, cutoff, trace, lead, extra_tools)
     except (OpenAIError, TimeoutError) as exc:

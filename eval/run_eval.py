@@ -7,7 +7,7 @@
 Each run's trace goes to <batch>/traces/ and a line to <batch>/runs.jsonl before the run starts, so a crash still
 shows up in the scores. The same command again with the same --out skips the runs that ended (failed ones too, so the
 failure rate stays honest) and reruns the ones that crashed. A batch's manifest.json records its set-up (model,
-prompts, config values, case files, git commit), and a resume with any of them changed is refused, so one batch never
+prompts, config values, case files, git commit, and any uncommitted changes as a flag and a hash of `git diff`), and a resume with any of them changed is refused, so one batch never
 mixes two set-ups. A runs only on the cases the old pipeline supports; B, C and D get every case. On a prompt-injection case the case's text is appended to what the target tool returns, so
 every condition reads the same injected filing text, and the trace freezes it.
 """
@@ -38,6 +38,7 @@ CONDITIONS = ("A", "B", "C", "D")
 ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 ITEM = re.compile(r"\bItem\s+(\w+)", re.IGNORECASE)
 MANIFEST = "manifest.json"
+GIT_AND_MODEL = ("provider", "model", "commit", "dirty", "diff")
 PROMPTS = Path(prompts.__file__).parent
 # The config.py values a run's result depends on (not timeouts, retries or cache ages).
 CONFIG_KEYS = ("AGENT_MAX_STEPS", "AGENT_SELF_REVIEW_PASSES", "AGENT_CRITIC_ROUNDS", "FIND_COMPANY_MAX_MATCHES",
@@ -59,12 +60,25 @@ def git_commit() -> str | None:
     return done.stdout.strip() if done.returncode == 0 else None
 
 
+def git_changes() -> tuple[bool | None, str | None]:
+    """Whether tracked files differ from the commit, and a hash of `git diff HEAD`, so an uncommitted edit counts too."""
+    try:
+        done = subprocess.run(["git", "diff", "HEAD", "--no-ext-diff"], cwd=config.PROJECT_ROOT, capture_output=True)
+    except OSError:
+        return None, None
+    if done.returncode != 0:
+        return None, None
+    return bool(done.stdout), hashlib.sha256(done.stdout).hexdigest()
+
+
 def manifest(settings, cases: list[dict], case_dir: Path) -> dict:
     """What this batch's results depend on, besides the data: the model, prompts, config, case files and code."""
+    dirty, diff = git_changes()
     return {"provider": settings and settings.provider, "model": settings and settings.model,
             "prompts": {path.name: digest(path) for path in sorted(PROMPTS.glob("*.md"))},
             "config": json.loads(json.dumps({key: getattr(config, key) for key in CONFIG_KEYS})),
-            "cases": {case["id"]: digest(case_dir / f"{case['id']}.yaml") for case in cases}, "commit": git_commit()}
+            "cases": {case["id"]: digest(case_dir / f"{case['id']}.yaml") for case in cases}, "commit": git_commit(),
+            "dirty": dirty, "diff": diff}
 
 
 def check_manifest(batch: Path, current: dict) -> str | None:
@@ -78,9 +92,10 @@ def check_manifest(batch: Path, current: dict) -> str | None:
         path.write_text(json.dumps(current, indent=1), encoding="utf-8")
         return None
     saved, problems = json.loads(path.read_text(encoding="utf-8")), []
-    for key in ("provider", "model", "commit"):  # None: not known then (an A-only batch) or now
+    for key in GIT_AND_MODEL:  # None: not known then (an A-only batch, an older manifest) or now
         if saved.get(key) is not None and current[key] is not None and saved[key] != current[key]:
-            problems.append(f"{key}: {saved[key]} then, {current[key]} now")
+            problems.append("uncommitted changes (git diff) differ" if key == "diff"
+                            else f"{key}: {saved[key]} then, {current[key]} now")
     for key in ("prompts", "config"):
         old = saved.get(key) or {}
         if changed := sorted(k for k in old.keys() | current[key].keys() if old.get(k) != current[key].get(k)):
@@ -91,7 +106,7 @@ def check_manifest(batch: Path, current: dict) -> str | None:
     if problems:
         return (f"{batch} ran with another set-up, so resuming it would mix results: {'; '.join(problems)}. "
                 "Start a new batch with another --out.")
-    known = {key: current[key] for key in ("provider", "model", "commit") if saved.get(key) is None}
+    known = {key: current[key] for key in GIT_AND_MODEL if saved.get(key) is None}
     path.write_text(json.dumps(saved | known | {"cases": old_cases | current["cases"]}, indent=1), encoding="utf-8")
     return None
 

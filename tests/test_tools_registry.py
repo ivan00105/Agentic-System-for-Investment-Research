@@ -10,11 +10,12 @@ from research_assistant.tools.result import ToolContext, ToolResult
 
 PHASE_1_TOOLS = {"find_company", "get_financials", "calculate", "list_filings", "read_filing_section", "get_prices",
                  "screen", "verify_against_filing"}
+DATA_TOOLS = {"get_macro", "get_insider_trades", "get_peers"}  # REFERENCE §10's November additions
 
 
 def test_every_tool_has_a_chat_completions_schema():
     schemas = registry.schemas()
-    assert {s["function"]["name"] for s in schemas} == PHASE_1_TOOLS
+    assert {s["function"]["name"] for s in schemas} == PHASE_1_TOOLS | DATA_TOOLS
     for schema in schemas:
         assert schema["type"] == "function" and schema["function"]["description"]
         assert schema["function"]["parameters"]["type"] == "object"

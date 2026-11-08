@@ -7,6 +7,7 @@ result is a shortlist with counts; fewer than k is fine and says why.
 The Discover trace holds the spec step, the host's tool calls and one event per candidate; each research run keeps
 its own trace, and the Discover run's totals add theirs in.
 """
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -17,7 +18,7 @@ from ..model_access import ModelSettings
 from ..tools.result import ToolContext
 from .acceptance import Acceptance, Verdict, threshold
 from .discover_report import render, spec_lines
-from .discover_spec import Interpretation, Term, interpret
+from .discover_spec import Interpretation, ScreenSpec, Term, interpret
 from .runner import AgentRun
 from .trace import Trace, _zero
 
@@ -55,18 +56,22 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
         research: Research, condition: str, ask: Callable[[Term], str | None] | None = None,
         defined: dict[str, str] | None = None, replacements: int = config.DISCOVER_MAX_REPLACEMENTS,
         trace_dir: Path | None = None, echo: Callable[[dict], None] | None = None,
-        trace: Trace | None = None) -> DiscoverRun:
-    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app)."""
+        trace: Trace | None = None, edit: Callable[[ScreenSpec], ScreenSpec | None] | None = None,
+        review: bool = False, top_k: int | None = None) -> DiscoverRun:
+    """`trace` is one the host made already, so it knows the run ID before the run starts (the web app). `edit`
+    lets the user edit the drafted spec directly before the screen, and `review` shows it even with no vague term
+    (discover_spec.interpret). `top_k` is a count the user set apart from the question; it replaces the spec's."""
     trace = trace or Trace.new(trace_dir, echo)
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=f"Discover ({condition})",
                 lead="screener", provider=settings.provider, model=settings.model, universe=universe.name,
                 replacements=replacements)
     with trace.acting_as("screener"):
         found = interpret(question, universe, client, settings, context, trace, ask=ask, defined=defined,
-                          on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
+                          edit=edit, review=review, top_k=top_k, on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
                               "questions", terms=[t.model_dump() for t in terms], shown=spec_lines(
                                   draft, dict.fromkeys((t.term for t in terms), "proposed"), universe,
-                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition)))
+                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition),
+                              spec=draft.model_dump(mode="json")))
     if found.spec is None or context.stop.is_set():  # cancelled, perhaps while the user was asked: nothing is screened
         return _close(trace, question, settings, context, universe, found, condition, [], {}, [],
                       None if context.stop.is_set() else found.error)
@@ -104,11 +109,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
             continue
         researched += 1
         brief = _brief(question, candidate, spec, universe, sum(c.outcome == "picked" for c in ranked) + 1, top_k)
-        trace.write("research_start", rank=candidate.rank, cik=candidate.cik, name=candidate.name, question=brief)
+        child = Trace.new(trace.path.parent, echo, parent_run_id=trace.run_id)
+        trace.write("research_start", rank=candidate.rank, cik=candidate.cik, name=candidate.name, question=brief,
+                    run_id=child.run_id)
         try:
             candidate.run = research(brief, client, settings, ToolContext(
                 cutoff=context.cutoff, sec=context.sec, price_providers=context.price_providers,
-                cache_dir=context.cache_dir, stop=context.stop), trace_dir=trace.path.parent, echo=echo)
+                cache_dir=context.cache_dir, stop=context.stop), trace=child)
         except Exception as exc:  # a bug in one research run must not lose the others; its own trace shows where
             candidate.error = f"The research run crashed ({type(exc).__name__}: {exc}). This is a bug."
         run = candidate.run
@@ -144,6 +151,21 @@ def _brief(question: str, candidate: Candidate, spec, universe: Universe, pick: 
             "figures. Research this company only; don't screen for other companies.")
 
 
+# Reads a _brief back as a short title; tests/test_agent_discover.py keeps the two in step.
+BRIEF = re.compile(r"Explain whether (?P<name>[^\n]+) \((?P<tickers>[^()\n]*), CIK \d+\) fits this request"
+                   r"(?:[\s\S]*?It is shortlist pick (?P<n>\d+) of the (?P<of>\d+) asked for)?")
+
+
+def pick_title(question: str | None) -> str | None:
+    """A pick's title from its brief, e.g. "Pick 2 of 5: Apple Inc. (AAPL)"; None for any other question.
+    Briefs saved before 3 Nov 2026 give no pick number."""
+    if not (found := BRIEF.match(question or "")):
+        return None
+    ticker = found["tickers"].split(", ")[0]
+    who = found["name"] + (f" ({ticker})" if ticker != "no ticker" else "")
+    return f"Pick {found['n']} of {found['of']}: {who}" if found["n"] else f"Pick: {who}"
+
+
 def _counts(screen: dict, ranked: list[Candidate], top_k: int) -> dict:
     checked = sum(c.verdict is not None for c in ranked)
     return {"screened": screen["screened"], "eligible": screen["eligible"], "ranked": len(ranked), "checked": checked,
@@ -177,5 +199,5 @@ def _close(trace, question, settings, context, universe, found, condition, ranke
                 candidates=[{"rank": c.rank, "cik": c.cik, "name": c.name, "outcome": c.outcome,
                              "verdict": c.verdict and c.verdict.state, "run_id": c.run and c.run.run_id,
                              "trace": c.run and str(c.run.trace_path)} for c in ranked if c.outcome != "not reached"],
-                markdown=markdown)
+                notes=notes, markdown=markdown)
     return DiscoverRun(trace.run_id, status, found, counts, ranked, markdown, trace.path, totals, error, notes)

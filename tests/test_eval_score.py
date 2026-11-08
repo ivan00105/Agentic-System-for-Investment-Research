@@ -204,6 +204,18 @@ def test_a_value_of_another_metric_never_counts():
     assert score.judge(CASE["gold"][1], 320193, [GROWTH], income)["outcome"] == "missing"
 
 
+def test_gold_in_the_filed_currency_matches_a_converted_figures_filed_value():
+    # TSMC's 2023 revenue: gold in NT$ millions, the record converted to USD and keeping the NT$ it was filed in.
+    gold = {"name": "net_revenue_2023", "metric": "revenue", "value": 2161735.8, "unit": "TWD millions",
+            "fiscal_period": "FY2023", "period_end": date(2023, 12, 31)}
+    tsm = {"id": "fact-tsm", "kind": "fact", "cik": "0001046179", "metric": "revenue", "unit": "USD",
+           "value": "69381000000", "reported_value": "2161735800000", "reported_unit": "TWD",
+           "start": "2023-01-01", "end": "2023-12-31"}
+    assert score.judge(gold, 1046179, [tsm], {"fact-tsm": tsm})["outcome"] == "correct"
+    dollars = {**gold, "value": 2161735.8, "unit": "USD millions"}  # the NT$ number labelled as dollars
+    assert score.judge(dollars, 1046179, [tsm], {"fact-tsm": tsm})["outcome"] == "missing"
+
+
 def test_an_interim_value_is_not_the_annual_gold():
     judged = score.judge(CASE["gold"][0], 320193, [{**FY25, "start": "2025-06-29"}], RECORDS)
     assert judged["outcome"] == "needs review" and "interim" in judged["note"]
@@ -220,3 +232,27 @@ def test_a_metric_no_tool_measures_or_no_metric_needs_review():
     assert cogs["outcome"] == "needs review" and "cost_of_goods_sold" in cogs["note"]
     unnamed = {k: v for k, v in CASE["gold"][0].items() if k != "metric"}
     assert score.judge(unnamed, 320193, [FY25], RECORDS)["outcome"] == "needs review"
+
+
+def test_a_number_whose_period_kind_is_unknown_needs_review():
+    # Second review: an FCF calc's period kind wasn't read, so quarterly FCF passed as the annual gold.
+    gold = {"name": "fcf_fy2025", "metric": "fcf", "ticker": "AAPL", "value": 98767, "unit": "USD millions",
+            "fiscal_period": "FY2025", "period_end": date(2025, 9, 27)}
+    ocf = {**FY25, "id": "fact-ocf", "metric": "operating_cash_flow", "value": "111482000000"}
+    capex = {**FY25, "id": "fact-capex", "metric": "capex", "value": "12715000000"}
+    fcf = {"id": "calc-fcf", "kind": "calc", "cik": "0000320193", "formula": "fcf", "unit": "USD", "value": "98767000000",
+           "inputs": {"operating_cash_flow": "fact-ocf", "capex": "fact-capex"}, "start": FY25["start"], "end": FY25["end"]}
+    records = {r["id"]: r for r in (ocf, capex, fcf)}
+    assert score.judge(gold, 320193, [fcf], records)["outcome"] == "correct"
+    quarter = score.judge(gold, 320193, [fcf], {**records, "fact-ocf": {**ocf, "start": "2025-06-29"}})
+    assert quarter["outcome"] == "needs review" and "interim" in quarter["note"]
+    unknown = score.judge(gold, 320193, [fcf], {"calc-fcf": fcf})  # its inputs aren't in the trace
+    assert unknown["outcome"] == "needs review" and "can't be told" in unknown["note"]
+
+
+def test_numbers_only_in_the_limitations_are_not_the_answer(tmp_path):
+    # Second review: a figure placed only in the limitations counted as the report's answer.
+    draft = {"summary": [{"text": "Apple's revenue could not be confirmed.", "citations": ["fact-rev25"]}],
+             "limitations": ["Revenue of {fact:fact-rev25} for fiscal 2025 was not checked against the filing."]}
+    [row] = batch(tmp_path, ("B", {"draft": draft}))
+    assert row["gold"][0]["outcome"] == "missing" and not row["answered"]

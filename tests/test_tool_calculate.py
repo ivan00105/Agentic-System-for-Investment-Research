@@ -1,8 +1,11 @@
 from decimal import Decimal
 
+import httpx
 import pytest
+from fx_rates import Frankfurter
 from sec_files import make_context
 
+from research_assistant.data import fx_frankfurter
 from research_assistant.tools.calculate import CalculateInput, run
 from research_assistant.tools.get_financials import GetFinancialsInput
 from research_assistant.tools.get_financials import run as get_financials
@@ -194,6 +197,17 @@ def test_market_cap_rejects_revenue_as_the_share_count(apple):
     assert result.status == "invalid" and "share count" in result.warnings[0]
 
 
+def test_market_cap_rejects_a_weighted_average_share_count(apple):
+    # Codex review: diluted_shares (a yearly average) passed the unit check and fed market cap.
+    context, ids = apple
+    cover = context.records[next(i for (_, metric), i in ids.items() if metric == "shares_outstanding")]
+    diluted = context.remember({**cover, "id": "fact-diluted", "metric": "diluted_shares", "start": "2024-09-29",
+                                "end": "2025-09-27", "tag": "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding"})
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    result = calc(context, "market_cap", prices=series, shares=diluted)
+    assert result.status == "invalid" and "diluted_shares" in result.warnings[0] and "shares_outstanding" in result.warnings[0]
+
+
 def test_pe_rejects_eps_as_net_income(apple):
     context, ids = apple
     eps = {**context.records[ids["2025-09-27", "net_income"]], "id": "fact-eps", "metric": "eps_diluted",
@@ -222,3 +236,132 @@ def test_market_cap_needs_a_price_series(apple):
     context, ids = apple
     result = calc(context, "market_cap", prices=ids["2025-09-27", "revenue"], shares=ids["2026-07-17", "shares_outstanding"])
     assert result.status == "invalid" and "price series" in result.warnings[0]
+
+
+def test_market_cap_is_unsupported_for_a_foreign_filer(apple):
+    # Second review: BABA's ADS is 8 ordinary shares, so ADS price x ordinary shares gave 8 times the market cap.
+    context, ids = apple
+    context.remember({**context.records[ids["2026-07-17", "shares_outstanding"]], "id": "fact-ordinary", "form": "20-F"})
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares="fact-ordinary")
+    assert cap.status == "unsupported" and cap.data["value"] is None and "20-F" in cap.data["reason"]
+    pe = calc(context, "pe", market_cap=cap.ids[0], net_income=ids["2025-09-27", "net_income"])
+    assert pe.status == "unsupported" and "20-F" in pe.data["reason"]
+
+
+def test_market_cap_is_unsupported_when_the_share_basis_is_unknown(apple):
+    context, ids = apple
+    shares = {k: v for k, v in context.records[ids["2026-07-17", "shares_outstanding"]].items() if k != "form"}
+    context.remember({**shares, "id": "fact-no-form"})
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares="fact-no-form")
+    assert cap.status == "unsupported" and "share basis" in cap.data["reason"]
+
+
+def test_pe_rejects_revenue_as_net_income(apple):
+    # Second review: a USD revenue fact passed the unit check as net income and gave a clean P/E.
+    context, ids = apple
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    result = calc(context, "pe", market_cap=cap.ids[0], net_income=ids["2025-09-27", "revenue"])
+    assert result.status == "invalid" and "not net_income" in result.warnings[0]
+    pb = calc(context, "pb", market_cap=cap.ids[0], equity=ids["2025-09-27", "net_income"])
+    assert pb.status == "invalid" and "not stockholders_equity" in pb.warnings[0]
+
+
+def test_fcf_yield_needs_an_fcf_result(apple):
+    context, ids = apple
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"])
+    result = calc(context, "fcf_yield", fcf=ids["2025-09-27", "operating_cash_flow"], market_cap=cap.ids[0])
+    assert result.status == "invalid" and "not fcf" in result.warnings[0]
+    swapped = calc(context, "fcf", operating_cash_flow=ids["2025-09-27", "capex"], capex=ids["2025-09-27", "operating_cash_flow"])
+    assert swapped.status == "invalid"
+
+
+def test_ratio_still_takes_any_two_amounts(apple):
+    context, ids = apple
+    result = calc(context, "ratio", numerator=ids["2025-09-27", "operating_cash_flow"], denominator=ids["2025-09-27", "revenue"])
+    assert result.status == "ok"
+
+
+@pytest.fixture
+def baba(tmp_path):
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1577552", years=1, metrics=["shares_outstanding", "net_income"]),
+                            context)
+    metrics = result.data["metrics"]
+    return context, metrics["shares_outstanding"]["values"][0], metrics["ordinary_shares_per_ads"]["values"][0]
+
+
+def test_ads_market_cap_divides_the_close_by_the_ratio_from_the_same_filing(baba):
+    # Second review: BABA's close per ADS x ordinary shares gave 8 times the market cap.
+    context, shares, ratio = baba
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 160.0, "adj_close": 160.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"], ads_ratio=ratio["id"])
+    assert cap.status == "ok" and cap.data["value"] == str(Decimal(160) / 8 * 18580374278)
+    assert cap.data["inputs"]["ads_ratio"] == ratio["id"]
+    assert "/ 8 ordinary shares per listed share" in cap.data["notes"][0] and ratio["accession"] in cap.data["notes"][0]
+    assert not cap.warnings
+    # Rechecked offline from the frozen inputs alone, as evidence.recheck does.
+    frozen = type(context)(cutoff=context.cutoff, sec=None, records={i: context.records[i] for i in cap.data["inputs"].values()})
+    assert run(CalculateInput(formula="market_cap", inputs=cap.data["inputs"]), frozen).data["value"] == cap.data["value"]
+
+
+def test_ads_market_cap_without_the_ratio_says_to_pass_it(baba):
+    context, shares, _ = baba
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 160.0, "adj_close": 160.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"])
+    assert cap.status == "unsupported" and "pass ads_ratio" in cap.data["reason"] and shares["accession"] in cap.data["reason"]
+
+
+def test_ads_ratio_from_another_filing_is_rejected(baba):
+    context, shares, ratio = baba
+    context.remember({**ratio, "kind": "fact", "metric": "ordinary_shares_per_ads", "id": "fact-old-ratio",
+                      "accession": "0000950170-25-090161"})
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 160.0, "adj_close": 160.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"], ads_ratio="fact-old-ratio")
+    assert cap.status == "invalid" and "share count's filing" in cap.warnings[0]
+
+
+def test_ads_ratio_must_be_the_ratio_fact(baba):
+    context, shares, _ = baba
+    series = prices(context, "prices-baba", [{"date": "2026-10-30", "close": 160.0, "adj_close": 160.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"], ads_ratio=shares["id"])
+    assert cap.status == "invalid" and "not get_financials' ordinary_shares_per_ads" in cap.warnings[0]
+
+
+def test_ads_market_cap_warns_when_the_filing_is_over_a_year_older_than_the_price(baba):
+    context, shares, ratio = baba
+    series = prices(context, "prices-baba", [{"date": "2027-06-01", "close": 160.0, "adj_close": 160.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"], ads_ratio=ratio["id"])
+    assert cap.status == "ok" and any("more than a year before the price" in w for w in cap.warnings)
+
+
+def test_a_direct_listing_uses_its_ratio_of_one(tmp_path):
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1015922", years=1, metrics=["shares_outstanding"]), context)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]["values"][0]
+    series = prices(context, "prices-chkp", [{"date": "2026-10-30", "close": 200.0, "adj_close": 200.0}])
+    cap = calc(context, "market_cap", prices=series, shares=shares["id"], ads_ratio=ratio["id"])
+    assert cap.status == "ok" and cap.data["value"] == str(200 * 105596035)
+
+
+def test_a_10k_share_count_refuses_an_ads_ratio(apple, baba):
+    context, ids = apple
+    _, _, ratio = baba
+    context.remember(ratio | {"kind": "fact", "metric": "ordinary_shares_per_ads", "cik": "0000320193"})
+    series = prices(context, "prices-aapl", [{"date": "2026-10-30", "close": 250.0, "adj_close": 250.0}])
+    cap = calc(context, "market_cap", prices=series, shares=ids["2026-07-17", "shares_outstanding"], ads_ratio=ratio["id"])
+    assert cap.status == "invalid" and "drop ads_ratio" in cap.warnings[0]
+
+
+def test_converted_inputs_are_named_and_growth_says_it_includes_currency_moves(tmp_path, monkeypatch):
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(Frankfurter()))
+    context = make_context(tmp_path)
+    result = get_financials(GetFinancialsInput(cik="1577552", years=2, metrics=["revenue"]), context)
+    latest, prior = result.data["metrics"]["revenue"]["values"]
+    growth = calc(context, "growth", current=latest["id"], previous=prior["id"])
+    assert growth.status == "ok" and any("converted from CNY at 7.200000" in n for n in growth.data["notes"])
+    assert any("includes exchange-rate moves" in n for n in growth.data["notes"])

@@ -14,7 +14,7 @@ MARGIN_TOPS = ("operating_income", "net_income")  # banks report no operating in
 def figures(cited: list[str], key_numbers: list[str], records: dict[str, dict]) -> dict:
     """`cited`: every record the report cites, in order; `key_numbers`: those the key-numbers section cites."""
     names = {r["cik"]: r.get("name") for r in records.values() if r.get("kind") == "company"}
-    ciks = list(dict.fromkeys(r["cik"] for i in cited if (r := records.get(i)) and r.get("kind") == "fact"))
+    ciks = list(dict.fromkeys(r["cik"] for i in cited if (r := records.get(i)) and r.get("kind") == "fact" and r.get("cik")))
     return {"table": table(key_numbers, records, names),
             "charts": [chart(cik, names.get(cik) or cik, records, set(cited)) for cik in ciks]}
 
@@ -63,6 +63,30 @@ def chart(cik: str, company: str, records: dict[str, dict], cited: set[str]) -> 
             "price": prices and {"id": prices["id"], "ticker": prices.get("ticker"), "source": prices.get("source"),
                                  "points": [[r["date"], r["adj_close"]] for r in prices["rows"]
                                             if r.get("adj_close") is not None]}}
+
+
+def raw(cited: list[str], records: dict[str, dict]) -> list[dict]:
+    """Every reported figure and calculation the report cites, and every input behind them, unformatted: the
+    Professional view's table and the CSV/JSON export."""
+    names = {r["cik"]: r.get("name") for r in records.values() if r.get("kind") == "company"}
+    rows, seen, queue = [], set(), list(cited)
+    while queue:
+        record = records.get(queue.pop(0))
+        if not record or record["id"] in seen or record.get("kind") not in ("fact", "calc"):
+            continue
+        seen.add(record["id"])
+        inputs = {role: i for role, i in (record.get("inputs") or {}).items() if isinstance(i, str)}
+        queue += list(inputs.values())
+        shown = _row(record, records, names)
+        rows.append({"id": record["id"], "kind": record["kind"], "cik": record.get("cik"), "company": shown["company"],
+                     "label": shown["metric"], "period": shown["period"], "value": record.get("value"),
+                     "unit": record.get("unit"), "shown": shown["value"],
+                     "start": record.get("start"), "end": record.get("end"), "formula": record.get("formula"),
+                     "inputs": inputs, "tag": record.get("tag"), "form": record.get("form"),
+                     "accession": record.get("accession"), "filed": record.get("filed"),
+                     "url": record.get("filing_url"), "notes": record.get("notes") or [],
+                     "reason": record.get("reason")})
+    return rows
 
 
 def _annual(cik: str, metric: str, records: dict[str, dict]) -> dict[str, dict]:

@@ -1,9 +1,14 @@
 import json
 from datetime import datetime, timezone
 
+from decimal import Decimal
+
 import httpx
+import pytest
+from fx_rates import Frankfurter, Fred
 from sec_files import FIXTURES, SecFiles, make_context
 
+from research_assistant.data import fx_frankfurter, macro_fred
 from research_assistant.tools.get_financials import GetFinancialsInput, run
 
 APPLE_FACTS = "/api/xbrl/companyfacts/CIK0000320193.json"
@@ -70,6 +75,52 @@ def test_conflicting_values_in_one_filing_are_withheld_not_fatal(tmp_path):
     assert any("conflicting values" in w for w in result.warnings)
 
 
+def trimmed(cik: int, **tags):
+    """A trimmed companyfacts payload; each row is (value, start, end, accession, filed) from a 10-K."""
+    rows = {name: {"units": {"USD": [{"start": s, "end": e, "val": v, "accn": a, "form": "10-K", "filed": f}
+                                     for v, s, e, a, f in found]}} for name, found in tags.items()}
+    files = SecFiles({f"/api/xbrl/companyfacts/CIK{cik:010d}.json": httpx.Response(
+        200, json={"cik": cik, "entityName": "Test filer", "facts": {"us-gaap": rows}})})
+    return {"cik": str(cik), "files": files}
+
+
+UDR_2025, UDR_2026 = ("0000074208-25-000009", "2025-02-12"), ("0000074208-26-000013", "2026-02-11")
+
+
+def test_a_larger_total_replaces_contract_revenue_and_keeps_its_tag(tmp_path):
+    # UDR, a REIT: ASC 606 contract revenue leaves out lease income. FY2025 values are real, FY2024 synthetic.
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (10964000, "2024-01-01", "2024-12-31", *UDR_2026),
+        (11361000, "2025-01-01", "2025-12-31", *UDR_2026)], Revenues=[
+        (1670000000, "2024-01-01", "2024-12-31", *UDR_2026), (1712317000, "2025-01-01", "2025-12-31", *UDR_2026)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    latest, prior = result.data["metrics"]["revenue"]["values"]
+    assert (latest["value"], latest["tag"], latest["accession"]) == ("1712317000", "us-gaap:Revenues", UDR_2026[0])
+    # The earlier 10-K tagged only contract revenue: another tag, not a restatement.
+    assert (prior["value"], prior["tag"], prior.get("original_value")) == ("1670000000", "us-gaap:Revenues", None)
+    assert not any("restated" in w for w in result.warnings)
+
+
+def test_sales_including_excise_tax_never_replace_net_sales(tmp_path):
+    # Brown-Forman: the tax-inclusive figure is contract revenue too, so the tax-exclusive one stays.
+    filing = ("0000014693-26-000021", "2026-06-12")
+    filer = trimmed(14693, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (3928000000, "2025-05-01", "2026-04-30", *filing)], RevenueFromContractWithCustomerIncludingAssessedTax=[
+        (5082000000, "2025-05-01", "2026-04-30", *filing)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert [(v["value"], v["tag"]) for v in result.data["metrics"]["revenue"]["values"]] == [
+        ("3928000000", "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax")]
+
+
+def test_a_conflicting_total_is_withheld_not_swapped_for_contract_revenue(tmp_path):
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (11361000, "2025-01-01", "2025-12-31", *UDR_2026)], Revenues=[
+        (1712317000, "2025-01-01", "2025-12-31", *UDR_2026), (1500000000, "2025-01-01", "2025-12-31", *UDR_2026)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert values(result, "revenue") == [("2024-12-31", "10964000")]
+    assert any("2025-12-31 has conflicting values" in w for w in result.warnings)
+
+
 def test_bank_operating_income_is_unsupported_but_revenue_works(tmp_path):
     result, _ = financials(tmp_path, cik="19617", metrics=["revenue", "operating_income"])
     assert result.status == "partial"
@@ -77,9 +128,131 @@ def test_bank_operating_income_is_unsupported_but_revenue_works(tmp_path):
     assert values(result, "revenue")[0][0] == "2025-12-31"
 
 
-def test_ifrs_filer_is_unsupported(tmp_path):
-    result, _ = financials(tmp_path, cik="1046179")
-    assert result.status == "unsupported" and "IFRS" in result.warnings[0]
+TSM = "1046179"
+TSM_FACTS = "/api/xbrl/companyfacts/CIK0001046179.json"
+
+
+@pytest.fixture
+def fred(monkeypatch):
+    """FRED H.10 keyed and mocked at 32 TWD per dollar."""
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+    mock = Fred({"DEXTAUS": lambda day: 32.0})
+    monkeypatch.setattr(macro_fred, "transport", httpx.MockTransport(mock))
+    monkeypatch.setattr(macro_fred.LIMITER, "wait", lambda: None)
+    return mock
+
+
+TSM_20F = "/Archives/edgar/data/1046179/000162828026025362/tsm-20251231.htm"
+def unreadable_20f() -> SecFiles:
+    """companyfacts' IFRS rows only (FY2024 and before): the FY2025 20-F itself can't be fetched."""
+    return SecFiles({TSM_20F: httpx.Response(404)})
+
+
+def test_an_ifrs_filer_converts_twd_at_fred_rates(tmp_path, fred):
+    result, context = financials(tmp_path, cik=TSM, metrics=["revenue", "net_income", "total_assets", "eps_diluted"],
+                                 years=1, files=unreadable_20f())
+    assert result.status == "ok"
+    revenue = result.data["metrics"]["revenue"]["values"][0]
+    assert (revenue["tag"], revenue["end"], revenue["form"]) == ("ifrs-full:Revenue", "2024-12-31", "20-F")
+    assert (revenue["reported_value"], revenue["reported_unit"], revenue["fx_rate"]) == ("2894307700000", "TWD", "32.000000")
+    assert revenue["value"] == str((Decimal(2894307700000) / 32).quantize(Decimal(1)))
+    assert revenue["fx_source"] == "FRED H.10 (Federal Reserve)" and revenue["fx_url"].endswith("/DEXTAUS")
+    income = result.data["metrics"]["net_income"]["values"][0]
+    assert income["tag"] == "ifrs-full:ProfitLossAttributableToOwnersOfParent"  # owners' share, as NetIncomeLoss
+    assert result.data["metrics"]["eps_diluted"]["values"][0]["value"] == "1.3959"  # 44.67 TWD / 32
+    assert context.records[revenue["id"]]["unit"] == "USD" and revenue["id"] in result.ids
+    assert result.source == "SEC companyfacts; exchange rates: FRED H.10 (Federal Reserve)"
+    assert any(w.startswith("Converted to USD from TWD at FRED H.10") for w in result.warnings)
+
+
+def test_a_filing_with_only_its_cover_in_companyfacts_is_read_from_its_ixbrl(tmp_path, fred):
+    # TSMC's FY2025 20-F gave companyfacts its cover count but none of its IFRS statements.
+    result, context = financials(tmp_path, cik=TSM, metrics=["revenue", "net_income"], years=2)
+    assert result.status == "ok" and result.source.startswith("SEC companyfacts; SEC filing (inline XBRL);")
+    assert result.warnings[0] == (
+        "The newest 20-F (0001628280-26-025362, filed 2026-04-16) has only its cover in SEC companyfacts, none of its "
+        "statements, so its figures here are read from the filing's own inline XBRL (https://www.sec.gov" + TSM_20F +
+        "); each such value's notes say so.")
+    latest, before = result.data["metrics"]["revenue"]["values"]
+    # Its NET REVENUE row uses the IFRS 15 tag; the year before comes from the same 20-F's comparative column.
+    assert (latest["end"], latest["reported_value"], latest["tag"]) == (
+        "2025-12-31", "3809054300000", "ifrs-full:RevenueFromContractsWithCustomers")
+    assert latest["accession"] == before["accession"] == "0001628280-26-025362" and before["end"] == "2024-12-31"
+    assert latest["notes"][0].startswith("Read from the filing's own inline XBRL") and latest["locator"].startswith("#")
+    assert context.records[latest["id"]]["source_url"] == "https://www.sec.gov" + TSM_20F
+    assert result.data["metrics"]["net_income"]["values"][0]["reported_value"] == "1697604000000"
+    assert not any("restated" in w for w in result.warnings)  # FY2024 is the same in both 20-Fs
+    apple, _ = financials(tmp_path / "aapl", metrics=["revenue"], years=1)
+    assert not any("only its cover" in w for w in apple.warnings) and apple.source == "SEC companyfacts"
+
+
+def test_without_a_fred_key_twd_is_unsupported_and_says_why(tmp_path):
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    del payload["facts"]["ifrs-full"]["Assets"]["units"]["USD"]
+    files = SecFiles({TSM_FACTS: httpx.Response(200, json=payload), TSM_20F: httpx.Response(404)})
+    result, _ = financials(tmp_path, cik=TSM, metrics=["revenue", "total_assets"], years=1, files=files)
+    assets = result.data["metrics"]["total_assets"]
+    assert assets["status"] == "unsupported" and assets["reason"].startswith("Reported in TWD, not USD")
+    assert "Frankfurter" not in assets["reason"] and "FRED_API_KEY" in assets["reason"]  # the ECB has no TWD
+    assert values(result, "revenue") == [("2024-12-31", "88268000000")]  # the 20-F's own convenience translation
+    assert any(w.startswith("revenue: no TWD exchange rate") for w in result.warnings)
+    # The FY2025 20-F couldn't be read, so its figures are missing and the warning says why.
+    assert "reading the filing itself failed" in result.warnings[0]
+
+
+def test_ifrs_long_term_debt_is_unsupported_not_read_from_bank_loans(tmp_path):
+    # TSMC tags LongtermBorrowings (bank loans) and its far larger bonds apart; IFRS has no total to read.
+    result, _ = financials(tmp_path, cik=TSM, metrics=["long_term_debt"])
+    debt = result.data["metrics"]["long_term_debt"]
+    assert result.status == "unsupported" and debt["status"] == "unsupported"
+    assert debt["reason"] == ("This filer reports under ifrs-full, and long_term_debt is read only from "
+                              "us-gaap:LongTermDebt, us-gaap:LongTermDebtNoncurrent.")
+
+
+def test_tsmc_share_count_comes_with_five_from_its_filings_text(tmp_path):
+    result, context = financials(tmp_path, cik=TSM, metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    (ratio,) = result.data["metrics"]["ordinary_shares_per_ads"]["values"]
+    assert shares["value"] == "25932524521" and ratio["accession"] == shares["accession"] == "0001628280-26-025362"
+    assert ratio["value"] == "5" and ratio["tag"] == "filing text"
+    assert ratio["notes"] == ["The cover gives no ratio, so it is read from the filing's text, the only ratio it "
+                              "states: \"each ADS represents five (5) common shares\"."]
+    assert context.records[ratio["id"]]["unit"] == "shares/ADS"
+
+
+def tsm_profit_only(nci: bool) -> SecFiles:
+    """TSMC's companyfacts with only ifrs-full:ProfitLoss (owners plus non-controlling interests), and with `nci` the
+    non-controlling share for each of its periods."""
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    ifrs = payload["facts"]["ifrs-full"]
+    owners = {(r["accn"], r["end"]): r["val"] for r in ifrs.pop("ProfitLossAttributableToOwnersOfParent")["units"]["TWD"]}
+    if nci:
+        ifrs["ProfitLossAttributableToNoncontrollingInterests"] = {"units": {"TWD": [
+            {**r, "val": r["val"] - owners[r["accn"], r["end"]]} for r in ifrs["ProfitLoss"]["units"]["TWD"]]}}
+    return SecFiles({TSM_FACTS: httpx.Response(200, json=payload), TSM_20F: httpx.Response(404)})
+
+
+def test_ifrs_profit_with_other_shareholders_share_has_it_subtracted(tmp_path, fred):
+    result, context = financials(tmp_path, cik=TSM, metrics=["net_income"], years=1, files=tsm_profit_only(nci=True))
+    (income,) = result.data["metrics"]["net_income"]["values"]
+    assert (income["tag"], income["end"], income["tagged_value"]) == ("ifrs-full:ProfitLoss", "2024-12-31", "1157523900000")
+    assert income["reported_value"] == "1158380200000"  # TSMC's owners' line: ProfitLoss less -856,300,000
+    assert "non-controlling interests" in income["notes"][0] and context.records[income["id"]]["unit"] == "USD"
+
+
+def test_ifrs_profit_without_the_other_shareholders_share_is_withheld(tmp_path, fred):
+    result, _ = financials(tmp_path, cik=TSM, metrics=["net_income"], years=1, files=tsm_profit_only(nci=False))
+    assert result.data["metrics"]["net_income"]["status"] != "ok"
+    assert any(w.startswith("net_income for the period ending 2024-12-31: filing 0001193125-25-083423 tags only "
+                            "ifrs-full:ProfitLoss") and "non-controlling" in w for w in result.warnings)
+
+
+def test_a_filer_with_neither_us_gaap_nor_ifrs_is_unsupported(tmp_path):
+    payload = json.loads((FIXTURES / "companyfacts_TSM.json").read_text())
+    del payload["facts"]["ifrs-full"]
+    files = SecFiles({TSM_FACTS: httpx.Response(200, json=payload)})
+    result, _ = financials(tmp_path, cik=TSM, files=files)
+    assert result.status == "unsupported" and "no US GAAP or IFRS" in result.warnings[0]
 
 
 def test_missing_metric_is_not_reported_with_the_tags_tried(tmp_path):
@@ -130,3 +303,95 @@ def test_quarter_and_off_year_end_rows_inside_a_10k_are_ignored(tmp_path):
     result, _ = financials(tmp_path, metrics=["revenue", "stockholders_equity"], files=files, years=10)
     assert "102466000000" not in [v for _, v in values(result, "revenue")]
     assert "2025-06-28" not in [end for end, _ in values(result, "stockholders_equity")]
+
+
+def test_a_total_from_an_older_filing_does_not_override_the_latest_one(tmp_path):
+    # Second review: the latest filing tags only contract revenue for FY2024; the older total is not swapped in.
+    filer = trimmed(74208, RevenueFromContractWithCustomerExcludingAssessedTax=[
+        (10964000, "2024-01-01", "2024-12-31", *UDR_2025), (10964000, "2024-01-01", "2024-12-31", *UDR_2026)], Revenues=[
+        (1670000000, "2024-01-01", "2024-12-31", *UDR_2025)])
+    result, _ = financials(tmp_path, metrics=["revenue"], **filer)
+    assert values(result, "revenue") == [("2024-12-31", "10964000")]
+    assert ("revenue for the period ending 2024-12-31: a larger us-gaap:Revenues total (1670000000) is in filing "
+            f"{UDR_2025[0]}, not the latest {UDR_2026[0]}; the latest filing's value is kept.") in result.warnings
+
+
+def test_a_20f_share_count_comes_with_the_ads_ratio_from_its_cover(tmp_path):
+    result, context = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]["values"][0]
+    assert ratio["value"] == "8" and ratio["accession"] == shares["accession"] == "0001193125-26-231755"
+    assert ratio["tag"] == "dei:Security12bTitle" and "each representing eight Ordinary Shares" in ratio["notes"][0]
+    assert ratio["id"] in result.ids and context.records[ratio["id"]]["unit"] == "shares/ADS"
+
+
+def test_a_cover_count_the_tag_cuts_off_uses_the_printed_number(tmp_path):
+    # BABA's 2026 cover tags "18,580,374,27" and prints the last 8 after the tag, so companyfacts has 1,858,037,427.
+    result, context = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1)
+    shares = result.data["metrics"]["shares_outstanding"]["values"][0]
+    assert shares["value"] == "18580374278" and shares["tagged_value"] == "1858037427"
+    assert context.records[shares["id"]]["value"] == "18580374278" and shares["id"] in result.ids
+    assert any("cuts the number off" in w for w in result.warnings)
+
+
+def test_a_direct_listing_is_one_ordinary_share_per_listed_share(tmp_path):
+    result, _ = financials(tmp_path, cik="1015922", metrics=["shares_outstanding"], years=1)
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]["values"][0]
+    assert ratio["value"] == "1" and ratio["tag"] == "no depositary shares"
+    assert result.data["metrics"]["shares_outstanding"]["values"][0]["value"] == "105596035"
+
+
+def test_a_ratio_whose_filing_is_missing_is_unsupported_not_fatal(tmp_path):
+    empty = {"cik": "1577552", "filings": {"recent": {}, "files": []}}
+    files = SecFiles({"/submissions/CIK0001577552.json": httpx.Response(200, json=empty)})
+    result, _ = financials(tmp_path, cik="1577552", metrics=["shares_outstanding"], years=1, files=files)
+    ratio = result.data["metrics"]["ordinary_shares_per_ads"]
+    assert result.status == "partial" and ratio["status"] == "unsupported" and "not in SEC's list" in ratio["reason"]
+    assert result.data["metrics"]["shares_outstanding"]["values"][0]["value"] == "1858037427"  # cover unread: as filed
+
+
+def test_a_10k_share_count_needs_no_ads_ratio(tmp_path):
+    result, _ = financials(tmp_path, metrics=["shares_outstanding"])
+    assert "ordinary_shares_per_ads" not in result.data["metrics"]
+
+
+@pytest.fixture
+def ecb(monkeypatch):
+    mock = Frankfurter()
+    monkeypatch.setattr(fx_frankfurter, "transport", httpx.MockTransport(mock))
+    return mock
+
+
+def test_figures_in_another_currency_convert_at_the_years_average_and_year_end_rates(tmp_path, ecb):
+    result, context = financials(tmp_path, cik="1577552", metrics=["revenue", "total_assets", "eps_diluted"], years=2)
+    revenue = result.data["metrics"]["revenue"]
+    assert revenue["unit"] == "USD" and [(v["end"], v["fx_rate"]) for v in revenue["values"]] == [
+        ("2026-03-31", "7.200000"), ("2025-03-31", "7.000000")]
+    latest = revenue["values"][0]
+    assert latest["value"] == str((Decimal(1023670000000) / Decimal("7.2")).quantize(Decimal(1)))
+    assert (latest["reported_value"], latest["reported_unit"], latest["fx_basis"]) == ("1023670000000", "CNY", "average")
+    assert latest["fx_first"] == "2025-04-01" and latest["fx_last"] == "2026-03-31"
+    assert "at 7.200000 CNY per US dollar, the average of" in latest["notes"][0]
+    assert context.records[latest["id"]]["unit"] == "USD" and latest["id"] in result.ids
+    assets = result.data["metrics"]["total_assets"]["values"][0]
+    assert assets["fx_basis"] == "year_end" and assets["fx_last"] == "2026-03-31"
+    eps = result.data["metrics"]["eps_diluted"]["values"][0]
+    assert context.records[eps["id"]]["unit"] == "USD/shares" and eps["value"] == "0.7639"  # 5.50 CNY / 7.2
+    assert result.source == "SEC companyfacts; exchange rates: Frankfurter (ECB reference rates) (fallback)"
+    assert any(w.startswith("Converted to USD from CNY at Frankfurter") for w in result.warnings)
+    assert any("FRED_API_KEY" in w for w in result.warnings)
+    assert not any("convenience translations at one exchange rate per filing" in w for w in result.warnings)
+
+
+def test_without_a_rate_the_filings_own_dollars_are_shown_and_say_so(tmp_path):
+    result, _ = financials(tmp_path, cik="1577552", metrics=["revenue"], years=1)  # tests block Frankfurter
+    assert values(result, "revenue") == [("2026-03-31", "148401000000")]
+    assert any(w.startswith("revenue: no CNY exchange rate") for w in result.warnings)
+    assert any("convenience translations" in w for w in result.warnings)
+
+
+def test_a_filer_reporting_only_another_currency_converts_when_a_rate_exists(tmp_path, ecb):
+    result, _ = financials(tmp_path, metrics=["revenue"], years=1, files=foreign_variant("CNY"))
+    (latest,) = result.data["metrics"]["revenue"]["values"]
+    assert result.status == "ok" and latest["reported_unit"] == "CNY"
+    assert Decimal("7.0") < Decimal(latest["fx_rate"]) < Decimal("7.2")  # the year spans the mocked change of rate
