@@ -302,6 +302,21 @@ Every kind of data has a few options, so nothing depends on one vendor. These ru
 
 Terms to respect: Finnhub's free licence is personal use; Tiingo and EODHD data is for internal use; prefer the primary source over the many new wrappers on public-apis (one less dependency and citation hop). The next seven add about 11–13 days of work with AI help. A new tool changes conditions B–D, so land it before the held-out run is frozen, or keep it out of the evaluated tool set (web app only).
 
+**Other HKU databases** ([database list](https://libguides.lib.hku.hk/az.php?s=154482), read 8 Nov 2026). The §6 WRDS rules apply to everything reached through WRDS: people work on it, no LLM or AI coding tool opens the data, and only aggregates reach the report.
+- **Worth using, offline:**
+  - **Audit Analytics** (restatements, going-concern opinions, auditor changes, control weaknesses): a person uses it to find restatement and going-concern examples, then writes each eval case from the SEC filings themselves, so no Audit Analytics data sits in a case. It also gives report-only base rates, such as how often a control weakness came before a restatement.
+  - **I/B/E/S Guidance**: how often companies met the guidance they gave, as a report-only base rate next to the filings analyst's attributed management claims.
+  - **Eventus** (event studies on CRSP): abnormal returns after 8-K events, insider purchases and earnings, done the standard way for the report. With free data alone, those event averages stay unbuilt (§6).
+- **For the report:** JSTOR, EconLit, Web of Science, SSRN (Financial Economics Network) and ProQuest give the original papers behind numbers in [Outlook evidence](#outlook-evidence-papers) that came from summaries (Lazy Prices, McLean & Pontiff, Chan, Karceski & Lakonishok, Barber et al.). People read and cite them; licensed full texts aren't fed to AI tools unless the licence allows.
+- **Not needed:**
+  - TAQ: tick data, and no horizon here is intraday.
+  - Fama-French through WRDS: the same as the free Ken French site.
+  - Bank Regulatory: FFIEC's free call reports have the same data if banks are ever supported.
+  - DealScan, Mergent FISD, BoardEx, ISS and SDC: loans, bonds, boards and deals.
+  - Compustat Global, PACAP, and the Hong Kong and China databases: outside the US-listed scope.
+  - Factiva and the FT and Economist archives: news text, whose licences ban bulk text mining, and an LLM would already know what came after.
+  - Finaeon, EIU, EMIS, Orbis, IRI and the rest: off-topic.
+
 Sources read on 4 Nov 2026: [World Monitor](https://www.worldmonitor.app/docs/data-sources) ([repo](https://github.com/koala73/worldmonitor), AGPL-3.0; mostly geopolitics; its finance feeds are FRED, ECB, BIS, Treasury, EIA, CFTC, USAspending, CoinGecko and Polymarket), [public-apis](https://github.com/public-apis/public-apis) (Finance, Government, News, Social, Jobs, Patent, Health) and awesome-quant's data and prediction-market sections.
 
 **Setup & status page (proposed, not built):** every row above lives in `data/providers.py` with its status, whether an adapter exists, env variable, free-tier limit, history, point-in-time flag and docs link, and a test checks each name appears in this table. Cards are grouped by question (company numbers, prices, events, insiders and ownership, news, macro and markets, alternative data). Built providers keep today's states and Test button; unbuilt ones show greyed as "planned" or "later" with the reason; "no" sources sit behind a disclosure. A summary line counts active, keyless-ready, needs-a-key and planned kinds.
