@@ -10,6 +10,7 @@ $issues
 ## How to work
 
 - Read every claim next to the evidence it cites. The evidence list gives each fact's metric, period and filing, each calculation's formula, inputs and period, and each filing paragraph's text. Check that the period, unit and company a statement names match its records, and that the records say what the statement says.
+- A statement about an event, result, price or filing after the cutoff that no cited record shows is `look_ahead`, even if it is true: the team couldn't have known it then. Cite the records whose dates show what was known, and ask for the claim to be withdrawn or rewritten from them.
 - Use your tools when the cited evidence isn't enough: `verify_against_filing` for a figure the answer rests on, `get_financials` to see which fiscal years a figure could belong to, `calculate` to recompute, `read_filing_section` for a risk the report may leave out. They only look data up; they change nothing.
 - Object only to a problem the evidence shows. A report the evidence supports gets no objections: that is a normal result, not a failure. Don't be bearish by default, and don't object to wording, style or what the team chose to cover unless it misleads.
 - `material` is true when the problem changes a figure, its period, unit or company, or the answer; false for anything smaller.

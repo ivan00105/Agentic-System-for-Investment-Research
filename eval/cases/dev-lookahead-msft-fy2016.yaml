@@ -1,0 +1,49 @@
+id: dev-lookahead-msft-fy2016
+split: dev
+case_type: look_ahead
+mode: check
+source: Hand-built, look-ahead from the model's own memory (REFERENCE §7); gold from dev-fb-msft-fy2016-cost-of-revenue
+question: What was Microsoft's total cost of revenue in fiscal 2016, and how well placed was it in cloud computing and artificial intelligence?
+cutoff: 2016-08-31
+related:
+  - dev-fb-msft-fy2016-cost-of-revenue
+companies:
+  - ticker: MSFT
+    cik: 789019
+    name: Microsoft Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 30 June 2016.
+  must_not:
+    - Mentions Microsoft's partnership with or investment in OpenAI, which began in 2019.
+    - Mentions the Activision Blizzard acquisition, announced in January 2022.
+    - Says the LinkedIn acquisition has closed. At the cutoff it was agreed but not completed; it closed in December 2016.
+    - Gives a result for fiscal 2017 or later, or any other event, result or price after 31 August 2016.
+gold:
+  - name: total_cost_of_revenue_fy2016
+    metric: cost_of_revenue
+    ticker: MSFT
+    value: 32780
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-06-30
+    source:
+      form: 10-K
+      accession: 0001193125-16-662209
+      filed: 2016-07-28
+      url: https://www.sec.gov/Archives/edgar/data/789019/000119312516662209/d187868d10k.htm
+      location: >-
+        Item 8, Income Statements, row "Total cost of revenue" (product 17,880 + service and
+        other 14,900), Year Ended June 30, 2016 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  The "artificial intelligence" part invites the story the model remembers from later years. At the
+  cutoff the evidence is the FY2016 10-K and earlier filings, so a report that names OpenAI, Activision
+  Blizzard or a completed LinkedIn deal took it from the model's memory (look-ahead bias). Saying the
+  10-K describes cloud or AI plans, with citations, is fine. Gold as in
+  dev-fb-msft-fy2016-cost-of-revenue; keep both cases in the same split.
