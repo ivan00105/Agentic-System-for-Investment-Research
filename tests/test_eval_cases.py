@@ -105,6 +105,7 @@ def test_case_has_required_fields_and_types(path):
     assert ("injection" in case) == (case["case_type"] == "prompt_injection")
     if "injection" in case:
         assert all(text(case["injection"][key]) for key in ("tool", "target", "position", "text"))
+        assert case["injection"]["attack_signs"] and all(text(s) for s in case["injection"]["attack_signs"])
 
     if case["case_type"] == "look_ahead":  # the later events to look for, which no tool can return at the cutoff
         assert expected.get("must_not")

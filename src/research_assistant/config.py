@@ -250,6 +250,11 @@ WEB_DISCOVER_CONDITION = "B"
 # Longest label a user can give a saved run in History: room for a sentence, short enough to stay one line in lists.
 RUN_LABEL_MAX = 120
 
+# Evaluation intervals (REFERENCE §7): resamples of cases for the 95% bootstrap interval, plenty for its two ends;
+# the fixed seed makes a rescore of the same batch print the same intervals.
+EVAL_BOOTSTRAP_RESAMPLES = 2000
+EVAL_BOOTSTRAP_SEED = 7608
+
 
 def trace_dir() -> Path:
     # One append-only JSONL trace per run, written step by step so a crash still leaves the trace.
