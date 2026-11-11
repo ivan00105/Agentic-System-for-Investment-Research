@@ -1,6 +1,7 @@
 """Filing lists from SEC submissions JSON, including the older pages in `files[]` (REFERENCE §10).
 
 A filing counts from its acceptance time (UTC in the JSON), so the cutoff is exact to the second.
+Forms that SEC releases later than it dates them (`RELEASED_LATER`) never count.
 """
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -27,6 +28,12 @@ EIGHT_K_ITEMS = {
     "6.06": "Static pool", "7.01": "Regulation FD disclosure", "8.01": "Other events", "9.01": "Financial statements and exhibits",
 }
 
+# SEC puts these on EDGAR long after the date it gives them, and its data has no release date (REFERENCE §5):
+# confidential drafts (DRS; Regulation A's DOS), their cover letters, and review letters to and from SEC staff.
+RELEASED_LATER = frozenset({"DRS", "DRS/A", "DRSLTR", "DOS", "DOS/A", "DOSLTR", "CORRESP", "UPLOAD"})
+RELEASED_LATER_WHY = ("SEC publishes these forms (drafts and review letters) later than the date it shows, "
+                      "and that release date is not in its data")
+
 
 @dataclass(frozen=True)
 class Filing:
@@ -49,7 +56,7 @@ class Filing:
         return self.folder_url + self.primary_document
 
     def public_by(self, cutoff: datetime) -> bool:
-        return (self.accepted_at or available_at(self.filed)) <= cutoff
+        return self.form not in RELEASED_LATER and (self.accepted_at or available_at(self.filed)) <= cutoff
 
 
 def _cell(columns: dict, name: str, i: int, default=""):

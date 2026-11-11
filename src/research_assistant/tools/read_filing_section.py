@@ -42,6 +42,9 @@ def run(args: ReadSectionInput, context: ToolContext) -> ToolResult:
         filing = sec_filings.find(context.sec, cik, args.accession)
         if filing is None:
             return ToolResult(status="not_found", source=source, warnings=[f"No filing {args.accession} for CIK {cik}."])
+        if filing.form in sec_filings.RELEASED_LATER:
+            return ToolResult(status="unsupported", source=source, warnings=[
+                f"{args.accession} is a {filing.form}, never read: {sec_filings.RELEASED_LATER_WHY}."])
         if not filing.public_by(context.cutoff):
             return ToolResult(status="invalid", source=source, warnings=[f"{args.accession} was filed after the cutoff."])
     else:

@@ -29,6 +29,8 @@ def run(args: ListFilingsInput, context: ToolContext) -> ToolResult:
     found = sec_filings.search(context.sec, cik, context.cutoff, forms=forms, since=args.since, after=after,
                                limit=limit + 1)
     warnings, next_page = [], None
+    if forms and (hidden := sorted(forms & sec_filings.RELEASED_LATER)):
+        warnings.append(f"{', '.join(hidden)} never listed: {sec_filings.RELEASED_LATER_WHY}.")
     if len(found) > limit:
         found = found[:limit]
         next_page = f"{found[-1].filed}/{found[-1].accession}"
@@ -52,4 +54,5 @@ def run(args: ListFilingsInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("list_filings", "A company's SEC filings up to the research cutoff, newest first: form, filing and "
             "acceptance time, event or period date, and 8-K item types (earnings, executive changes, deals...). "
-            "Use forms=[\"8-K\"] for events.", ListFilingsInput, run, "SEC submissions")
+            "Use forms=[\"8-K\"] for events. Drafts and SEC review letters (DRS, CORRESP, UPLOAD) are never listed.",
+            ListFilingsInput, run, "SEC submissions")
