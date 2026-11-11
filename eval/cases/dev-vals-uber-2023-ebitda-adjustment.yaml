@@ -1,0 +1,43 @@
+id: dev-vals-uber-2023-ebitda-adjustment
+split: dev
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 35 of 50 (adapted)
+question: For the year ended 31 December 2023, what was Uber's largest adjustment from net income to Adjusted EBITDA? Give the line item and the amount.
+cutoff: 2024-03-31
+companies:
+  - ticker: UBER
+    cik: 1543151
+    name: Uber Technologies, Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - The largest adjustment is "Stock-based compensation expense", $1,935 million, in a non-GAAP reconciliation.
+  must_not:
+    - Names "Other (income) expense, net" (-1,844 in 2023), a deduction smaller than stock-based compensation, as the largest.
+    - Gives 2022's figures (stock-based compensation 1,793) as 2023's.
+gold:
+  - name: sbc_adjustment_2023
+    metric: stock_based_compensation
+    ticker: UBER
+    value: 1935
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0001543151-24-000012
+      filed: 2024-02-15
+      url: https://www.sec.gov/Archives/edgar/data/1543151/000154315124000012/uber-20231231.htm
+      location: >-
+        Item 7, Reconciliations of Non-GAAP Financial Measures, Adjusted EBITDA reconciliation, row
+        "Stock-based compensation expense", 2023 column
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches Vals' $1.935B. In the 2023 column the other large lines are "Other (income) expense, net"
+  (1,844, deducted) and depreciation and amortization (823). No tool measures stock-based compensation,
+  so the gold item needs review. The cash-flow statement shows the same 1,935.

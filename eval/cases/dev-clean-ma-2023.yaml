@@ -1,0 +1,74 @@
+id: dev-clean-ma-2023
+split: dev
+case_type: clean
+mode: check
+source: Hand-built, clean case (REFERENCE §7)
+question: What were Mastercard's net revenue, operating income, operating margin and net income in 2023?
+cutoff: 2024-03-31
+companies:
+  - ticker: MA
+    cik: 1141391
+    name: Mastercard Incorporated
+expected:
+  behaviour: answer
+gold:
+  - name: net_revenue_2023
+    metric: revenue
+    ticker: MA
+    value: 25098
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0001141391-24-000022
+      filed: 2024-02-13
+      url: https://www.sec.gov/Archives/edgar/data/1141391/000114139124000022/ma-20231231.htm
+      location: Consolidated Statement of Operations, row "Net Revenue", 2023 column
+  - name: operating_income_2023
+    metric: operating_income
+    ticker: MA
+    value: 14008
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0001141391-24-000022
+      filed: 2024-02-13
+      url: https://www.sec.gov/Archives/edgar/data/1141391/000114139124000022/ma-20231231.htm
+      location: Consolidated Statement of Operations, row "Operating income", 2023 column
+  - name: net_income_2023
+    metric: net_income
+    ticker: MA
+    value: 11195
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0001141391-24-000022
+      filed: 2024-02-13
+      url: https://www.sec.gov/Archives/edgar/data/1141391/000114139124000022/ma-20231231.htm
+      location: Consolidated Statement of Operations, row "Net Income", 2023 column
+  - name: operating_margin_2023
+    metric: operating_income_to_revenue
+    ticker: MA
+    value: 55.8
+    unit: percent
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    derived:
+      formula: operating_income_2023 / net_revenue_2023
+      inputs: [operating_income_2023, net_revenue_2023]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  A clean case: one US filer, a calendar year, plain GAAP lines in one statement, no restatement, and
+  the latest 10-K at the cutoff is the source. A correct first draft needs no change, so it measures the
+  critic's damage (right to wrong) and invalid objections. 14,008 / 25,098 = 55.81%. Mastercard's
+  "Net Revenue" includes the impact of rebates and incentives (Item 7); it is the reported revenue line.

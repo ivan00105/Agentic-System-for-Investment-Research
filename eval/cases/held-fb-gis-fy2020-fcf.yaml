@@ -1,0 +1,67 @@
+id: held-fb-gis-fy2020-fcf
+split: held_out
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04854 (adapted)
+question: What was General Mills' free cash flow (operating cash flow minus capital expenditure) in fiscal 2020?
+cutoff: 2020-08-31
+companies:
+  - ticker: GIS
+    cik: 40704
+    name: General Mills, Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 31 May 2020.
+  must_not:
+    - Subtracts total investing cash flow (486.2) instead of capital expenditure.
+gold:
+  - name: operating_cash_flow_fy2020
+    metric: operating_cash_flow
+    ticker: GIS
+    value: 3676.2
+    unit: USD millions
+    fiscal_period: FY2020
+    period_end: 2020-05-31
+    source:
+      form: 10-K
+      accession: 0001193125-20-186469
+      filed: 2020-07-02
+      url: https://www.sec.gov/Archives/edgar/data/40704/000119312520186469/d89717d10k.htm
+      location: >-
+        Consolidated Statements of Cash Flows, row "Net cash provided by operating activities",
+        Fiscal Year 2020 column
+  - name: capex_fy2020
+    metric: capex
+    ticker: GIS
+    value: 460.8
+    unit: USD millions
+    fiscal_period: FY2020
+    period_end: 2020-05-31
+    source:
+      form: 10-K
+      accession: 0001193125-20-186469
+      filed: 2020-07-02
+      url: https://www.sec.gov/Archives/edgar/data/40704/000119312520186469/d89717d10k.htm
+      location: >-
+        Consolidated Statements of Cash Flows, Investing Activities, row "Purchases of land,
+        buildings, and equipment", Fiscal Year 2020 column, shown as (460.8)
+  - name: fcf_fy2020
+    metric: fcf
+    ticker: GIS
+    value: 3215.4
+    unit: USD millions
+    fiscal_period: FY2020
+    period_end: 2020-05-31
+    derived:
+      formula: operating_cash_flow_fy2020 - capex_fy2020
+      inputs: [operating_cash_flow_fy2020, capex_fy2020]
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  3,676.2 - 460.8 = 3,215.4, matching FinanceBench's $3,215 million. Free cash flow is non-GAAP
+  (REFERENCE §5); here it is the question's own definition. The 10-K says fiscal 2020 was a 53-week
+  year and included 13 months of the Pet segment, so comparing it with fiscal 2019 needs that caveat.

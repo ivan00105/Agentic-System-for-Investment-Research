@@ -1,0 +1,70 @@
+id: held-vals-orcl-fy2024-tax-rate
+split: held_out
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 20 of 50 (adapted)
+question: What was Oracle's effective tax rate for the fiscal year ended 31 May 2024, and how did it change from the year before, in basis points?
+cutoff: 2024-07-31
+companies:
+  - ticker: ORCL
+    cik: 1341439
+    name: Oracle Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The effective tax rate was 10.9% in fiscal 2024 and 6.8% in fiscal 2023, up about 410 basis points.
+  must_not:
+    - Gives the non-GAAP rates (19.2% for fiscal 2024, 16.3% for fiscal 2023) as Oracle's effective tax rate.
+gold:
+  - name: effective_tax_rate_fy2024
+    metric: effective_tax_rate
+    ticker: ORCL
+    value: 10.9
+    unit: percent
+    fiscal_period: FY2024
+    period_end: 2024-05-31
+    source:
+      form: 10-K
+      accession: 0000950170-24-075605
+      filed: 2024-06-20
+      url: https://www.sec.gov/Archives/edgar/data/1341439/000095017024075605/orcl-20240531.htm
+      location: >-
+        Item 7, Provision for Income Taxes, table row "Effective tax rate", 2024 column; it is
+        provision 1,274 / income before income taxes 11,741 in the Consolidated Statements of
+        Operations
+  - name: effective_tax_rate_fy2023
+    metric: effective_tax_rate
+    ticker: ORCL
+    value: 6.8
+    unit: percent
+    fiscal_period: FY2023
+    period_end: 2023-05-31
+    source:
+      form: 10-K
+      accession: 0000950170-24-075605
+      filed: 2024-06-20
+      url: https://www.sec.gov/Archives/edgar/data/1341439/000095017024075605/orcl-20240531.htm
+      location: >-
+        Item 7, Provision for Income Taxes, table row "Effective tax rate", 2023 column; it is
+        provision 623 / income before income taxes 9,126 in the Consolidated Statements of Operations
+  - name: effective_tax_rate_change
+    metric: effective_tax_rate_change_bps
+    ticker: ORCL
+    value: 410
+    unit: basis points
+    fiscal_period: FY2024 vs FY2023
+    period_end: 2024-05-31
+    derived:
+      formula: effective_tax_rate_fy2024 - effective_tax_rate_fy2023
+      inputs: [effective_tax_rate_fy2024, effective_tax_rate_fy2023]
+    tolerance: 10
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches Vals (10.9%, 6.8%, +410 bps). From the unrounded statement figures the rates are 10.85% and
+  6.83%, a change of 402 bps, hence the tolerance of 10 bps. The same MD&A section gives non-GAAP rates
+  of 19.2% and 16.3%, which are not the effective tax rate. No tool measures tax rates, so every gold
+  item needs review.

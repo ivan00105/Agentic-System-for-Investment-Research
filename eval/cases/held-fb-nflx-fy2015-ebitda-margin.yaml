@@ -1,0 +1,83 @@
+id: held-fb-nflx-fy2015-ebitda-margin
+split: held_out
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04458 (adapted)
+question: What was Netflix's 2015 EBITDA margin, with EBITDA as operating income plus the depreciation and amortization of property, equipment and intangibles from the cash flow statement?
+cutoff: 2016-02-29
+companies:
+  - ticker: NFLX
+    cik: 1065280
+    name: Netflix, Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - EBITDA here is a non-GAAP measure built to the question's definition.
+  must_not:
+    - Adds "Amortization of streaming content assets" (3,405,382 thousand), which gives about 55.7%.
+gold:
+  - name: revenues_2015
+    metric: revenue
+    ticker: NFLX
+    value: 6779.511
+    unit: USD millions
+    fiscal_period: FY2015
+    period_end: 2015-12-31
+    source:
+      form: 10-K
+      accession: 0001065280-16-000047
+      filed: 2016-01-28
+      url: https://www.sec.gov/Archives/edgar/data/1065280/000106528016000047/nflx201510k.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Revenues", 2015 column, shown as
+        6,779,511
+  - name: operating_income_2015
+    metric: operating_income
+    ticker: NFLX
+    value: 305.826
+    unit: USD millions
+    fiscal_period: FY2015
+    period_end: 2015-12-31
+    source:
+      form: 10-K
+      accession: 0001065280-16-000047
+      filed: 2016-01-28
+      url: https://www.sec.gov/Archives/edgar/data/1065280/000106528016000047/nflx201510k.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Operating income", 2015 column,
+        shown as 305,826
+  - name: depreciation_amortization_2015
+    metric: depreciation_and_amortization
+    ticker: NFLX
+    value: 62.283
+    unit: USD millions
+    fiscal_period: FY2015
+    period_end: 2015-12-31
+    source:
+      form: 10-K
+      accession: 0001065280-16-000047
+      filed: 2016-01-28
+      url: https://www.sec.gov/Archives/edgar/data/1065280/000106528016000047/nflx201510k.htm
+      location: >-
+        Consolidated Statements of Cash Flows (in thousands), row "Depreciation and amortization of
+        property, equipment and intangibles", 2015 column, shown as 62,283
+  - name: ebitda_margin_2015
+    metric: ebitda_to_revenue
+    ticker: NFLX
+    value: 5.43
+    unit: percent
+    fiscal_period: FY2015
+    period_end: 2015-12-31
+    derived:
+      formula: (operating_income_2015 + depreciation_amortization_2015) / revenues_2015
+      inputs: [operating_income_2015, depreciation_amortization_2015, revenues_2015]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  (305,826 + 62,283) / 6,779,511 = 5.43%, matching FinanceBench's 5.4%. Netflix's content amortization
+  is a separate, much larger cash-flow row; the question's definition leaves it out. No tool measures
+  D&A or EBITDA, so those two items need review; revenue and operating income are scored automatically.

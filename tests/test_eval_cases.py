@@ -15,7 +15,7 @@ CASES = sorted((Path(__file__).resolve().parents[1] / "eval" / "cases").glob("*.
 SPLITS = {"dev", "held_out"}
 MODES = {"check", "compare", "discover"}
 # The robustness cases in REFERENCE §7; add a type here when a new kind of case needs one.
-CASE_TYPES = {"check", "fiscal_period_trap", "bank", "foreign_filer", "unknown_ticker", "prompt_injection",
+CASE_TYPES = {"check", "clean", "fiscal_period_trap", "bank", "foreign_filer", "unknown_ticker", "prompt_injection",
               "restatement", "injected_error", "missing_data", "impossible_filter", "api_failure", "look_ahead"}
 BEHAVIOURS = {"answer", "answer_or_abstain", "not_available"}
 ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")

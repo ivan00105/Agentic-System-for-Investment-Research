@@ -1,0 +1,43 @@
+id: dev-vals-abnb-2024-sbc-adjustment
+split: dev
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 45 of 50 (adapted)
+question: In 2024, how much stock-based compensation expense did Airbnb add back to net income to arrive at Adjusted EBITDA?
+cutoff: 2025-03-31
+companies:
+  - ticker: ABNB
+    cik: 1559720
+    name: Airbnb, Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - Adjusted EBITDA is a non-GAAP measure and is labelled as such.
+  must_not:
+    - Gives 2023's figure (1,120) as 2024's.
+gold:
+  - name: sbc_2024
+    metric: stock_based_compensation
+    ticker: ABNB
+    value: 1407
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001559720-25-000010
+      filed: 2025-02-13
+      url: https://www.sec.gov/Archives/edgar/data/1559720/000155972025000010/abnb-20241231.htm
+      location: >-
+        Item 7, Key Business Metrics and Non-GAAP Financial Measures, Adjusted EBITDA reconciliation,
+        row "Stock-based compensation expense", 2024 column; the Consolidated Statements of Cash
+        Flows show the same 1,407 (2024 is the rightmost column there)
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches Vals' $1,407,000,000. No tool measures stock-based compensation, so the gold item needs
+  review. Airbnb's tables put 2022, 2023, 2024 from left to right in the cash-flow statement but 2023,
+  2024 in the MD&A reconciliation.

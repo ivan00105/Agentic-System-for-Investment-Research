@@ -1,0 +1,71 @@
+id: held-vals-net-2024-channel-partners
+split: held_out
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 34 of 50 (adapted)
+question: In fiscal 2024, what percentage of Cloudflare's revenue came from channel partners?
+cutoff: 2025-03-31
+companies:
+  - ticker: NET
+    cik: 1477333
+    name: Cloudflare, Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Gives 2023's share (16%) as 2024's.
+    - Gives the share of revenue from international customers (49%) instead.
+gold:
+  - name: channel_partner_revenue_2024
+    metric: channel_partner_revenue
+    ticker: NET
+    value: 337.394
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001477333-25-000043
+      filed: 2025-02-20
+      url: https://www.sec.gov/Archives/edgar/data/1477333/000147733325000043/cloud-20241231.htm
+      location: >-
+        Notes, Note 3 (Revenue), Disaggregation of Revenue, table of revenue by type of customer (in
+        thousands), row "Channel partners", 2024 Amount, shown as 337,394
+  - name: revenue_2024
+    metric: revenue
+    ticker: NET
+    value: 1669.626
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001477333-25-000043
+      filed: 2025-02-20
+      url: https://www.sec.gov/Archives/edgar/data/1477333/000147733325000043/cloud-20241231.htm
+      location: >-
+        Notes, Note 3, Disaggregation of Revenue, the same table (in thousands), row "Total", 2024
+        Amount, shown as 1,669,626
+  - name: channel_partner_share_2024
+    metric: channel_partner_share_of_revenue
+    ticker: NET
+    value: 20
+    unit: percent
+    fiscal_period: FY2024
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001477333-25-000043
+      filed: 2025-02-20
+      url: https://www.sec.gov/Archives/edgar/data/1477333/000147733325000043/cloud-20241231.htm
+      location: >-
+        Notes, Note 3, Disaggregation of Revenue, the same table, row "Channel partners", 2024
+        "Percentage of Revenue" column, shown as 20
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches Vals' 20%. 337,394 / 1,669,626 = 20.2%, which the table rounds to 20 (the default tolerance
+  of 0.5 accepts both). The share was 16% in 2023 and 13% in 2022. Only revenue is scored automatically;
+  the channel-partner items need review.

@@ -1,0 +1,115 @@
+id: held-fb-wmt-fy2019-operating-margin-change
+split: held_out
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04784 (adapted)
+question: By how much did Walmart's operating margin (operating income over total revenues) change from fiscal 2018 to fiscal 2019?
+cutoff: 2019-04-30
+companies:
+  - ticker: WMT
+    cik: 104169
+    name: Walmart Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - The change is about +0.2 percentage points (from about 4.1% to about 4.3%), not a percent change.
+    - The periods are the fiscal years ended 31 January 2019 and 31 January 2018.
+  must_not:
+    - Uses Walmart's own "Operating income as a percentage of net sales" (4.3 and 4.1), which divides by net sales, not total revenues, without saying so.
+gold:
+  - name: total_revenues_fy2019
+    metric: revenue
+    ticker: WMT
+    value: 514405
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-01-31
+    source:
+      form: 10-K
+      accession: 0000104169-19-000016
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/104169/000010416919000016/wmtform10-kx1312019.htm
+      location: Consolidated Statements of Income, row "Total revenues", fiscal 2019 column
+  - name: total_revenues_fy2018
+    metric: revenue
+    ticker: WMT
+    value: 500343
+    unit: USD millions
+    fiscal_period: FY2018
+    period_end: 2018-01-31
+    source:
+      form: 10-K
+      accession: 0000104169-19-000016
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/104169/000010416919000016/wmtform10-kx1312019.htm
+      location: Consolidated Statements of Income, row "Total revenues", fiscal 2018 column
+  - name: operating_income_fy2019
+    metric: operating_income
+    ticker: WMT
+    value: 21957
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-01-31
+    source:
+      form: 10-K
+      accession: 0000104169-19-000016
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/104169/000010416919000016/wmtform10-kx1312019.htm
+      location: Consolidated Statements of Income, row "Operating income", fiscal 2019 column
+  - name: operating_income_fy2018
+    metric: operating_income
+    ticker: WMT
+    value: 20437
+    unit: USD millions
+    fiscal_period: FY2018
+    period_end: 2018-01-31
+    source:
+      form: 10-K
+      accession: 0000104169-19-000016
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/104169/000010416919000016/wmtform10-kx1312019.htm
+      location: Consolidated Statements of Income, row "Operating income", fiscal 2018 column
+  - name: operating_margin_fy2019
+    metric: operating_income_to_revenue
+    ticker: WMT
+    value: 4.27
+    unit: percent
+    fiscal_period: FY2019
+    period_end: 2019-01-31
+    derived:
+      formula: operating_income_fy2019 / total_revenues_fy2019
+      inputs: [operating_income_fy2019, total_revenues_fy2019]
+    tolerance: 0.01
+  - name: operating_margin_fy2018
+    metric: operating_income_to_revenue
+    ticker: WMT
+    value: 4.08
+    unit: percent
+    fiscal_period: FY2018
+    period_end: 2018-01-31
+    derived:
+      formula: operating_income_fy2018 / total_revenues_fy2018
+      inputs: [operating_income_fy2018, total_revenues_fy2018]
+    tolerance: 0.01
+  - name: operating_margin_change_fy2019
+    metric: operating_income_to_revenue_change_pp
+    ticker: WMT
+    value: 0.18
+    unit: percentage points
+    fiscal_period: FY2019 vs FY2018
+    period_end: 2019-01-31
+    derived:
+      formula: >-
+        operating_income_fy2019 / total_revenues_fy2019 - operating_income_fy2018 / total_revenues_fy2018
+      inputs: [operating_income_fy2019, total_revenues_fy2019, operating_income_fy2018, total_revenues_fy2018]
+    tolerance: 0.01
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  21,957 / 514,405 = 4.268% and 20,437 / 500,343 = 4.085%, a change of +0.18 percentage points, which
+  FinanceBench rounds to 0.2%. Walmart's fiscal year ends 31 January and is named after the calendar
+  year it ends in. score.py has no unit rule for percentage points, so the change item needs review;
+  the two margins are scored automatically.

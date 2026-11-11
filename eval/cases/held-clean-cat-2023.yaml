@@ -1,0 +1,65 @@
+id: held-clean-cat-2023
+split: held_out
+case_type: clean
+mode: check
+source: Hand-built, clean case (REFERENCE §7)
+question: What were Caterpillar's total sales and revenues, operating profit and profit in 2023?
+cutoff: 2024-03-31
+companies:
+  - ticker: CAT
+    cik: 18230
+    name: Caterpillar Inc.
+expected:
+  behaviour: answer
+gold:
+  - name: total_sales_and_revenues_2023
+    metric: revenue
+    ticker: CAT
+    value: 67060
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0000018230-24-000009
+      filed: 2024-02-16
+      url: https://www.sec.gov/Archives/edgar/data/18230/000001823024000009/cat-20231231.htm
+      location: Consolidated Results of Operations, row "Total sales and revenues", 2023 column
+  - name: operating_profit_2023
+    metric: operating_income
+    ticker: CAT
+    value: 12966
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0000018230-24-000009
+      filed: 2024-02-16
+      url: https://www.sec.gov/Archives/edgar/data/18230/000001823024000009/cat-20231231.htm
+      location: Consolidated Results of Operations, row "Operating profit", 2023 column
+  - name: profit_2023
+    metric: net_income
+    ticker: CAT
+    value: 10335
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-12-31
+    source:
+      form: 10-K
+      accession: 0000018230-24-000009
+      filed: 2024-02-16
+      url: https://www.sec.gov/Archives/edgar/data/18230/000001823024000009/cat-20231231.htm
+      location: >-
+        Consolidated Results of Operations, row "Profit" (footnote 1: profit attributable to common
+        shareholders), 2023 column
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  A clean case, as dev-clean-ma-2023: a correct first draft needs no change. Caterpillar calls its
+  income statement "Consolidated Results of Operations" and net income "Profit"; 10,335 is after
+  noncontrolling interests (-3), and "Profit of consolidated and affiliated companies" (10,332) is the
+  line before them. "Total sales and revenues" includes Financial Products revenues (3,191).

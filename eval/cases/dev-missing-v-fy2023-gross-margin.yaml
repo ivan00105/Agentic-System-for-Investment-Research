@@ -1,0 +1,42 @@
+id: dev-missing-v-fy2023-gross-margin
+split: dev
+case_type: missing_data
+mode: check
+source: Hand-built, a metric the filer does not report (REFERENCE §7)
+question: What were Visa's net revenues, gross profit and gross margin in fiscal 2023?
+cutoff: 2023-12-31
+companies:
+  - ticker: V
+    cik: 1403161
+    name: Visa Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - Gross profit and gross margin are not available because Visa's income statement has no cost of revenue or gross profit line; they are unsupported, not zero.
+    - The period is the fiscal year ended 30 September 2023.
+  must_not:
+    - Invents a gross profit, for example from operating income (21,000) or from net revenues minus one expense line such as "Network and processing" (736).
+gold:
+  - name: net_revenues_fy2023
+    metric: revenue
+    ticker: V
+    value: 32653
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-09-30
+    source:
+      form: 10-K
+      accession: 0001403161-23-000099
+      filed: 2023-11-15
+      url: https://www.sec.gov/Archives/edgar/data/1403161/000140316123000099/v-20230930.htm
+      location: Consolidated Statements of Operations, row "Net revenues", 2023 column
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Visa's statement goes from net revenues straight to operating expenses by type (personnel,
+  marketing, network and processing, ...), with no cost of revenue, so a gross margin can't be built
+  from the filing. An operating margin (21,000 / 32,653 = 64.3%) is a fine extra if it is labelled as
+  operating margin. Like dev-bank-jpm-2023, but for a filer that is not a bank.

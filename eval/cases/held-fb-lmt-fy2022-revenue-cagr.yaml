@@ -1,0 +1,62 @@
+id: held-fb-lmt-fy2022-revenue-cagr
+split: held_out
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_03718 (adapted)
+question: What was Lockheed Martin's two-year compound annual growth rate of total net sales from 2020 to 2022?
+cutoff: 2023-02-28
+companies:
+  - ticker: LMT
+    cik: 936468
+    name: Lockheed Martin Corporation
+expected:
+  behaviour: answer
+  must_not:
+    - Gives the 2021-to-2022 change (about -1.6%) as the two-year growth rate.
+gold:
+  - name: total_net_sales_2022
+    metric: revenue
+    ticker: LMT
+    value: 65984
+    unit: USD millions
+    fiscal_period: FY2022
+    period_end: 2022-12-31
+    source:
+      form: 10-K
+      accession: 0000936468-23-000009
+      filed: 2023-01-26
+      url: https://www.sec.gov/Archives/edgar/data/936468/000093646823000009/lmt-20221231.htm
+      location: Consolidated Statements of Earnings, row "Total net sales", 2022 column
+  - name: total_net_sales_2020
+    metric: revenue
+    ticker: LMT
+    value: 65398
+    unit: USD millions
+    fiscal_period: FY2020
+    period_end: 2020-12-31
+    source:
+      form: 10-K
+      accession: 0000936468-23-000009
+      filed: 2023-01-26
+      url: https://www.sec.gov/Archives/edgar/data/936468/000093646823000009/lmt-20221231.htm
+      location: Consolidated Statements of Earnings, row "Total net sales", 2020 column
+  - name: revenue_cagr_2020_2022
+    metric: revenue_cagr
+    ticker: LMT
+    value: 0.45
+    unit: percent
+    fiscal_period: FY2020 to FY2022
+    period_end: 2022-12-31
+    derived:
+      formula: (total_net_sales_2022 / total_net_sales_2020) ** (1 / 2) - 1
+      inputs: [total_net_sales_2022, total_net_sales_2020]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  (65,984 / 65,398) ^ (1/2) - 1 = 0.447%, which FinanceBench rounds to 0.4%. Both inputs come from the
+  FY2022 10-K (its 2020 column), so one filing's figures are compared. Sales rose to 67,044 in 2021 and
+  fell back in 2022, so the yearly changes differ from the two-year rate.
