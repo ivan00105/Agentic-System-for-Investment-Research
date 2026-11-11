@@ -6,6 +6,7 @@ import openai
 from fake_llm import FakeClient, reply, resubmit, tool_results
 from sec_files import make_context
 
+from research_assistant import config
 from research_assistant.agents import single_agent
 from research_assistant.agents.objections import ISSUES
 from research_assistant.model_access import ModelSettings
@@ -88,6 +89,18 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert kinds.count("check") == 2 and kinds.count("self_review") == 1
     assert events[-1]["totals"]["model_calls"] == 6 and events[-1]["totals"]["tool_calls"] == 3
     assert result.totals == events[-1]["totals"] and events[-1]["markdown"] == result.markdown
+
+
+def test_decoding_settings_are_recorded_and_pinned_ones_go_with_every_call(tmp_path, monkeypatch):
+    script = (PLAN, find_apple, get_financials, calculate_margin, submit(stray=False), resubmit)
+    _, client, events = run(tmp_path, *script)
+    assert events[0]["decoding"] == dict.fromkeys(("temperature", "top_p", "seed"), "provider default")
+    assert not any({"temperature", "top_p", "seed"} & set(request) for request in client.requests)
+    monkeypatch.setattr(config, "AGENT_TEMPERATURE", 0.0)
+    monkeypatch.setattr(config, "AGENT_SEED", 7)
+    _, client, events = run(tmp_path, *script)
+    assert events[0]["decoding"] == {"temperature": 0.0, "top_p": "provider default", "seed": 7}
+    assert all((r["temperature"], r["seed"]) == (0.0, 7) and "top_p" not in r for r in client.requests)
 
 
 def test_a_clean_draft_still_gets_one_self_review_for_the_critics_issue_types(tmp_path):

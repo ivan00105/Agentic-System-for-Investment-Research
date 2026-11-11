@@ -116,7 +116,7 @@ def interpret(question: str, universe: Universe, client, settings: ModelSettings
     returns the spec as the user edited it directly (the page's spec editor), or None to keep the draft; an edited
     spec is used as it is, with no model call. `review` shows the spec for checking even when no term is asked."""
     defined = defined or {}
-    kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
+    kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
     given = "".join(f"\n- {term}: {meaning}" for term, meaning in defined.items())
     messages = [{"role": "system", "content": prompts.load(
                     "screener", cutoff=context.cutoff.isoformat(), universe=describe(universe),

@@ -11,7 +11,7 @@ from typing import Callable
 from openai import OpenAIError
 
 from .. import config
-from ..model_access import ModelSettings, safe_model_error
+from ..model_access import ModelSettings, decoding_record, safe_model_error
 from ..tools.result import Tool, ToolContext
 from . import prompts
 from .checker import CheckedReport, check
@@ -66,7 +66,7 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     ledger = ledger or ClaimLedger()
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), historical=context.historical,
                 condition=condition, lead=lead.name, provider=settings.provider, model=settings.model,
-                max_steps=max_steps)
+                decoding=decoding_record(), max_steps=max_steps)
     with trace.acting_as(lead.name):
         work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)
@@ -79,7 +79,7 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
 
 def _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps, passes) -> Work:
     work, cutoff = Work(), context.cutoff.isoformat()
-    kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
+    kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
     if context.stop.is_set():  # cancelled before the plan: no model call at all
         work.status = "stopped"
         return work

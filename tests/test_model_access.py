@@ -9,7 +9,8 @@ from openai import (
     BadRequestError, NotFoundError, OpenAIError, PermissionDeniedError, RateLimitError,
 )
 
-from research_assistant.model_access import load_model_settings, safe_model_error
+from research_assistant import config
+from research_assistant.model_access import decoding_record, load_model_settings, safe_model_error
 
 
 @pytest.fixture(autouse=True)
@@ -60,6 +61,16 @@ def test_openrouter_uses_only_its_key_and_pins_request_policy(monkeypatch):
     assert settings.request_kwargs(fallbacks=True)["extra_body"]["provider"]["allow_fallbacks"] is True
     assert settings.metadata()["model"] == "vendor/model:free"
     assert "router-secret" not in repr(settings)
+
+
+def test_agents_send_only_the_decoding_settings_config_pins(monkeypatch):
+    settings = configure(monkeypatch, RESEARCH_MODEL_PROVIDER="openrouter", RESEARCH_MODEL="m", OPENROUTER_API_KEY="k")
+    assert settings.agent_kwargs() == settings.request_kwargs(fallbacks=True)
+    assert decoding_record() == dict.fromkeys(("temperature", "top_p", "seed"), "provider default")
+    monkeypatch.setattr(config, "AGENT_TOP_P", 0.9)
+    monkeypatch.setattr(config, "AGENT_SEED", 7)
+    assert settings.agent_kwargs() == settings.request_kwargs(fallbacks=True) | {"top_p": 0.9, "seed": 7}
+    assert decoding_record() == {"temperature": "provider default", "top_p": 0.9, "seed": 7}
 
 
 def test_openrouter_cannot_fall_back_to_openai_key(monkeypatch):

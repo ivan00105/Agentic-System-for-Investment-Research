@@ -13,7 +13,7 @@ from typing import Callable
 
 from .. import config
 from ..data.sec import SecClient
-from ..model_access import ModelSettings
+from ..model_access import ModelSettings, decoding_record
 from ..tools.result import ToolContext
 from . import evidence, prompts
 from .claims import ClaimLedger
@@ -50,7 +50,8 @@ def run(path: Path, client, settings: ModelSettings, sec: SecClient, *, inject: 
     trace = Trace.new(trace_dir, echo)
     trace.write("run_start", question=question, cutoff=cutoff.isoformat(), historical=context.historical,
                 condition=condition, lead=COORDINATOR.name,
-                provider=settings.provider, model=settings.model, max_steps=max_steps, reviewed=str(path))
+                provider=settings.provider, model=settings.model, decoding=decoding_record(), max_steps=max_steps,
+                reviewed=str(path))
     # The evidence it starts from, frozen here too: this trace can be rechecked or reviewed again on its own, even
     # if no tool runs during the review.
     trace.write("evidence", records=trace.new_records(context.records))
@@ -74,7 +75,7 @@ def run(path: Path, client, settings: ModelSettings, sec: SecClient, *, inject: 
                                         "report. A critic now reviews it, and you answer its objections with your "
                                         "analysts' help. Your analysts start fresh, so give them the company's "
                                         "name, ticker and CIK again."}]
-        work.resume = partial(run_loop, client, settings.model, settings.request_kwargs(fallbacks=True),
+        work.resume = partial(run_loop, client, settings.model, settings.agent_kwargs(),
                               work.messages, context, trace=trace, tool_names=COORDINATOR.tools,
                               extra_tools=desk.tools())
         critic.review(work)

@@ -231,6 +231,11 @@ AGENT_MODEL_RETRIES = 6
 # Retries of a model call whose 200 reply body isn't JSON (a host cut the reply off), which the SDK doesn't retry.
 # Seen once in the 3 Nov 2026 live Discover check; after these the call fails like any other model error.
 AGENT_BAD_REPLY_RETRIES = 2
+# Decoding settings for agent calls. None sends nothing (the provider's default); run_start and the eval manifest
+# record them either way, since a run can't be reproduced without them. A seed only works on hosts that support it.
+AGENT_TEMPERATURE: float | None = None
+AGENT_TOP_P: float | None = None
+AGENT_SEED: int | None = None
 
 # Discover (REFERENCE §4): companies explained when the question doesn't say how many. Each one is a full
 # research run (B, C or D), so three keeps a Discover run to about the cost and time of three Check runs.

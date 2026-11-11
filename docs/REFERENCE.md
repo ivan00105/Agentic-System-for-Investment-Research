@@ -195,7 +195,7 @@ Tool lists are enforced (`agents/roles.py`): the loop answers a call to any othe
   - Risk coverage, justified abstention, and discover-mode correctness (filters satisfied, replacements correct)
   - Steps, tokens, cost, median and p95 latency, failure rate
 - **Stats:** paired comparisons per case, bootstrap intervals, repeated runs on a subset to measure randomness. Label small samples "exploratory". Negative results are fine.
-- **Freeze** the model ID and prompts before the held-out run, and upgrade nothing mid-ablation. Within one batch `eval/run_eval.py` enforces this: its `manifest.json` records the model, prompt and case-file hashes, the relevant `config.py` values and the git commit, and a resume with any of them changed is refused.
+- **Freeze** the model ID and prompts before the held-out run, and upgrade nothing mid-ablation. Within one batch `eval/run_eval.py` enforces this: its `manifest.json` records the model, prompt and case-file hashes, the relevant `config.py` values and the git commit, and a resume with any of them changed is refused. The config values include the decoding settings (`AGENT_TEMPERATURE`, `AGENT_TOP_P`, `AGENT_SEED`; `None` sends nothing, so the provider's default applies), which every `run_start` also records, "provider default" when unset (decided 11 Nov 2026: a run can't be reproduced without them).
 - **Component benchmarks (optional):** FinQA or TAT-QA for numeric reasoning, AgentDojo-style injection cases.
 
 ## 8. Security and prompt injection

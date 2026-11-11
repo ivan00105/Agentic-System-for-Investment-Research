@@ -54,7 +54,7 @@ class Desk:
     def __init__(self, question: str, client, settings: ModelSettings, trace: Trace, ledger: ClaimLedger,
                  max_steps: int):
         self.question, self.client, self.model, self.trace, self.ledger = question, client, settings.model, trace, ledger
-        self.kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
+        self.kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
         self.max_steps = max_steps  # per request: the same guard as any other agent's loop
         self.conversations: dict[str, list[dict]] = {}
         self.log: list[str] = []  # one line per request, for the report's "Who did what"
