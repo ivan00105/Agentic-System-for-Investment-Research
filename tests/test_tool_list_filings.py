@@ -1,15 +1,21 @@
 from datetime import date, datetime, timezone
 
-from sec_files import SecFiles, make_context
+import pytest
+from sec_files import ABNB_IPO, ABNB_SUBMISSIONS, SecFiles, make_context, submissions
 
+from research_assistant.data.sec_filings import RELEASED_LATER, Filing
 from research_assistant.tools.list_filings import ListFilingsInput, run
 
 OLDER_PAGE = "/submissions/CIK0000320193-submissions-001.json"
 
 
-def listed(tmp_path, cutoff=None, files=None, **args):
+def listed(tmp_path, cutoff=None, files=None, cik="320193", **args):
     context = make_context(tmp_path, files=files, **({"cutoff": cutoff} if cutoff else {}))
-    return run(ListFilingsInput(cik="320193", **args), context), context
+    return run(ListFilingsInput(cik=cik, **args), context), context
+
+
+def airbnb(tmp_path, **args):
+    return listed(tmp_path, files=SecFiles({ABNB_SUBMISSIONS: submissions(ABNB_IPO)}), cik="1559720", **args)[0]
 
 
 def test_8k_events_have_item_names_and_event_dates(tmp_path):
@@ -69,3 +75,27 @@ def test_paging_never_skips_filings_from_the_same_day(tmp_path):
     second, _ = listed(tmp_path, files=files, limit=1, page=first.data["next_page"])
     shown = {first.data["filings"][0]["accession"], second.data["filings"][0]["accession"]}
     assert shown == {recent["accessionNumber"][newest], recent["accessionNumber"][twin]}
+
+
+def test_drafts_and_review_letters_are_not_listed_before_sec_released_them(tmp_path):
+    # Airbnb's DRS, DRS/A, DRSLTR and UPLOAD are dated August-September 2020; the public S-1 came on 16 November.
+    before_the_s1 = datetime(2020, 10, 31, 23, 59, 59, tzinfo=timezone.utc)
+    result = airbnb(tmp_path, cutoff=before_the_s1)
+    assert result.data["filings"] == [] and result.warnings == ["No filings match before the cutoff."]
+
+
+def test_forms_released_later_stay_out_at_any_cutoff(tmp_path):
+    assert [f["form"] for f in airbnb(tmp_path).data["filings"]] == ["S-1/A", "S-1"]
+
+
+def test_asking_for_a_form_released_later_says_why_it_is_missing(tmp_path):
+    result = airbnb(tmp_path, forms=["drs", "S-1"])
+    assert [f["form"] for f in result.data["filings"]] == ["S-1"]
+    assert [w for w in result.warnings if w.startswith("DRS never listed: SEC publishes these forms")]
+
+
+@pytest.mark.parametrize("form", sorted(RELEASED_LATER))
+def test_a_form_released_later_is_never_public_at_a_cutoff(form):
+    accepted = datetime(2020, 8, 19, 20, 18, 11, tzinfo=timezone.utc)
+    filing = Filing("0001559720", "0000950123-20-009252", form, accepted.date(), accepted, None, (), "filename1.htm", "")
+    assert not filing.public_by(datetime.max.replace(tzinfo=timezone.utc))

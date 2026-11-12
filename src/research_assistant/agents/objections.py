@@ -23,6 +23,9 @@ ISSUES = {
     "misleading_certainty": "the statement is surer than its evidence: a management claim or a forecast stated as "
                             "fact, or a needed caveat left out",
     "missing_material_risk": "a material risk in the evidence (e.g. the 10-K's Item 1A) is missing from the report",
+    # The model was trained after most eval cutoffs, so it may remember what came next.
+    "look_ahead": "the statement uses something from after the research cutoff that no cited record shows, such as "
+                  "a later event, result, price or filing the writer may remember",
 }
 Issue = Literal[tuple(ISSUES)]  # type: ignore[valid-type]
 OUTCOMES = ("defended", "corrected", "withdrawn", "unresolved")

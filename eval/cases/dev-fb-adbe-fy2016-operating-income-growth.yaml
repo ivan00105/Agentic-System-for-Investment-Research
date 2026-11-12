@@ -1,0 +1,65 @@
+id: dev-fb-adbe-fy2016-operating-income-growth
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_07507 (adapted)
+question: By what percentage did Adobe's operating income change from fiscal 2015 to fiscal 2016?
+cutoff: 2017-02-28
+companies:
+  - ticker: ADBE
+    cik: 796343
+    name: Adobe Inc.
+expected:
+  behaviour: answer
+gold:
+  - name: operating_income_fy2016
+    metric: operating_income
+    ticker: ADBE
+    value: 1493.602
+    unit: USD millions
+    fiscal_period: FY2016
+    period_end: 2016-12-02
+    source:
+      form: 10-K
+      accession: 0000796343-17-000031
+      filed: 2017-01-20
+      url: https://www.sec.gov/Archives/edgar/data/796343/000079634317000031/adbe10kfy16.htm
+      location: >-
+        Consolidated Statements of Income (in thousands), row "Operating income", Year Ended
+        December 2, 2016 column, shown as 1,493,602
+  - name: operating_income_fy2015
+    metric: operating_income
+    ticker: ADBE
+    value: 903.095
+    unit: USD millions
+    fiscal_period: FY2015
+    period_end: 2015-11-27
+    source:
+      form: 10-K
+      accession: 0000796343-17-000031
+      filed: 2017-01-20
+      url: https://www.sec.gov/Archives/edgar/data/796343/000079634317000031/adbe10kfy16.htm
+      location: >-
+        Consolidated Statements of Income (in thousands), row "Operating income", Year Ended
+        November 27, 2015 column, shown as 903,095
+  - name: operating_income_growth_fy2016
+    metric: operating_income_growth
+    ticker: ADBE
+    value: 65.4
+    unit: percent
+    fiscal_period: FY2016 vs FY2015
+    period_end: 2016-12-02
+    derived:
+      formula: operating_income_fy2016 / operating_income_fy2015 - 1
+      inputs: [operating_income_fy2016, operating_income_fy2015]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  1,493,602 / 903,095 - 1 = 65.39%, matching FinanceBench's 65.4%. The gold is GAAP operating income
+  as reported ("unadjusted" in FinanceBench's words). The 10-K says fiscal 2016 was a 53-week year and
+  fiscal 2015 a 52-week year; mentioning that it flatters the change is good but not required. The
+  filer was named Adobe Systems Incorporated then.

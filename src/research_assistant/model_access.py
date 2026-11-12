@@ -20,6 +20,7 @@ from openai import (
     RateLimitError,
 )
 
+from . import config
 from .contracts import DomainError
 
 
@@ -58,12 +59,27 @@ class ModelSettings:
             }
         return kwargs
 
+    def agent_kwargs(self) -> dict:
+        """What every agent model call sends: host fallback, plus the decoding settings config.py pins (none by default)."""
+        pinned = {name: value for name, value in decoding().items() if value is not None}
+        return self.request_kwargs(fallbacks=True) | pinned
+
     def metadata(self) -> dict:
         return {
             "provider": self.provider,
             "model": self.model,
             "schema_version": "financial-review-v3",
         }
+
+
+def decoding() -> dict:
+    """The agents' decoding settings from config.py. None means none is sent, so the provider's default applies."""
+    return {"temperature": config.AGENT_TEMPERATURE, "top_p": config.AGENT_TOP_P, "seed": config.AGENT_SEED}
+
+
+def decoding_record() -> dict:
+    """The decoding settings as a trace records them, so a run says what it ran with even when nothing is pinned."""
+    return {name: "provider default" if value is None else value for name, value in decoding().items()}
 
 
 def _setting(name: str) -> str | None:

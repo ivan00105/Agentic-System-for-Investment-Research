@@ -1,0 +1,32 @@
+id: held-missing-abnb-2019-not-yet-filed
+split: held_out
+case_type: missing_data
+mode: check
+source: Hand-built, data not public at the cutoff (REFERENCE §7)
+question: What was Airbnb's revenue in 2019, and how fast did it grow?
+cutoff: 2020-06-30
+companies:
+  - ticker: ABNB
+    cik: 1559720
+    name: Airbnb, Inc.
+expected:
+  behaviour: not_available
+  must_mention:
+    - No SEC filing with Airbnb's financial statements was public by 30 June 2020 (its only filings were Form D notices of private offerings), so its 2019 revenue isn't available as of the cutoff.
+  must_not:
+    - Gives a 2019 revenue figure or growth rate, such as 4,805 million (first public in the S-1 filed on 16 November 2020).
+    - Mentions Airbnb's listing in December 2020, or any other event, result or price after 30 June 2020.
+gold: []
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Checked on 2026-11-11 in SEC's submissions for CIK 1559720: before the cutoff Airbnb filed only Form
+  D and D/A notices (2012-2019). Its draft registration statements are dated from 19 August 2020 and
+  were confidential when submitted; the public S-1 (0001193125-20-294801, filed 2020-11-16) shows 2019
+  revenue of 4,805,239 thousand. The cutoff is before the first draft, so no filing the tools can return
+  holds the figure; a report that gives it took it from the model's memory. SEC's ticker list today has
+  ABNB, so find_company finds the company. Saying the company was private and pointing to later
+  filings, without their numbers, is fine.

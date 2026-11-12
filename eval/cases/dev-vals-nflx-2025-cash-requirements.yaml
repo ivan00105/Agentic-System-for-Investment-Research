@@ -1,0 +1,41 @@
+id: dev-vals-nflx-2025-cash-requirements
+split: dev
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 28 of 50 (adapted)
+question: As of 31 December 2024, what were Netflix's total projected material cash requirements for the next 12 months?
+cutoff: 2025-02-28
+companies:
+  - ticker: NFLX
+    cik: 1065280
+    name: Netflix, Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Gives the total of all future obligations (45,851,513 thousand) as the next 12 months' figure.
+    - Gives only content obligations (11,424,696 thousand for the next 12 months) as the total.
+gold:
+  - name: cash_requirements_next_12_months
+    metric: material_cash_requirements_next_12_months
+    ticker: NFLX
+    value: 14426.266
+    unit: USD millions
+    fiscal_period: FY2024 (the 12 months after 31 December 2024)
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001065280-25-000044
+      filed: 2025-01-27
+      url: https://www.sec.gov/Archives/edgar/data/1065280/000106528025000044/nflx-20241231.htm
+      location: >-
+        Item 7, Liquidity and Capital Resources, table of material cash requirements (in thousands),
+        row "Total", column "Next 12 Months", shown as 14,426,266
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches Vals' $14,426,266,000. The table adds content obligations (11,424,696), debt (2,486,945) and
+  operating lease obligations (514,625) for the next 12 months. No tool measures this, so the gold item
+  needs review.

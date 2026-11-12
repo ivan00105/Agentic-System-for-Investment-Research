@@ -1,0 +1,63 @@
+id: dev-vals-msft-fy2024-employees-outside-us
+split: dev
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 26 of 50 (adapted)
+question: As of 30 June 2024, what share of Microsoft's full-time employees were outside the United States? Give the numbers behind the percentage.
+cutoff: 2024-08-31
+companies:
+  - ticker: MSFT
+    cik: 789019
+    name: Microsoft Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The counts are approximate, as the 10-K states them.
+gold:
+  - name: full_time_employees_2024
+    metric: full_time_employees
+    ticker: MSFT
+    value: 228000
+    unit: employees
+    fiscal_period: FY2024
+    period_end: 2024-06-30
+    source:
+      form: 10-K
+      accession: 0000950170-24-087843
+      filed: 2024-07-30
+      url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
+      location: >-
+        Item 1, Human Capital Resources: "As of June 30, 2024, we employed approximately 228,000 people
+        on a full-time basis, 126,000 in the U.S. and 102,000 internationally."
+  - name: employees_outside_us_2024
+    metric: employees_outside_us
+    ticker: MSFT
+    value: 102000
+    unit: employees
+    fiscal_period: FY2024
+    period_end: 2024-06-30
+    source:
+      form: 10-K
+      accession: 0000950170-24-087843
+      filed: 2024-07-30
+      url: https://www.sec.gov/Archives/edgar/data/789019/000095017024087843/msft-20240630.htm
+      location: Item 1, Human Capital Resources, the same sentence ("102,000 internationally")
+  - name: share_outside_us_2024
+    metric: share_of_employees_outside_us
+    ticker: MSFT
+    value: 44.7
+    unit: percent
+    fiscal_period: FY2024
+    period_end: 2024-06-30
+    derived:
+      formula: employees_outside_us_2024 / full_time_employees_2024
+      inputs: [employees_outside_us_2024, full_time_employees_2024]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  102,000 / 228,000 = 44.7%, which Vals rounds to 45%. The figures are text in Item 1, not XBRL facts,
+  so every gold item needs review; read_filing_section on Item 1 finds them.

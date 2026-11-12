@@ -1,0 +1,65 @@
+id: held-vals-pltr-2024-revenue-cagr
+split: held_out
+case_type: check
+mode: check
+source: Vals Finance Agent public set (vals-ai/finance-agent, data/public.csv), question 10 of 50 (adapted)
+question: What was Palantir Technologies' two-year revenue CAGR from 2022 to 2024?
+cutoff: 2025-03-31
+companies:
+  - ticker: PLTR
+    cik: 1321655
+    name: Palantir Technologies Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Gives the 2023-to-2024 growth (about 28.8%) as the two-year rate.
+gold:
+  - name: revenue_2024
+    metric: revenue
+    ticker: PLTR
+    value: 2865.507
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-12-31
+    source:
+      form: 10-K
+      accession: 0001321655-25-000022
+      filed: 2025-02-18
+      url: https://www.sec.gov/Archives/edgar/data/1321655/000132165525000022/pltr-20241231.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Revenue", 2024 column, shown as
+        2,865,507
+  - name: revenue_2022
+    metric: revenue
+    ticker: PLTR
+    value: 1905.871
+    unit: USD millions
+    fiscal_period: FY2022
+    period_end: 2022-12-31
+    source:
+      form: 10-K
+      accession: 0001321655-25-000022
+      filed: 2025-02-18
+      url: https://www.sec.gov/Archives/edgar/data/1321655/000132165525000022/pltr-20241231.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Revenue", 2022 column, shown as
+        1,905,871
+  - name: revenue_cagr_2022_2024
+    metric: revenue_cagr
+    ticker: PLTR
+    value: 22.6
+    unit: percent
+    fiscal_period: FY2022 to FY2024
+    period_end: 2024-12-31
+    derived:
+      formula: (revenue_2024 / revenue_2022) ** (1 / 2) - 1
+      inputs: [revenue_2024, revenue_2022]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  (2,865,507 / 1,905,871) ^ (1/2) - 1 = 22.62%, matching Vals' 22.6%. Both inputs come from the FY2024
+  10-K. 2023 revenue was 2,225,012, so 2024 alone grew 28.8% and 2023 alone 16.7%.

@@ -202,6 +202,7 @@ def pinned(tmp_path, monkeypatch):
     (lambda mp, tmp, prompts: (prompts / "coordinator.md").write_text("Plan it.", encoding="utf-8"),
      "prompts: coordinator.md changed"),
     (lambda mp, tmp, prompts: mp.setattr(config, "AGENT_MAX_STEPS", 5), "config: AGENT_MAX_STEPS changed"),
+    (lambda mp, tmp, prompts: mp.setattr(config, "AGENT_SEED", 7), "config: AGENT_SEED changed"),
     (lambda mp, tmp, prompts: cases(tmp, CASE | {"notes": "changed"}), "case files: dev-aapl-growth changed"),
     (lambda mp, tmp, prompts: mp.setattr(run_eval, "git_commit", lambda: "b" * 40), "commit: aaaaaaa"),
     # Second review: an uncommitted edit kept the commit the same, so a resume mixed two versions of the code.
@@ -219,6 +220,7 @@ def test_a_batch_keeps_a_manifest_and_refuses_to_resume_with_another_set_up(tmp_
     assert (manifest["provider"], manifest["model"], manifest["commit"]) == ("openrouter", "fake-model", "a" * 40)
     assert (manifest["dirty"], manifest["diff"]) == (True, "d" * 64)
     assert list(manifest["prompts"]) == ["coordinator.md"] and manifest["config"]["AGENT_MAX_STEPS"] == 30
+    assert {manifest["config"][key] for key in ("AGENT_TEMPERATURE", "AGENT_TOP_P", "AGENT_SEED")} == {None}
     assert list(manifest["cases"]) == ["dev-aapl-growth"]
     capsys.readouterr()
 

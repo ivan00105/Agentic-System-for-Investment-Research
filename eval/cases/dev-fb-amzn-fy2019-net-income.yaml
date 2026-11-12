@@ -1,0 +1,38 @@
+id: dev-fb-amzn-fy2019-net-income
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_08286 (adapted)
+question: What was Amazon's net income in 2019?
+cutoff: 2020-02-29
+companies:
+  - ticker: AMZN
+    cik: 1018724
+    name: Amazon.com, Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Reports 10,073 (2018) or 3,033 (2017) as 2019's net income.
+gold:
+  - name: net_income_2019
+    metric: net_income
+    ticker: AMZN
+    value: 11588
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-12-31
+    source:
+      form: 10-K
+      accession: 0001018724-20-000004
+      filed: 2020-01-31
+      url: https://www.sec.gov/Archives/edgar/data/1018724/000101872420000004/amzn-20191231x10k.htm
+      location: Consolidated Statements of Operations, row "Net income", 2019 column (the rightmost)
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Matches FinanceBench's $11,588 million. Amazon's statements put the years in rising order (2017,
+  2018, 2019 from left to right), unlike most filers, so reading the first column gives 2017's 3,033.
+  Amazon has no non-controlling interest line, so net income is the shareholders' figure.

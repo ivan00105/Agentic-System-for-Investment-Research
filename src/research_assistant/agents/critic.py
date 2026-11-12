@@ -82,7 +82,7 @@ class Critic:
                  ledger: ClaimLedger, desk: Desk, max_steps: int, rounds: int):
         self.question, self.client, self.model, self.context = question, client, settings.model, context
         self.trace, self.ledger, self.desk, self.max_steps, self.rounds = trace, ledger, desk, max_steps, rounds
-        self.kwargs = settings.request_kwargs(fallbacks=True)  # no output-token cap (PROJECT_GUIDE §5)
+        self.kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
         self.raised: list[Raised] = []
 
     def review(self, work: Work) -> None:

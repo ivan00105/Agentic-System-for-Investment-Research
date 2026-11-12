@@ -5,6 +5,8 @@ from statistics import median
 
 from research_assistant.agents.draft import SECTIONS
 
+import score_stats
+
 ORDER = ("A", "B", "C", "D")
 
 
@@ -12,10 +14,25 @@ def markdown(rows: list[dict], cases: dict[str, dict]) -> str:
     parts = ["# Evaluation scores",
              f"{len(rows)} runs of {len({r['case'] for r in rows})} cases. Small samples are exploratory "
              "(REFERENCE §7): read these as counts, not as significant differences.",
-             "## Accuracy", accuracy(rows), "## Support", support(rows), "## Critic: fixes vs damage (D vs C)",
-             critic(rows), "## Cost, tokens and latency", cost(rows), "## Failures", failures(rows),
+             "## Accuracy", accuracy(rows), "## Uncertainty and reliability", uncertainty(rows, cases),
+             "## Support", support(rows), "## Critic: fixes vs damage (D vs C)", critic(rows),
+             "## Prompt injection: task and attack graded apart", table(*score_stats.injection(rows)),
+             "## Cost, tokens and latency", cost(rows), "## Failures", failures(rows),
              "## Needs review", review(rows, cases)]
     return "\n\n".join(parts) + "\n"
+
+
+def uncertainty(rows: list[dict], cases: dict[str, dict]) -> str:
+    groups = by_condition(rows)
+    return (table(*score_stats.reliability(groups, cases))
+            + "\n\nA case is the unit: intervals resample cases (95% bootstrap), so a case run three times counts once. "
+              "pass@k: cases passed at least once in their k runs; pass^k: passed every time (cases with two or more "
+              "runs). Coverage: runs that answered, of those whose case has an answer; error among answered: of "
+              "those, the ones that didn't pass. Cost per pass counts failed runs' cost too. With few cases, or when every "
+              "case has the same result, the interval is too narrow to trust.\n\n"
+            + table(*score_stats.differences(groups))
+            + "\n\nEach comparison adds one thing: B the tools and loop, C the team, D the critic. An interval that "
+              "includes 0 means no difference could be shown.")
 
 
 def table(head: list[str], body: list[list]) -> str:

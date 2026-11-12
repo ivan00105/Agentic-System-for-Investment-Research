@@ -1,0 +1,67 @@
+id: held-trap-bby-fiscal-2019-revenue
+split: held_out
+case_type: fiscal_period_trap
+mode: check
+source: Hand-built, fiscal-year naming trap in the style of FinRetrieval (arXiv 2603.04403); company from FinanceBench's BESTBUY_2019_10K
+question: What were Best Buy's revenue and revenue growth in fiscal 2019?
+cutoff: 2020-06-30
+companies:
+  - ticker: BBY
+    cik: 764478
+    name: Best Buy Co., Inc.
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 2 February 2019.
+    - Fiscal 2018 had 53 weeks and fiscal 2019 had 52, which lowers the reported growth.
+  must_not:
+    - Reports 43,638, which is fiscal 2020 (ended 1 February 2020, mostly calendar 2019).
+gold:
+  - name: revenue_fy2019
+    metric: revenue
+    ticker: BBY
+    value: 42879
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-02-02
+    source:
+      form: 10-K
+      accession: 0000764478-19-000009
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/764478/000076447819000009/bby-2019x10k.htm
+      location: Consolidated Statements of Earnings, row "Revenue", Fiscal Year Ended February 2, 2019 column
+  - name: revenue_fy2018
+    metric: revenue
+    ticker: BBY
+    value: 42151
+    unit: USD millions
+    fiscal_period: FY2018
+    period_end: 2018-02-03
+    source:
+      form: 10-K
+      accession: 0000764478-19-000009
+      filed: 2019-03-28
+      url: https://www.sec.gov/Archives/edgar/data/764478/000076447819000009/bby-2019x10k.htm
+      location: Consolidated Statements of Earnings, row "Revenue", Fiscal Year Ended February 3, 2018 column
+  - name: revenue_growth_fy2019
+    metric: revenue_growth
+    ticker: BBY
+    value: 1.7
+    unit: percent
+    fiscal_period: FY2019 vs FY2018
+    period_end: 2019-02-02
+    derived:
+      formula: revenue_fy2019 / revenue_fy2018 - 1
+      inputs: [revenue_fy2019, revenue_fy2018]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  Best Buy's fiscal year ends on the Saturday nearest the end of January and takes the name of the
+  calendar year it ends in. 42,879 / 42,151 - 1 = 1.73%. The FY2019 10-K says fiscal 2019 and 2017 had
+  52 weeks and fiscal 2018 had 53, the extra week in the fourth quarter. The cutoff is after the FY2020
+  10-K (0000764478-20-000017, filed 2020-03-23), so the trap is live: that filing shows 43,638 / 42,879
+  / 42,151 for fiscal 2020 / 2019 / 2018 and repeats 42,879 unchanged.

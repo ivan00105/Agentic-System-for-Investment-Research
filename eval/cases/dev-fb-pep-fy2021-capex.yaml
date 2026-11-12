@@ -1,0 +1,40 @@
+id: dev-fb-pep-fy2021-capex
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_04980 (adapted)
+question: What was PepsiCo's capital expenditure in fiscal 2021?
+cutoff: 2022-03-31
+companies:
+  - ticker: PEP
+    cik: 77476
+    name: PepsiCo, Inc.
+expected:
+  behaviour: answer
+  must_not:
+    - Nets capital spending against "Sales of property, plant and equipment" (166) without saying so.
+gold:
+  - name: capex_fy2021
+    metric: capex
+    ticker: PEP
+    value: 4625
+    unit: USD millions
+    fiscal_period: FY2021
+    period_end: 2021-12-25
+    source:
+      form: 10-K
+      accession: 0000077476-22-000010
+      filed: 2022-02-10
+      url: https://www.sec.gov/Archives/edgar/data/77476/000007747622000010/pep-20211225.htm
+      location: >-
+        Consolidated Statement of Cash Flows, Investing Activities, row "Capital spending", 2021
+        column, shown as (4,625)
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  FinanceBench's answer ($4.60 billion) is 4,625 rounded. PepsiCo's fiscal 2021 is the year ended 25
+  December 2021, so the period end is not 31 December. The filing shows the outflow in parentheses;
+  the gold is its size. The MD&A cash-flow table repeats (4,625).

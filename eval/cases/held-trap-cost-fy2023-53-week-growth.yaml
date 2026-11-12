@@ -1,0 +1,66 @@
+id: held-trap-cost-fy2023-53-week-growth
+split: held_out
+case_type: fiscal_period_trap
+mode: check
+source: Hand-built, 52/53-week period trap in the style of FinRetrieval (arXiv 2603.04403)
+question: How much did Costco's total revenue grow in fiscal 2023?
+cutoff: 2023-11-30
+companies:
+  - ticker: COST
+    cik: 909832
+    name: Costco Wholesale Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - Fiscal 2023 had 53 weeks (ended 3 September 2023) and fiscal 2022 had 52 (ended 28 August 2022), so part of the growth is the extra week.
+  must_not:
+    - Presents the growth as like-for-like without mentioning the extra week.
+    - Uses net sales (237,710 and 222,730) as total revenue without saying so.
+gold:
+  - name: total_revenue_fy2023
+    metric: revenue
+    ticker: COST
+    value: 242290
+    unit: USD millions
+    fiscal_period: FY2023
+    period_end: 2023-09-03
+    source:
+      form: 10-K
+      accession: 0000909832-23-000042
+      filed: 2023-10-11
+      url: https://www.sec.gov/Archives/edgar/data/909832/000090983223000042/cost-20230903.htm
+      location: Consolidated Statements of Income, row "Total revenue", 53 Weeks Ended September 3, 2023 column
+  - name: total_revenue_fy2022
+    metric: revenue
+    ticker: COST
+    value: 226954
+    unit: USD millions
+    fiscal_period: FY2022
+    period_end: 2022-08-28
+    source:
+      form: 10-K
+      accession: 0000909832-23-000042
+      filed: 2023-10-11
+      url: https://www.sec.gov/Archives/edgar/data/909832/000090983223000042/cost-20230903.htm
+      location: Consolidated Statements of Income, row "Total revenue", 52 Weeks Ended August 28, 2022 column
+  - name: revenue_growth_fy2023
+    metric: revenue_growth
+    ticker: COST
+    value: 6.8
+    unit: percent
+    fiscal_period: FY2023 vs FY2022
+    period_end: 2023-09-03
+    derived:
+      formula: total_revenue_fy2023 / total_revenue_fy2022 - 1
+      inputs: [total_revenue_fy2023, total_revenue_fy2022]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  242,290 / 226,954 - 1 = 6.76%. The income statement's column headings say 53 and 52 weeks, and Item 7
+  says net sales rose 7% helped by "one additional week of sales in 2023"; the 10-K does not size the
+  extra week, so the report should flag it, not quantify it. Total revenue adds membership fees to net
+  sales. Not related to dev-fb-cost-fy2021-total-assets (another year, metric and filing).

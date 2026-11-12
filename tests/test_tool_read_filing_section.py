@@ -91,3 +91,11 @@ def test_auditor_report_inside_mdna_is_flagged():
 def test_non_utf8_filing_is_read_and_flagged():
     text, notes = sec_sections.decode(b"Company\x92s")
     assert text == "Company’s" and "Windows-1252" in notes[0]
+
+
+def test_a_draft_is_not_read_because_its_release_date_is_unknown(tmp_path):
+    from sec_files import ABNB_IPO, ABNB_SUBMISSIONS, submissions
+
+    context = make_context(tmp_path, files=SecFiles({ABNB_SUBMISSIONS: submissions(ABNB_IPO)}))
+    result = run(ReadSectionInput(cik="1559720", item="1A", accession="0000950123-20-009252"), context)
+    assert result.status == "unsupported" and "is a DRS, never read: SEC publishes these forms" in result.warnings[0]

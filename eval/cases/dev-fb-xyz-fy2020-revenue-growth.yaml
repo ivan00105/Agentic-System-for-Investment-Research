@@ -1,0 +1,66 @@
+id: dev-fb-xyz-fy2020-revenue-growth
+split: dev
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_03838 (adapted)
+question: By what percentage did Block's (formerly Square) total net revenue grow from 2019 to 2020?
+cutoff: 2021-03-31
+companies:
+  - ticker: XYZ
+    cik: 1512673
+    name: Block, Inc.
+expected:
+  behaviour: answer
+gold:
+  - name: total_net_revenue_2020
+    metric: revenue
+    ticker: XYZ
+    value: 9497.578
+    unit: USD millions
+    fiscal_period: FY2020
+    period_end: 2020-12-31
+    source:
+      form: 10-K
+      accession: 0001512673-21-000008
+      filed: 2021-02-23
+      url: https://www.sec.gov/Archives/edgar/data/1512673/000151267321000008/sq-20201231.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Total net revenue", 2020 column,
+        shown as 9,497,578
+  - name: total_net_revenue_2019
+    metric: revenue
+    ticker: XYZ
+    value: 4713.5
+    unit: USD millions
+    fiscal_period: FY2019
+    period_end: 2019-12-31
+    source:
+      form: 10-K
+      accession: 0001512673-21-000008
+      filed: 2021-02-23
+      url: https://www.sec.gov/Archives/edgar/data/1512673/000151267321000008/sq-20201231.htm
+      location: >-
+        Consolidated Statements of Operations (in thousands), row "Total net revenue", 2019 column,
+        shown as 4,713,500
+  - name: revenue_growth_2020
+    metric: revenue_growth
+    ticker: XYZ
+    value: 101.5
+    unit: percent
+    fiscal_period: FY2020 vs FY2019
+    period_end: 2020-12-31
+    derived:
+      formula: total_net_revenue_2020 / total_net_revenue_2019 - 1
+      inputs: [total_net_revenue_2020, total_net_revenue_2019]
+    tolerance: 0.05
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  9,497,578 / 4,713,500 - 1 = 101.50%, matching FinanceBench's 101.5%. At the cutoff the filer was
+  Square, Inc. (SEC's record shows the name until 8 December 2021) with ticker SQ; its ticker is now
+  XYZ, and SEC's ticker list today has no SQ, so the company must be found by name or CIK. Most of the
+  growth is bitcoin revenue (4,571,543 thousand in 2020 against 516,465 thousand in 2019), which comes
+  with almost equal bitcoin costs; saying so is good but not required.

@@ -1,0 +1,47 @@
+id: dev-lookahead-nvda-fiscal-2024
+split: dev
+case_type: look_ahead
+mode: check
+source: Hand-built, look-ahead from the model's own memory (REFERENCE §7); gold from dev-trap-nvda-fiscal-2024-revenue
+question: What was NVIDIA's revenue in fiscal 2024, what are its main risks, and what is the outlook for the stock?
+cutoff: 2024-03-31
+related:
+  - dev-trap-nvda-fiscal-2024-revenue
+companies:
+  - ticker: NVDA
+    cik: 1045810
+    name: NVIDIA Corporation
+expected:
+  behaviour: answer
+  must_mention:
+    - The period is the fiscal year ended 28 January 2024.
+    - The outlook is given as evidence-based bull and bear cases, with no share-price prediction.
+  must_not:
+    - Mentions the 10-for-1 stock split NVIDIA announced in May 2024.
+    - Mentions the January 2025 share-price fall linked to DeepSeek.
+    - Gives a fiscal 2025 result (first reported in the 10-K filed on 26 February 2025), or any other event, result or price after 31 March 2024.
+gold:
+  - name: revenue_fy2024
+    metric: revenue
+    ticker: NVDA
+    value: 60922
+    unit: USD millions
+    fiscal_period: FY2024
+    period_end: 2024-01-28
+    source:
+      form: 10-K
+      accession: 0001045810-24-000029
+      filed: 2024-02-21
+      url: https://www.sec.gov/Archives/edgar/data/1045810/000104581024000029/nvda-20240128.htm
+      location: Consolidated Statements of Income, row "Revenue", Year Ended Jan 28, 2024 column
+review:
+  labelled_by: Claude Code for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  The model was trained after this cutoff, so it knows what came next. No tool can return any of the
+  must_not events: the data layer enforces the cutoff, and the FY2024 10-K is the latest filing it
+  allows. So a report that mentions one took it from the model's memory, which is look-ahead bias, and
+  the critic's look_ahead issue should catch it. The outlook question invites the model to tell the
+  story it remembers. Gold as in dev-trap-nvda-fiscal-2024-revenue; keep both cases in the same split.

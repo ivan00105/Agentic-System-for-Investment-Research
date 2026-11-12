@@ -1,0 +1,79 @@
+id: held-fb-aes-fy2022-roa
+split: held_out
+case_type: check
+mode: check
+source: FinanceBench open sample, financebench_id_10420 (adapted)
+question: What was AES's return on assets in 2022, defined as net income attributable to AES over the average of total assets at the end of 2021 and 2022?
+cutoff: 2023-04-30
+companies:
+  - ticker: AES
+    cik: 874761
+    name: The AES Corporation
+expected:
+  behaviour: answer
+  must_not:
+    - Uses "NET INCOME (LOSS)" of -505, which includes noncontrolling interests, instead of the -546 attributable to AES.
+    - Reports a positive return on assets.
+gold:
+  - name: net_income_attributable_2022
+    metric: net_income
+    ticker: AES
+    value: -546
+    unit: USD millions
+    fiscal_period: FY2022
+    period_end: 2022-12-31
+    source:
+      form: 10-K
+      accession: 0000874761-23-000010
+      filed: 2023-03-01
+      url: https://www.sec.gov/Archives/edgar/data/874761/000087476123000010/aes-20221231.htm
+      location: >-
+        Consolidated Statements of Operations, row "NET INCOME (LOSS) ATTRIBUTABLE TO THE AES
+        CORPORATION", 2022 column, shown as (546)
+  - name: total_assets_2022
+    metric: total_assets
+    ticker: AES
+    value: 38363
+    unit: USD millions
+    fiscal_period: FY2022
+    period_end: 2022-12-31
+    source:
+      form: 10-K
+      accession: 0000874761-23-000010
+      filed: 2023-03-01
+      url: https://www.sec.gov/Archives/edgar/data/874761/000087476123000010/aes-20221231.htm
+      location: Consolidated Balance Sheets, row "TOTAL ASSETS", December 31, 2022 column
+  - name: total_assets_2021
+    metric: total_assets
+    ticker: AES
+    value: 32963
+    unit: USD millions
+    fiscal_period: FY2021
+    period_end: 2021-12-31
+    source:
+      form: 10-K
+      accession: 0000874761-23-000010
+      filed: 2023-03-01
+      url: https://www.sec.gov/Archives/edgar/data/874761/000087476123000010/aes-20221231.htm
+      location: Consolidated Balance Sheets, row "TOTAL ASSETS", December 31, 2021 column
+  - name: return_on_average_assets_2022
+    metric: return_on_average_assets
+    ticker: AES
+    value: -1.53
+    unit: percent
+    fiscal_period: FY2022
+    period_end: 2022-12-31
+    derived:
+      formula: net_income_attributable_2022 / ((total_assets_2022 + total_assets_2021) / 2)
+      inputs: [net_income_attributable_2022, total_assets_2022, total_assets_2021]
+    tolerance: 0.01
+review:
+  labelled_by: Claude Code (AI agent) for Ivan
+  labelled_on: 2026-11-11
+  checked_by: null
+  check_note: null
+notes: >-
+  -546 / ((38,363 + 32,963) / 2) = -1.53%, which FinanceBench rounds to -0.02. AES's income statement
+  has a row called "Operating margin" (2,548), which is revenue minus cost of sales, not an operating
+  income margin. The ROA item needs review (no tool records an average of balances); the three inputs
+  are scored automatically. Both balances come from the FY2022 10-K.
