@@ -42,6 +42,7 @@ def test_placeholders_are_filled_and_count_as_citations():
     assert item.text == "Revenue was $416.2 billion with an operating margin of 32.0%."
     assert item.citations == ["fact-aaa111", "calc-bbb222"] and item.status == "cited" and not report.flags
     assert report.section_status("key_numbers") == "cited" and report.section_status("risks") == "abstained"
+    assert report.section_status("bull_case") == "abstained"  # no summary: nothing was answered, so nothing was found
 
 
 def test_problems_are_flagged_never_rejected():
@@ -126,7 +127,7 @@ def test_limitations_are_checked_and_render_lists_sources_and_flags():
     assert "stopped at limit" in text and "## Plan\n\n1. find_company" in text
     assert "## Summary (cited)\n\n- Revenue was $416.2 billion. [1]" in text
     assert "## Risks (cited)\n\n- Supply risk. [2]" in text
-    assert "## Bull case (abstained)\n\n- Nothing to report." in text
+    assert "## Bull case (none found)\n\n- Nothing to report." in text  # the report answers, so this is a finding
     assert "1. `fact-aaa111` revenue = $416.2 billion, 2024-09-29 to 2025-09-27" in text
     assert "2. `chunk-0000320193-25-000079-1A-4` 10-K 0000320193-25-000079, 1A paragraph 4" in text
     assert "## Flags\n\n- limitations[1]: '3' is typed" in text

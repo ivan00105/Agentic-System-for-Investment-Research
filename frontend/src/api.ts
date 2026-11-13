@@ -31,7 +31,7 @@ export interface DiscoverTerm { term: string; definition: string; question: stri
 export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
 export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
-export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
+export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained' | 'none found'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
 export interface AgentSource { n: number; id: string; text: string; url: string | null; kind?: string | null; group?: string; label?: string }
 export interface KeyNumber { id: string; company: string | null; metric: string; period: string; value: string; change: string | null; change_id: string | null }

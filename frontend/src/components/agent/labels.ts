@@ -14,7 +14,7 @@ export const STATUS: Record<string, string> = {
   stopped_at_limit: 'Stopped at the step limit (partial report)', stopped: 'Cancelled (partial report)', failed: 'Failed',
   incomplete: 'No end recorded: still running elsewhere, or interrupted',
 }
-export const tone = (status: string) => ['cited', 'finished', 'pass', 'picked'].includes(status) ? 'green' : ['abstained', 'running', 'waiting'].includes(status) ? '' : 'amber'
+export const tone = (status: string) => ['cited', 'finished', 'pass', 'picked'].includes(status) ? 'green' : ['abstained', 'none found', 'running', 'waiting'].includes(status) ? '' : 'amber'
 const count = (n: number, word: string) => n ? `${n} ${word}${n === 1 ? '' : 's'}` : ''
 // The runs a Discover run started, as History counts them: "3 picks · 1 comparison".
 export const childCount = (children: AgentRunSummary[]) => {

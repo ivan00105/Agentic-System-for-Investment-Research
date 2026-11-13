@@ -223,7 +223,7 @@ def test_outcomes_follow_the_ledger_and_what_is_open_at_the_guard_is_unresolved(
     # The material objection left unresolved qualifies its claim; the minor one doesn't.
     assert [f.problem for f in summary.flags] == [
         f"Objection {defended['id']} (unsupported inference) is unresolved: It is wrong."]
-    assert "## Summary (qualified)" in result.markdown and "## Bull case (abstained)" in result.markdown
+    assert "## Summary (qualified)" in result.markdown and "## Bull case (none found)" in result.markdown
     assert "  - Outcome: withdrawn in round 1: It was an opinion. [1]" in result.markdown
 
 

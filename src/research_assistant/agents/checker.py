@@ -61,8 +61,13 @@ class CheckedReport:
     def section_status(self, key: str) -> str:
         claims = self.sections[key]
         if not claims:
-            return "abstained"
+            return empty_status(key, answered=bool(self.sections["summary"]))
         return "qualified" if any(c.flags for c in claims) else "cited"
+
+
+def empty_status(key: str, answered: bool) -> str:
+    # A bull or bear side left empty in a report that answers the question is a finding: no point was padded in.
+    return "none found" if answered and key in ("bull_case", "bear_case") else "abstained"
 
 
 def check(draft: Draft, records: dict[str, dict]) -> CheckedReport:
