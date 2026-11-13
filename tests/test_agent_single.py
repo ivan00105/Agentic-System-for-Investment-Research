@@ -80,7 +80,8 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert "tools" not in client.requests[0] and client.requests[1]["tools"]
     for request in client.requests:
         assert request["model"] == "fake-model" and request["store"] is False
-        assert request["extra_body"]["provider"] == {"require_parameters": True, "allow_fallbacks": True}
+        assert request["extra_body"]["provider"] == {"require_parameters": True, "allow_fallbacks": True,
+                                                     "ignore": ["wafer"]}
         assert not {"max_tokens", "max_completion_tokens"} & set(request)
     assert "2026-11-01" in client.requests[1]["messages"][0]["content"]
     assert "Your plan:\n1. find_company AAPL" in client.requests[1]["messages"][1]["content"]

@@ -113,6 +113,26 @@ def test_bad_json_arguments_come_back_invalid(tmp_path):
     assert result.status == "finished"
 
 
+def test_runaway_arguments_are_not_sent_back_but_the_trace_keeps_them(tmp_path):
+    # As on Wafer (11 Nov 2026): a broken tool call fills one argument with repeated markup.
+    junk = "2025-10-30" + "</invoke_placeholder>" * 2000
+    size = len(json.dumps({"ticker": "AAPL", "start": junk}))
+
+    def check(messages):
+        calls = messages[1]["tool_calls"]
+        assert json.loads(calls[0]["function"]["arguments"]) == {"query": "AAPL"}  # a normal call is sent as made
+        assert json.loads(calls[1]["function"]["arguments"])["not_resent"].startswith(f"These arguments were {size:,}")
+        assert "invoke_placeholder" not in json.dumps(messages)
+        assert "not sent again" in tool_results(messages)[-1]["warnings"][-1]
+        return submit_found_cik(messages[:-1])
+
+    calls = [("find_company", {"query": "AAPL"}), ("get_prices", {"ticker": "AAPL", "start": junk})]
+    client = FakeClient(reply(tool_calls=calls), check)
+    result, _, trace = start(tmp_path, client)
+    assert result.status == "finished"
+    assert next(e for e in events(trace) if e.get("name") == "get_prices")["arguments"]["start"] == junk
+
+
 def test_the_step_guard_asks_for_the_best_answer_and_marks_it(tmp_path):
     client = FakeClient(FIND_APPLE, reply(tool_calls=[("find_company", {"query": "MSFT"})]), submit_found_cik)
     result, messages, trace = start(tmp_path, client, max_steps=2)
