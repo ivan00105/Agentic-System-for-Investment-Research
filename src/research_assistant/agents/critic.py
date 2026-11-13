@@ -22,7 +22,7 @@ from .claims import ClaimLedger
 from .loop import Finish, run_loop
 from .objections import Objection, Objections, Revision, claims_view, draft_with_ids, evidence_view, issue_list
 from .roles import ANALYSTS, COORDINATOR, CRITIC
-from .runner import AgentRun, Work, check_draft, research
+from .runner import AgentRun, Work, check_draft, drops_answer, research
 from .team import Desk
 from .trace import Trace
 
@@ -100,7 +100,7 @@ class Critic:
             if n == self.rounds:
                 break
             if not self._revise(work, n, pending):
-                stop = f"Still open: the revision in round {n} ended without a report."
+                stop = f"Still open: the revision in round {n} wasn't used (see the report's limitations)."
                 break
         for o in self.raised:
             if o.outcome == "open":
@@ -171,9 +171,10 @@ class Critic:
         self.trace.write("revision_start", round=n, objections=[o.id for o in pending])
         work.messages.append({"role": "user", "content": self._request(work, n, pending)})
         result = work.resume(SUBMIT_REVISION, max_steps=self.max_steps)  # each revision gets its own step guard
-        if result.output is None:
-            work.notes.append(f"The revision in round {n} ended without a report ({result.error or result.status}); "
-                              "the report before it is shown.")
+        why = (f"ended without a report ({result.error or result.status})" if result.output is None
+               else drops_answer(work.draft, result.output))
+        if why:
+            work.notes.append(f"The revision in round {n} {why}; the report before it is shown.")
             return False
         work.draft, work.status = result.output, result.status
         work.report = check_draft(work.draft, self.context, self.trace, self.ledger, COORDINATOR.name)

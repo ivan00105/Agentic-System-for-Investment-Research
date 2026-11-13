@@ -227,6 +227,30 @@ def test_outcomes_follow_the_ledger_and_what_is_open_at_the_guard_is_unresolved(
     assert "  - Outcome: withdrawn in round 1: It was an opinion. [1]" in result.markdown
 
 
+def test_a_revision_that_leaves_the_summary_empty_is_not_used(tmp_path):
+    def critic_round_1(messages):
+        summary = claim_in(messages[1]["content"], "summary[0]")
+        return calls(("submit_objections", {"objections": [objection(*summary, "unsupported_inference")]}))
+
+    def changes_only(messages):
+        found = re.search(r"- (objection-\w+) on", messages[-1]["content"])[1]
+        return calls(("submit_revision", {
+            "bull_case": [{"text": "Apple files on time.", "citations": [COMPANY]}],
+            "outcomes": [{"objection": found, "outcome": "corrected", "explanation": "Fixed.", "citations": [COMPANY]}]}))
+
+    result, client, events = run_d(tmp_path, PLAN, calls(("find_company", {"query": "AAPL"})), calls(("submit_report", {
+        "summary": [{"text": "Apple Inc. files annual reports with the SEC.", "citations": [COMPANY]}]})),
+        resubmit, critic_round_1, changes_only, critic_rounds=2)
+    assert result.status == "finished" and len(client.requests) == 6
+    assert result.report.sections["summary"][0].text == "Apple Inc. files annual reports with the SEC."
+    assert result.report.sections["bull_case"] == []
+    [o] = events[-1]["objections"]
+    assert o["outcome"] == "unresolved"
+    assert o["notes"][-1] == "Still open: the revision in round 1 wasn't used (see the report's limitations)."
+    assert ("The revision in round 1 left the summary empty, so the report would no longer answer the question; "
+            "the report before it is shown.") in result.markdown
+
+
 def missing_risk_run(tmp_path, risk_cites, outcome_cites):
     def critic_round_1(messages):
         return calls(("submit_objections", {"objections": [

@@ -135,6 +135,22 @@ def test_a_failed_self_review_keeps_the_first_draft_with_its_flags(tmp_path):
     assert "The self-review pass ended without a new report" in result.markdown
 
 
+def test_a_self_review_that_sends_back_only_its_changes_keeps_the_draft_before_it(tmp_path):
+    # Live eval 13 Nov 2026: the revision held only the sections it changed, so the summary (the answer) vanished.
+    def changes_only(messages):
+        margin = next(r for r in reversed(tool_results(messages)) if r["source"] == "calculate")["ids"][0]
+        return reply(tool_calls=[("submit_report", {"bull_case": [
+            {"text": "The margin leaves room for investment.", "citations": [margin], "kind": "interpretation"}]})])
+
+    result, _, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=True),
+                            changes_only)
+    assert result.status == "finished" and "## Summary (cited)" in result.markdown
+    assert "Margins above 30% leave room. [1] (qualified: see checker flags)" in result.markdown
+    assert ("The self-review pass left the summary empty, so the report would no longer answer the question; the "
+            "draft before it is shown with its checker flags.") in result.markdown
+    assert [e["kind"] for e in events].count("check") == 1  # the claim ledger never sees the partial revision
+
+
 def test_the_step_guard_gives_a_partial_report_marked_stopped_at_limit(tmp_path):
     result, _, events = run(tmp_path, PLAN, find_apple, get_financials, reply("I need more steps."), max_steps=2)
     assert result.status == "stopped_at_limit" and result.report.flags == []
