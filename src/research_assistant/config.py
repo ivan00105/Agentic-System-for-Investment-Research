@@ -244,6 +244,9 @@ DISCOVER_DEFAULT_TOP_K = 3
 # a few replacements", user-adjustable with --replacements). Candidates the deterministic check rejects cost no
 # model call and don't count. On reaching it the shortlist returns fewer picks and says why.
 DISCOVER_MAX_REPLACEMENTS = 3
+# The set-up of a Research or Check run started from the web page, unless Advanced options pick another: D, the
+# analyst team with its critic, is the full design.
+WEB_RESEARCH_CONDITION = "D"
 # The research condition of a Discover run started from the web page, unless Advanced options pick another. Each pick
 # is a full research run: B (one agent) keeps three picks to minutes and cents, while D takes about 20 minutes a pick.
 WEB_DISCOVER_CONDITION = "B"

@@ -1,6 +1,6 @@
 export type View = 'research' | 'history' | 'setup'
-// /api/config: the configured model, which Advanced options shows as the default.
-export interface Config { model: string | null; model_configured: boolean }
+// /api/config: the configured model and each mode's set-up, which Advanced options show as the defaults.
+export interface Config { model: string | null; model_configured: boolean; agents: {research: Condition; find: Condition} }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
