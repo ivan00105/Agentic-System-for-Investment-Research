@@ -35,6 +35,13 @@ CONCEPTS = {c.metric: c for c in (
             "USD", "duration"),
     Concept("net_income", ("us-gaap:NetIncomeLoss", "ifrs-full:ProfitLossAttributableToOwnersOfParent",
                            "ifrs-full:ProfitLoss"), "USD", "duration"),
+    # Total cost of revenue or of goods sold. Not CostOfGoodsSold: Microsoft's FY2016 10-K uses it for product cost
+    # only (17,880 of 32,780).
+    Concept("cost_of_revenue", ("us-gaap:CostOfRevenue", "us-gaap:CostOfGoodsAndServicesSold", "ifrs-full:CostOfSales"),
+            "USD", "duration"),
+    # The cash-flow add-back first; the expense when only it is tagged (usually equal, Airbnb 2024: 1,407 vs 1,400).
+    Concept("stock_based_compensation", ("us-gaap:ShareBasedCompensation",
+                                         "us-gaap:AllocatedShareBasedCompensationExpense"), "USD", "duration"),
     Concept("research_and_development", ("us-gaap:ResearchAndDevelopmentExpense",
              "us-gaap:ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
              "ifrs-full:ResearchAndDevelopmentExpense"), "USD", "duration"),
@@ -50,6 +57,7 @@ CONCEPTS = {c.metric: c for c in (
     Concept("diluted_shares", ("us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding",
                                "ifrs-full:AdjustedWeightedAverageShares"), "shares", "duration"),
     Concept("total_assets", ("us-gaap:Assets", "ifrs-full:Assets"), "USD", "instant"),
+    Concept("current_assets", ("us-gaap:AssetsCurrent", "ifrs-full:CurrentAssets"), "USD", "instant"),
     Concept("total_liabilities", ("us-gaap:Liabilities", "ifrs-full:Liabilities"), "USD", "instant"),
     Concept("stockholders_equity", ("us-gaap:StockholdersEquity", "ifrs-full:EquityAttributableToOwnersOfParent"),
             "USD", "instant"),
