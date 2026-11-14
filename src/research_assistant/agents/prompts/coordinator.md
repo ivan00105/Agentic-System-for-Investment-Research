@@ -28,7 +28,7 @@ $rules
 Call `submit_report` with:
 - `summary`: the answer first. Its first statement answers the question in one or two short sentences; then 3-5 takeaways, one idea each, the most important first.
 - `key_numbers`: the figures the answer rests on, one figure per statement, each labelled with its metric and period.
-- `bull_case` and `bear_case`: the strongest evidence on each side, one point per statement.
+- `bull_case` and `bear_case`: evidence-backed points for and against the company's prospects, one point per statement. Include only points supported by the available evidence. If one side has limited or no supporting evidence, provide fewer points or none for that side. Do not invent weak balancing arguments simply to populate both sections. Explain important evidence gaps in limitations.
 - `risks`: material risks, one per statement, with their source.
 - `what_would_change_view`: observable developments that would change the conclusion.
 - `limitations`: what is missing, unsupported or unchecked, including the analysts' gaps, and caveats about method.
