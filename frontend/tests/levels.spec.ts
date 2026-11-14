@@ -10,7 +10,12 @@ test('the detail level changes how runs are shown, never what they do', async ({
   await expect(page.locator('.agent-options')).not.toHaveAttribute('open', '')
   await level.selectOption('professional')
   await expect(page.locator('.agent-options')).toHaveAttribute('open', '')
+  // The set-up the run will use is shown by name, never as "Default".
+  const agents = page.getByRole('combobox', {name: 'Agents', exact: true})
+  await expect(agents.locator('option')).toHaveText(['Analyst team with critic', 'Analyst team', 'Single agent'])
+  await expect(agents).toHaveValue('D')
   await page.locator('.starter', {hasText: 'Find companies by my criteria'}).click()
+  await expect(agents).toHaveValue('B')
   await expect(page.getByRole('checkbox', {name: /check and edit the screen spec/})).toBeChecked()
   await expect(page.getByRole('textbox', {name: 'Model'})).toBeVisible()
 

@@ -65,11 +65,13 @@ def test_openrouter_uses_only_its_key_and_pins_request_policy(monkeypatch):
 
 def test_agents_send_only_the_decoding_settings_config_pins(monkeypatch):
     settings = configure(monkeypatch, RESEARCH_MODEL_PROVIDER="openrouter", RESEARCH_MODEL="m", OPENROUTER_API_KEY="k")
-    assert settings.agent_kwargs() == settings.request_kwargs(fallbacks=True)
+    routed = settings.request_kwargs(fallbacks=True)
+    routed["extra_body"]["provider"]["ignore"] = ["wafer"]  # config.AGENT_IGNORED_HOSTS
+    assert settings.agent_kwargs() == routed
     assert decoding_record() == dict.fromkeys(("temperature", "top_p", "seed"), "provider default")
     monkeypatch.setattr(config, "AGENT_TOP_P", 0.9)
     monkeypatch.setattr(config, "AGENT_SEED", 7)
-    assert settings.agent_kwargs() == settings.request_kwargs(fallbacks=True) | {"top_p": 0.9, "seed": 7}
+    assert settings.agent_kwargs() == routed | {"top_p": 0.9, "seed": 7}
     assert decoding_record() == {"temperature": "provider default", "top_p": 0.9, "seed": 7}
 
 

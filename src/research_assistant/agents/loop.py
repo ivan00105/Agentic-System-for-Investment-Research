@@ -168,11 +168,25 @@ def _run_tool(call, context, messages, trace, step, seen, allowed):
         else:
             result = registry.call(name, arguments, context, allowed)
             seen[key] = (step, result)
+    if len(raw) > config.AGENT_MAX_RESENT_ARGUMENT_CHARS:
+        result = result.model_copy(update={"warnings": [*result.warnings, _not_resent(messages, call.id, len(raw))]})
     messages.append({"role": "tool", "tool_call_id": call.id, "content": result.model_dump_json()})
     # `records` holds every record this call added in full (e.g. all daily prices behind a series ID), so a
     # saved run can be rechecked offline (evidence.py).
     trace.write("tool_call", step=step, name=name, arguments=arguments, repeat_of=repeat_of,
                 result=result.model_dump(mode="json"), records=trace.new_records(context.records))
+
+
+def _not_resent(messages, call_id, size) -> str:
+    """Swap a call's runaway arguments for a short note in the conversation, so the model neither pays for them on
+    every later step nor copies them (config.AGENT_MAX_RESENT_ARGUMENT_CHARS). The trace keeps them in full."""
+    note = (f"These arguments were {size:,} characters long, far longer than any real call, so they are not sent "
+            "again. If the call is still needed, make it again with short arguments.")
+    entry = next(m for m in reversed(messages) if m["role"] == "assistant")
+    for sent in entry["tool_calls"]:
+        if sent["id"] == call_id:
+            sent["function"]["arguments"] = json.dumps({"not_resent": note})
+    return note
 
 
 def _finish(call, finish, messages, trace, step):

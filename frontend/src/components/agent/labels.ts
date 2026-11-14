@@ -2,12 +2,19 @@
 import type { AgentRunSummary, Condition } from '../../api'
 
 export const CONDITIONS: Record<Condition, string> = {D: 'Analyst team with critic', C: 'Analyst team', B: 'Single agent'}
+// A run's set-up by name. Traces keep the evaluation's letter, e.g. "D (analyst team + critic)", "Discover (B (single agent))".
+export const setupName = (condition: string) => {
+  const discover = condition.startsWith('Discover (')
+  const name = CONDITIONS[(discover ? condition.slice('Discover ('.length) : condition)[0] as Condition]
+  if (!name) return condition
+  return discover ? `Discover · ${name.toLowerCase()} for each pick` : name
+}
 export const STATUS: Record<string, string> = {
   running: 'Running', stopping: 'Stopping after the current step', waiting: 'Waiting for your answers', finished: 'Finished',
   stopped_at_limit: 'Stopped at the step limit (partial report)', stopped: 'Cancelled (partial report)', failed: 'Failed',
   incomplete: 'No end recorded: still running elsewhere, or interrupted',
 }
-export const tone = (status: string) => ['cited', 'finished', 'pass', 'picked'].includes(status) ? 'green' : ['abstained', 'running', 'waiting'].includes(status) ? '' : 'amber'
+export const tone = (status: string) => ['cited', 'finished', 'pass', 'picked'].includes(status) ? 'green' : ['abstained', 'none found', 'running', 'waiting'].includes(status) ? '' : 'amber'
 const count = (n: number, word: string) => n ? `${n} ${word}${n === 1 ? '' : 's'}` : ''
 // The runs a Discover run started, as History counts them: "3 picks · 1 comparison".
 export const childCount = (children: AgentRunSummary[]) => {

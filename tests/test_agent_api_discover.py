@@ -24,6 +24,7 @@ def test_discover_waits_for_the_users_answers_with_the_draft_spec_in_view(web):
     assert run["questions"]["terms"] == [{**LARGE, "options": []}]
     assert run["questions"]["shown"][0].startswith("Universe: your list, 2 companies")
     assert any("proposed: waiting for the user's answer" in line for line in run["questions"]["shown"])
+    assert run["questions"]["shown"][-1] == "Each pick is researched by a single agent."
     assert web.get("/api/agent-runs").json()["items"][0]["status"] == "waiting"
 
     answered = web.post(f"/api/agent-runs/{run_id}/answers", json={"answers": {"large": "revenue over $100 billion"}})

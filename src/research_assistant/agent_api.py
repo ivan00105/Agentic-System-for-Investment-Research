@@ -38,7 +38,7 @@ class Universe(BaseModel):
 
 class StartRun(BaseModel):
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    # Empty: D, the analyst team with its critic (the full design), or config.WEB_DISCOVER_CONDITION for Discover.
+    # Empty: config.WEB_RESEARCH_CONDITION, or config.WEB_DISCOVER_CONDITION for Discover.
     condition: Literal["B", "C", "D"] | None = None
     cutoff: date | None = None  # research as of the end of this day (UTC), as the CLI's --cutoff
     discover: Universe | None = None
@@ -233,7 +233,7 @@ def start(body: StartRun, request: Request):
                             else universes.from_tickers(sec, body.discover.tickers))
         except (universes.UniverseError, DataError) as exc:
             raise DomainError(str(exc), "bad_universe", 422) from exc
-    condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
+    condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else config.WEB_RESEARCH_CONDITION)
     cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
     settings = replace(settings, model=body.model) if body.model else settings
     question = preferences.attach(body.question, body.preferences)

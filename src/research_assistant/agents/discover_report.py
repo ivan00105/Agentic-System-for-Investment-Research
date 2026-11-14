@@ -10,6 +10,8 @@ COUNTS = (("screened", "Screened"), ("eligible", "Passed the screen"), ("ranked"
           ("researched", "Researched"), ("failed", "Research failed"), ("replaced", "Replaced"),
           ("returned", "Returned"))
 SHOWN = ("summary", "bull_case", "bear_case", "risks")  # the parts of a pick's report repeated in the shortlist
+# The set-up by name, as the web page shows it; its letter (B-D) is for the evaluation only.
+SETUPS = {"B": "a single agent", "C": "the analyst team", "D": "the analyst team with critic"}
 
 
 def spec_lines(spec, sources: dict[str, str], universe, top_k: int, condition: str) -> list[str]:
@@ -30,7 +32,7 @@ def spec_lines(spec, sources: dict[str, str], universe, top_k: int, condition: s
                  threshold(c.metric, c.op, c.value) for c in insiders) if insiders else "") + "."]
     lines += [f'"{t.term}" read as: {t.definition} ({SOURCES[sources.get(t.term, "assumed")]})' for t in spec.terms]
     lines += [f"Not checked: {text}" for text in spec.not_covered]
-    return lines + [f"Each pick is researched by condition {condition}."]
+    return lines + [f"Each pick is researched by {SETUPS.get(condition[:1], condition)}."]
 
 
 def render(*, question, status, cutoff, model, run_id, error, condition, universe, found, top_k, counts,

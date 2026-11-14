@@ -106,9 +106,11 @@ def _work(question, client, settings, context, lead, trace, ledger, extra_tools,
         messages.append({"role": "user", "content": _review_request(work.report, ledger, context.records)})
         again = work.resume(SUBMIT, max_steps=max_steps - steps)
         steps += again.steps
-        if again.output is None:
-            work.notes.append(f"The self-review pass ended without a new report ({again.error or again.status}); "
-                              "the draft before it is shown" + (" with its checker flags." if work.report.flags else "."))
+        why = (f"ended without a new report ({again.error or again.status})" if again.output is None
+               else drops_answer(work.draft, again.output))
+        if why:
+            work.notes.append(f"The self-review pass {why}; the draft before it is shown"
+                              + (" with its checker flags." if work.report.flags else "."))
             break
         work.draft, work.status = again.output, again.status
         work.report = check_draft(work.draft, context, trace, ledger, lead.name)
@@ -125,6 +127,14 @@ def _plan(question, client, model, kwargs, cutoff, trace, lead: Role, extra_tool
     trace.write("plan", plan=plan, model=response.model, provider=(response.model_extra or {}).get("provider"),
                 usage=response.usage.model_dump() if response.usage else None)
     return plan
+
+
+def drops_answer(before: Draft, after: Draft) -> str | None:
+    """A revision may drop claims, even a whole section, but not the whole summary. Twice in 109 revisions (13 Nov
+    2026, one host) the model sent back only the sections it changed, and the answer vanished."""
+    if before.summary and not after.summary:
+        return "left the summary empty, so the report would no longer answer the question"
+    return None
 
 
 def check_draft(draft: Draft | None, context, trace, ledger: ClaimLedger, author: str) -> CheckedReport | None:

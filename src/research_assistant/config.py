@@ -236,6 +236,14 @@ AGENT_BAD_REPLY_RETRIES = 2
 AGENT_TEMPERATURE: float | None = None
 AGENT_TOP_P: float | None = None
 AGENT_SEED: int | None = None
+# OpenRouter hosts (slugs) that never serve agent calls. On Wafer, DeepSeek V4.1 Flash's tool calls broke into
+# repeating markup up to the 131,072-token output limit: 34 of the 36 calls over 30k output tokens in data/traces
+# (2-11 Nov 2026), 6% of its 554 calls against 0.2% of the other hosts' 917, and $2.60 of the $9.00 spent.
+AGENT_IGNORED_HOSTS: tuple[str, ...] = ("wafer",)
+# Tool-call arguments longer than this are not sent back to the model (the trace keeps them). Real calls stayed under
+# 7,300 characters in 5,731 traced calls; broken ones ran 22,000-520,000, and resending them made the VICI market
+# analyst (11 Nov 2026) copy the junk into 20 more calls while its prompt grew from 5k to 1M tokens.
+AGENT_MAX_RESENT_ARGUMENT_CHARS = 20_000
 
 # Discover (REFERENCE §4): companies explained when the question doesn't say how many. Each one is a full
 # research run (B, C or D), so three keeps a Discover run to about the cost and time of three Check runs.
@@ -244,6 +252,9 @@ DISCOVER_DEFAULT_TOP_K = 3
 # a few replacements", user-adjustable with --replacements). Candidates the deterministic check rejects cost no
 # model call and don't count. On reaching it the shortlist returns fewer picks and says why.
 DISCOVER_MAX_REPLACEMENTS = 3
+# The set-up of a Research or Check run started from the web page, unless Advanced options pick another: D, the
+# analyst team with its critic, is the full design.
+WEB_RESEARCH_CONDITION = "D"
 # The research condition of a Discover run started from the web page, unless Advanced options pick another. Each pick
 # is a full research run: B (one agent) keeps three picks to minutes and cents, while D takes about 20 minutes a pick.
 WEB_DISCOVER_CONDITION = "B"

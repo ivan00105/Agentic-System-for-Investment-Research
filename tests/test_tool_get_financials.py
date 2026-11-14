@@ -122,9 +122,11 @@ def test_a_conflicting_total_is_withheld_not_swapped_for_contract_revenue(tmp_pa
 
 
 def test_bank_operating_income_is_unsupported_but_revenue_works(tmp_path):
-    result, _ = financials(tmp_path, cik="19617", metrics=["revenue", "operating_income"])
+    result, _ = financials(tmp_path, cik="19617", metrics=["revenue", "operating_income", "cost_of_revenue",
+                                                           "current_assets"])
     assert result.status == "partial"
-    assert result.data["metrics"]["operating_income"]["status"] == "unsupported"
+    assert {result.data["metrics"][m]["status"] for m in ("operating_income", "cost_of_revenue", "current_assets")} == {
+        "unsupported"}
     assert values(result, "revenue")[0][0] == "2025-12-31"
 
 

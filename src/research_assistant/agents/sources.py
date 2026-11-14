@@ -11,9 +11,11 @@ GROUPS = {"fact": "Reported figures", "calc": "Calculations", "chunk": "Filing t
           "claim": "Analyst findings", "calendar": "Release dates", "insider": "Insider trades",
           "peers": "Peers and sector"}
 METRICS = {"revenue": "Revenue", "gross_profit": "Gross profit", "operating_income": "Operating income",
-           "net_income": "Net income", "research_and_development": "R&D spending",
+           "net_income": "Net income", "cost_of_revenue": "Cost of revenue",
+           "stock_based_compensation": "Stock-based compensation", "research_and_development": "R&D spending",
            "operating_cash_flow": "Operating cash flow", "capex": "Capital spending", "eps_diluted": "Diluted EPS",
-           "diluted_shares": "Diluted shares", "total_assets": "Total assets", "total_liabilities": "Total liabilities",
+           "diluted_shares": "Diluted shares", "total_assets": "Total assets", "current_assets": "Current assets",
+           "total_liabilities": "Total liabilities",
            "stockholders_equity": "Shareholders' equity", "cash": "Cash", "long_term_debt": "Long-term debt",
            "shares_outstanding": "Shares outstanding",
            "ordinary_shares_per_ads": "Ordinary shares per ADS"}
@@ -22,7 +24,8 @@ FORMULAS = {"fcf": "Free cash flow", "market_cap": "Market cap", "pe": "P/E", "p
             "volatility": "Volatility", "max_drawdown": "Largest fall from a peak", "beta": "Beta",
             "sharpe": "Sharpe ratio", "relative_return": "Return against the benchmark"}
 MARGINS = {"gross_profit": "Gross margin", "operating_income": "Operating margin", "net_income": "Net margin",
-           "fcf": "FCF margin", "operating_cash_flow": "Operating cash flow margin"}
+           "fcf": "FCF margin", "operating_cash_flow": "Operating cash flow margin",
+           "cost_of_revenue": "Cost of revenue share"}
 
 
 def label(record: dict | None, records: dict[str, dict]) -> str:

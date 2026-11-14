@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import agent_api, companies_api
 from .application import Application
+from .config import WEB_DISCOVER_CONDITION, WEB_RESEARCH_CONDITION
 from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
 from .data import providers
 from .data.errors import DataError
@@ -99,7 +100,7 @@ def create_app(data_dir: Path | None = None):
     @app.get("/api/config")
     def config():
         connections = app.state.application.connections()
-        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
+        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections, "agents": {"research": WEB_RESEARCH_CONDITION, "find": WEB_DISCOVER_CONDITION}}
 
     @app.get("/api/status")
     def data_status():

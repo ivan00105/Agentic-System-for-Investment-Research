@@ -2,7 +2,7 @@
 // Professional view, folded away otherwise.
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
-import type { Condition } from '../../api'
+import type { Condition, Config } from '../../api'
 import { useLevel } from '../../level'
 import { CONDITIONS } from './labels'
 
@@ -10,11 +10,14 @@ export interface Options { condition: Condition | ''; model: string; editSpec: b
 
 export function AdvancedOptions({find, options, onChange}: {find: boolean; options: Options; onChange: (next: Partial<Options>) => void}) {
   const {level} = useLevel()
-  const [defaultModel, setDefaultModel] = useState<string | null>(null)
-  useEffect(() => { api.config().then(c => setDefaultModel(c.model)).catch(() => setDefaultModel(null)) }, [])
+  const [config, setConfig] = useState<Config | null>(null)
+  useEffect(() => { api.config().then(setConfig).catch(() => setConfig(null)) }, [])
+  const defaultModel = config?.model ?? null
+  // Not chosen yet: show the set-up the server will use for this mode, by name.
+  const preset = config?.agents?.[find ? 'find' : 'research']
   return <details className="agent-options" open={level === 'professional'}><summary>Advanced options</summary>
-    <label>Agents<select value={options.condition} onChange={e => onChange({condition: e.target.value as Condition | ''})}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{c} · {CONDITIONS[c]}</option>)}</select></label>
-    <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is D: three analysts write the report and a critic checks it.'}</p>
+    <label>Agents<select value={options.condition || preset || ''} onChange={e => onChange({condition: e.target.value as Condition | ''})}>{!options.condition && !preset && <option value="">Set by the server</option>}{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{CONDITIONS[c]}</option>)}</select></label>
+    <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is the analyst team with critic: three analysts write the report and a critic checks it.'}</p>
     <label>Model<input value={options.model} onChange={e => onChange({model: e.target.value})} placeholder={defaultModel ?? 'the model set in .env'} spellCheck={false} /></label>
     <p className="form-note">Leave empty for {defaultModel ? <code>{defaultModel}</code> : 'the model set in .env'}. Another model ID of the same provider must support tool calling.</p>
     {find ? <>
