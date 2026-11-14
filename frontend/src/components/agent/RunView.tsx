@@ -5,7 +5,7 @@ import type { AgentProgress, AgentReport as Report, CompanyMatch } from '../../a
 import { AgentReport } from './AgentReport'
 import { DiscoverQuestions, DiscoverReport } from './Discover'
 import { useLevel } from '../../level'
-import { STATUS } from './labels'
+import { STATUS , CONDITIONS} from './labels'
 import { RunTimeline } from './RunTimeline'
 
 export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRun: (id: string) => void; onNew: () => void; onCompare: (companies: CompanyMatch[], parent: string) => void}) {
@@ -42,7 +42,7 @@ export function RunView({id, onOpenRun, onNew, onCompare}: {id: string; onOpenRu
     {back}
     <section className="report-body agent-run">
       <div className="report-section">
-        <div className="section-label">AGENT RUN · {run.condition ?? 'starting'}</div>
+        <div className="section-label">AGENT RUN · {run.condition ? CONDITIONS[run.condition] : 'starting'}</div>
         <h2 className="agent-run-question">{title}</h2>
         {run.question && (run.kind === 'pick' ? <details className="run-brief"><summary>The brief its research agents got</summary><p>{run.question}</p></details>
           : run.question !== title && <p className="run-brief">{run.question}</p>)}
