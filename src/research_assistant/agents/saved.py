@@ -164,6 +164,17 @@ def report(path: Path) -> dict | None:
                    "flags": [flag["problem"] for flag in c["flags"]]} for c in checked["sections"].get(key, [])]
         status = "abstained" if not claims else "qualified" if any(c["flags"] for c in claims) else "cited"
         sections.append({"key": key, "heading": heading, "status": status, "claims": claims})
+    outlook = [
+        r for r in run.records.values()
+        if r.get("kind") == "calc"
+        and (
+            str(r.get("formula", "")).startswith("outlook_")
+            or r.get("formula") in {
+                "base_rates", "implied_growth", "factor_exposures",
+                "strategy_lab", "shortlist_risk",
+            }
+        )
+    ]
     return {"status": end["status"], "status_label": RUN_STATUS.get(end["status"], end["status"]),
             "error": end.get("error"), "sections": sections, "limitations": checked.get("limitations", []),
             "flags": [f"{flag['where']}: {flag['problem']}" for flag in checked.get("flags", [])],
@@ -171,6 +182,7 @@ def report(path: Path) -> dict | None:
             "sources": [_source(n, i, run.records) for i, n in number.items()],
             "figures": figures(checked["sources"], _shown(end, run.records), run.records) if checked else None,
             "raw": raw(checked["sources"], run.records) if checked else [],
+            "outlook": outlook,
             "discover": _discover(run, path.parent) if "candidates" in end else None,
             "markdown": end.get("markdown") or ""}
 

@@ -2,7 +2,7 @@
 // against, risks, what the review changed, then limitations and sources folded away.
 import { useMemo, useRef, useState } from 'react'
 import { stamp } from '../../api'
-import type { AgentReport as Report } from '../../api'
+import type { AgentReport as Report, OutlookRecord } from '../../api'
 import { Badge } from '../Badge'
 import { RecordPanel } from '../EvidencePanel'
 import { useLevel } from '../../level'
@@ -16,6 +16,13 @@ import { Claim, Claims, KeyNumbers, ReviewChanges, SourcesList } from './ReportP
 const HEADINGS = {
   plain: {bull: 'Reasons for', bear: 'Reasons against', risks: 'What could go wrong', what_would_change_view: 'What would change this picture', review: 'What the checking agent changed'},
   usual: {bull: 'Bull case: for', bear: 'Bear case: against', risks: 'Risks', what_would_change_view: 'What would change the view', review: 'What the review changed'},
+}
+
+function outlookValue(record: OutlookRecord) {
+  if (record.value == null) return 'Unavailable'
+  if (record.unit === 'ratio') return `${(record.value * 100).toFixed(1)}%`
+  if (record.unit === 'x') return `${record.value.toFixed(2)}x`
+  return String(record.value)
 }
 
 export function AgentReport({runId, report}: {runId: string; report: Report}) {
@@ -49,6 +56,20 @@ export function AgentReport({runId, report}: {runId: string; report: Report}) {
       {!!figures?.charts.length && <p className="muted">Charts are drawn from the SEC figures and prices this run saved, with nothing fetched again. Years are fiscal years, labelled by the calendar year each one ends in.</p>}
       {!!figures?.table.length && !!keyNumbers?.claims.length && <details className="technical-details" open={keyNumbers.status === 'qualified'}><summary>Key numbers as the agents wrote them ({keyNumbers.claims.length})</summary><Claims section={keyNumbers} {...parts} empty="" /></details>}
     </section>
+    {report.outlook && report.outlook.length > 0 && <section className="report-section outlook-section">
+      <div className="section-heading"><h2>Outlook</h2><Badge tone="green">statistical records</Badge></div>
+      <p className="muted">Host-made forecasts shown beside their evidence. No direction is a buy or sell call.</p>
+      <div className="cases">
+        {report.outlook.map(record => <div key={record.id}>
+          <div className="section-heading">
+            <h3>{record.ticker ? `${record.ticker} · ` : ''}{record.formula.replaceAll('_', ' ')}</h3>
+            <button type="button" className="text-button" onClick={() => open(record.id)}>Inspect record</button>
+          </div>
+          <p>{record.plain_words ?? outlookValue(record)}</p>
+          {(record.notes?.length ?? 0) > 0 && <ul>{record.notes?.map(note => <li key={note}>{note}</li>)}</ul>}
+        </div>)}
+      </div>
+    </section>}
     <section className="report-section">
       <h2>The case for and against</h2>
       <div className="cases">

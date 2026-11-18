@@ -195,6 +195,58 @@ class Forecast(Record):
     reason: str = "A return forecast is not available. These financial results do not predict future performance."
 
 
+class EventRecord(Record):
+    """A dated catalyst observed by the host; it is not an analyst assertion."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
+    id: str
+    ticker: str = Field(min_length=1, max_length=12)
+    event_type: Literal["earnings", "ex_dividend", "event"]
+    event_date: date
+    announced_at: AwareDatetime
+    observed_at: AwareDatetime
+    source: str
+    status: Literal["upcoming", "occurred", "unknown"] = "upcoming"
+    details: dict[str, str] = Field(default_factory=dict)
+
+
+class OutlookPlaceholder(Record):
+    """Stable report contract while individual Phase 6 forecasts are added."""
+
+    status: Literal["available", "unavailable", "pending", "partial"] = "unavailable"
+    record_ids: list[str] = Field(default_factory=list)
+    reason: str = "This outlook component is not available yet."
+
+
+class OutlookReport(Record):
+    risk: OutlookPlaceholder = Field(default_factory=OutlookPlaceholder)
+    business: OutlookPlaceholder = Field(default_factory=OutlookPlaceholder)
+    priced_in: OutlookPlaceholder = Field(default_factory=OutlookPlaceholder)
+    direction: OutlookPlaceholder = Field(default_factory=OutlookPlaceholder)
+    events: list[EventRecord] = Field(default_factory=list)
+    status: Literal["available", "unavailable", "pending", "partial"] = "unavailable"
+
+
+class OutlookLogEntry(Record):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
+    sequence: int = Field(ge=1)
+    recorded_at: AwareDatetime
+    kind: Literal["record", "outcome"]
+    payload: dict
+    previous_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class OutlookOutcome(Record):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
+    forecast_id: str
+    resolved_at: AwareDatetime
+    status: Literal["resolved", "unresolved", "missed"]
+    actual: Decimal | None = None
+    error: Decimal | None = None
+    note: str | None = None
+
+
 class CompanyReport(Record):
     ticker: Ticker
     company: str
@@ -204,6 +256,7 @@ class CompanyReport(Record):
     claims: list[Claim]
     reviews: list[Review]
     forecast: Forecast = Field(default_factory=Forecast)
+    outlook: OutlookReport = Field(default_factory=OutlookReport)
     limitations: list[str]
     source_limitations: list[str] | None = None  # None identifies saved reports from before source/review separation.
     review_status: Literal["not_requested", "pending", "completed", "unavailable", "failed", "not_recorded"] = "not_recorded"

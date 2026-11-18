@@ -28,6 +28,8 @@ KINDS = {
     "insiders": ("Insider trades", "Insiders' open-market purchases and sales from their SEC Form 4 filings."),
     "peers": ("Peers and sector", "Peers by SIC industry code and size, and the sector ETF to compare against (its "
               "prices come from the daily prices card)."),
+    "factors": ("Factors and strategies", "Ken French market, size, value, profitability, investment and momentum "
+               "factor histories; low-volatility sorted portfolios require a separate provider."),
     "llm": ("Model", "The language model that plans the research, calls the tools and writes the report."),
 }
 
@@ -96,6 +98,8 @@ def all_providers() -> list[Provider]:
         Provider("sec_tickers", "identity", "SEC company tickers", **sec),
         Provider("sec_form4", "insiders", "SEC Form 4 filings", **sec),
         Provider("sec_sic", "peers", "SEC company list by SIC code", **sec),
+        Provider("ken_french", "factors", "Ken French factor library", 0, (), lambda: True,
+                 note="Free daily 5-factor and momentum histories; no API key."),
         *[Provider(a.NAME, "prices", a.LABEL, a.TIER, a.ENV, a.configured, a.check) for a in price_adapters],
         *[Provider(a.NAME, "macro", a.LABEL, a.TIER, a.ENV, a.configured, a.check, note=a.NOTE) for a in macro_adapters],
         # Names are unique across cards, so FRED's exchange rates are "fred_fx".

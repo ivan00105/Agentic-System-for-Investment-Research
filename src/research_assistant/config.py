@@ -112,6 +112,39 @@ RISK_FREE_WINDOW_SLACK_DAYS = 7
 # filing gets a warning, since buybacks or a ratio change may have happened since.
 SHARE_FILING_MAX_AGE_DAYS = 365
 
+# --- Outlook risk forecast -----------------------------------------------------------------
+
+# Three years gives the empirical range enough observations while keeping the tool responsive on the daily cache.
+OUTLOOK_DEFAULT_LOOKBACK_DAYS = 3 * 365
+# A range or probability with fewer observations is too unstable to publish as a forecast.
+OUTLOOK_MIN_OBSERVATIONS = 60
+# The central 80% empirical interval required by the outlook specification.
+OUTLOOK_QUANTILE_LOW = 0.10
+OUTLOOK_QUANTILE_HIGH = 0.90
+# "Trailing SPY" means the stock's relative return is at least ten percentage points below SPY.
+OUTLOOK_TRAILING_THRESHOLD = -0.10
+# HAR uses daily, weekly and monthly realised-volatility components.
+OUTLOOK_HAR_WEEK_DAYS = 5
+OUTLOOK_HAR_MONTH_DAYS = 22
+# Target coverage and update size for the adaptive conformal half-width calibration.
+OUTLOOK_CONFORMAL_COVERAGE = 0.80
+OUTLOOK_CONFORMAL_LEARNING_RATE = 0.01
+# Append-only live outlook records are kept separately from frozen research traces.
+OUTLOOK_LIVE_LOG_NAME = "outlook_live.jsonl"
+
+# --- Quant factors, direction and shortlist -------------------------------------------------
+
+# Ken French publishes factor files with a lag; a month cache keeps the app responsive without hiding updates.
+FACTOR_CACHE_MAX_AGE_DAYS = 30
+# Requiring at least a year of common daily observations keeps factor and momentum descriptions from tiny samples.
+DIRECTION_MIN_OBSERVATIONS = 252
+FACTOR_MIN_OBSERVATIONS = 252
+SHORTLIST_MIN_OBSERVATIONS = 20
+# Ridge-style regularisation and gradient descent settings for the small in-repo logistic direction model.
+DIRECTION_REGULARIZATION = 0.01
+DIRECTION_LEARNING_RATE = 0.05
+DIRECTION_MAX_ITERATIONS = 1000
+
 # --- Macro: risk-free rate, rates, inflation, release dates (REFERENCE §10) -----------------
 
 # Provider order, best first; MACRO_PROVIDERS in .env overrides it. FRED (free key) has every series, ALFRED

@@ -8,7 +8,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
 
-from .contracts import Action, Calculation, DomainError, Evidence, FinancialFact, Report, Run, RunRequest, utcnow
+from . import config
+from .contracts import Action, Calculation, DomainError, Evidence, FinancialFact, OutlookLogEntry, Report, Run, RunRequest, utcnow
 
 
 class Store:
@@ -250,6 +251,72 @@ class Store:
         if hashlib.sha256(raw).hexdigest() != digest:
             raise DomainError("Saved source bytes failed their integrity check.", "source_integrity", 409)
         return raw
+
+    def _outlook_log_path(self):
+        return self.root / config.OUTLOOK_LIVE_LOG_NAME
+
+    def outlook_log(self):
+        """Read and verify the append-only outlook chain before exposing it."""
+        path = self._outlook_log_path()
+        if not path.exists():
+            return []
+        entries = []
+        previous = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                entry = OutlookLogEntry.model_validate_json(line)
+            except ValueError as exc:
+                raise DomainError("The live outlook log is malformed.", "outlook_log_integrity", 409) from exc
+            if entry.sequence != len(entries) + 1 or entry.previous_hash != previous:
+                raise DomainError("The live outlook log hash chain is broken.", "outlook_log_integrity", 409)
+            body = entry.model_dump(mode="json", exclude={"hash"})
+            digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if digest != entry.hash:
+                raise DomainError("The live outlook log hash chain is broken.", "outlook_log_integrity", 409)
+            entries.append(entry)
+            previous = entry.hash
+        return entries
+
+    def _append_outlook(self, kind, payload):
+        entries = self.outlook_log()
+        body = {
+            "sequence": len(entries) + 1,
+            "recorded_at": utcnow().isoformat(),
+            "kind": kind,
+            "payload": payload,
+            "previous_hash": entries[-1].hash if entries else None,
+        }
+        canonical = OutlookLogEntry.model_validate({**body, "hash": "0" * 64}).model_dump(
+            mode="json", exclude={"hash"}
+        )
+        body["hash"] = hashlib.sha256(
+            json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        entry = OutlookLogEntry.model_validate(body)
+        path = self._outlook_log_path()
+        with path.open("a", encoding="utf-8", newline="\n") as stream:
+            stream.write(entry.model_dump_json() + "\n")
+        return entry
+
+    def append_outlook_record(self, record):
+        """Append a forecast/event record; an existing record ID can never be changed."""
+        payload = record.model_dump(mode="json") if hasattr(record, "model_dump") else dict(record)
+        record_id = payload.get("id")
+        if not record_id:
+            raise DomainError("Outlook records require an id.", "invalid_outlook_record")
+        for entry in self.outlook_log():
+            if entry.kind == "record" and entry.payload.get("id") == record_id:
+                if entry.payload != payload:
+                    raise DomainError("Outlook record identifiers are immutable.", "immutable_record", 409)
+                return entry
+        return self._append_outlook("record", payload)
+
+    def append_outlook_outcome(self, outcome):
+        """Append an observed outcome separately; forecasts themselves remain immutable."""
+        payload = outcome.model_dump(mode="json") if hasattr(outcome, "model_dump") else dict(outcome)
+        if not payload.get("forecast_id") or not payload.get("resolved_at"):
+            raise DomainError("Outcomes require forecast_id and resolved_at.", "invalid_outlook_outcome")
+        return self._append_outlook("outcome", payload)
 
     def recover(self):
         with self.connect() as db:

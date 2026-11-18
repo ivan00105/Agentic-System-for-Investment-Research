@@ -101,6 +101,11 @@ def create_app(data_dir: Path | None = None):
         connections = app.state.application.connections()
         return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
 
+    @app.get("/api/outlook-log")
+    def outlook_log():
+        """Expose only the verified hash-chained live outlook log; no outlook number is recalculated here."""
+        return {"entries": [entry.model_dump(mode="json") for entry in app.state.store.outlook_log()]}
+
     @app.get("/api/status")
     def data_status():
         """Every data provider by kind: tier, which settings are set (never their values), and the last check."""
