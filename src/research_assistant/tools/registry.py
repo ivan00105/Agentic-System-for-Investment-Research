@@ -2,14 +2,16 @@
 from pydantic import ValidationError
 
 from ..data.errors import DataError
-from . import (calculate, find_company, get_base_rates, get_events, get_factor_exposures, get_financials, get_insider_trades,
+from . import (calculate, find_company, get_base_rates, get_events, get_factor_exposures,
+               get_filing_change_alerts, get_financials, get_insider_trades,
                get_macro, get_outlook, get_peers, get_prices, get_shortlist_risk, get_strategy_lab,
                list_filings, read_filing_section, screen, verify_against_filing)
 from .result import Tool, ToolContext, ToolResult
 
 TOOLS: dict[str, Tool] = {tool.name: tool for tool in (
     find_company.TOOL, get_financials.TOOL, calculate.TOOL, list_filings.TOOL, read_filing_section.TOOL,
-    get_prices.TOOL, get_outlook.TOOL, get_events.TOOL, get_base_rates.TOOL, get_factor_exposures.TOOL, get_strategy_lab.TOOL,
+    get_prices.TOOL, get_outlook.TOOL, get_filing_change_alerts.TOOL,
+    get_events.TOOL, get_base_rates.TOOL, get_factor_exposures.TOOL, get_strategy_lab.TOOL,
     get_shortlist_risk.TOOL, screen.TOOL, verify_against_filing.TOOL, get_macro.TOOL, get_insider_trades.TOOL,
     get_peers.TOOL)}
 

@@ -51,7 +51,7 @@ def find_item(found: dict[str, dict], item: str, part: str | None) -> list[str]:
     """Section names for an item like "1A" or "7", optionally within a part ("I", "II"); several means ambiguous."""
     wanted = re.sub(r"^item[\s._]*", "", item.strip().lower()).rstrip(".")
     names = [name for name, section in found.items()
-             if name.endswith(f"item_{wanted}") or wanted in [c.lower() for c in section["covered_items"]]]
+             if name.endswith(f"item_{wanted}") or wanted in [c.lower() for c in section.get("covered_items", [])]]
     if part:
         names = [name for name in names if name.startswith(f"part_{part.strip().lower()}_")]
     return names
