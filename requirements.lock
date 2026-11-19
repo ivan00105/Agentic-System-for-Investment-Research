@@ -11,6 +11,7 @@ colorama==0.4.6
 curl_cffi==0.17.0
 distro==1.9.0
 edgartools==5.62.1
+exchange_calendars==4.13.2
 fastapi==0.146.0
 filelock==4.2.6
 h11==0.16.0
