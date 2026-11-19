@@ -98,6 +98,13 @@ PRICE_CACHE_MAX_AGE_HOURS = 24
 # Yahoo can list the newest day with a blank close for hours after it closes (seen at 21:23 New York time on
 # 2 Nov 2026), so a series ending that way is refetched after this long; 30 minutes covers one research run.
 PRICE_CACHE_BLANK_CLOSE_MAX_AGE_MINUTES = 30
+
+# --- Earnings and events -----------------------------------------------------------------
+
+# Finnhub is the point-in-time calendar when a free key is set; yfinance is the keyless fallback.
+# Future dates move, so every returned record is timestamped with the exact observation cutoff.
+EVENT_PROVIDERS = ("finnhub", "yfinance")
+EVENT_CACHE_MAX_AGE_HOURS = 12
 # History fetched when the agent gives no start date: three years covers volatility, drawdown and beta.
 PRICE_DEFAULT_LOOKBACK_DAYS = 3 * 365
 # A day's close counts as known from this New York hour on: the close is 16:00 and end-of-day
@@ -131,6 +138,18 @@ OUTLOOK_CONFORMAL_COVERAGE = 0.80
 OUTLOOK_CONFORMAL_LEARNING_RATE = 0.01
 # Append-only live outlook records are kept separately from frozen research traces.
 OUTLOOK_LIVE_LOG_NAME = "outlook_live.jsonl"
+OUTLOOK_LIVE_LOG_ENABLED = os.getenv("OUTLOOK_LIVE_LOG_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+# Local New York time. The live forecast is issued on an XNYS session this many minutes before 16:00 close.
+OUTLOOK_LOG_BEFORE_CLOSE_MINUTES = 30
+# The bundled list logged prospectively. It is intentionally a snapshot and this note stays visible.
+OUTLOOK_LIVE_UNIVERSE = "sp500_tech"
+# Scheduler polling has no hidden cap: failures are noted and retried on the next bounded polling cycle.
+OUTLOOK_SCHEDULER_POLL_SECONDS = 300
+
+# --- Filing-change alerts -----------------------------------------------------------------
+# Plain-text Item 1A/Item 7 comparison is deterministic and has no LLM in the calculation.
+# Defaults keep a check to the current and immediately prior 10-K while leaving the model no count control.
+FILING_CHANGE_DEFAULT_ITEMS = ("1A", "7")
 
 # --- Quant factors, direction and shortlist -------------------------------------------------
 

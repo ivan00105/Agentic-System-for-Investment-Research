@@ -11,7 +11,7 @@ from typing import Callable
 
 from ..contracts import DomainError
 from ..model_access import check_model, load_model_settings
-from . import fx, macro, prices, prices_tiingo, prices_yfinance
+from . import events, fx, macro, prices, prices_tiingo, prices_yfinance
 from .errors import DataError
 from .sec import SecClient
 
@@ -28,6 +28,8 @@ KINDS = {
     "insiders": ("Insider trades", "Insiders' open-market purchases and sales from their SEC Form 4 filings."),
     "peers": ("Peers and sector", "Peers by SIC industry code and size, and the sector ETF to compare against (its "
               "prices come from the daily prices card)."),
+    "events": ("Earnings and events", "Upcoming earnings and ex-dividend dates, typical results-day moves and "
+               "the live yfinance option-implied range."),
     "factors": ("Factors and strategies", "Ken French market, size, value, profitability, investment and momentum "
                "factor histories; low-volatility sorted portfolios require a separate provider."),
     "llm": ("Model", "The language model that plans the research, calls the tools and writes the report."),
@@ -92,6 +94,8 @@ def all_providers() -> list[Provider]:
     macro_adapters += [a for a in macro.ADAPTERS.values() if a not in macro_adapters]
     fx_adapters = [fx.ADAPTERS[name] for name in fx.provider_order()]
     fx_adapters += [a for a in fx.ADAPTERS.values() if a not in fx_adapters]
+    event_adapters = [events.ADAPTERS[name] for name in events.provider_order()]
+    event_adapters += [a for a in events.ADAPTERS.values() if a not in event_adapters]
     return [
         Provider("sec_archives", "filings", "SEC EDGAR filings", **sec),
         Provider("sec_companyfacts", "fundamentals", "SEC companyfacts", **sec),
@@ -105,6 +109,8 @@ def all_providers() -> list[Provider]:
         # Names are unique across cards, so FRED's exchange rates are "fred_fx".
         *[Provider(f"{a.NAME}_fx" if a.NAME in macro.ADAPTERS else a.NAME, "fx", a.LABEL, a.TIER, a.ENV, a.configured,
                    a.check, note=a.NOTE) for a in fx_adapters],
+        *[Provider(a.NAME, "events", a.LABEL, a.TIER, a.ENV, a.configured,
+                   a.check if hasattr(a, "check") else None) for a in event_adapters],
         _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),
         _model_provider("openai", "OpenAI", 2, ("RESEARCH_MODEL", "OPENAI_API_KEY")),
         _model_provider("compatible", "OpenAI-compatible endpoint (e.g. local Ollama)", 0,

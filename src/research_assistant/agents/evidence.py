@@ -2,6 +2,7 @@
 daily prices behind a calculation), so a saved run can be reopened and its numbers rechecked offline, with no
 SEC, price provider or model call. Files are enough for now; SQLite waits for the UI (PROJECT_GUIDE Phase 7)."""
 import json
+import statistics
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import product
@@ -86,6 +87,8 @@ def _recompute(calc: dict, run: SavedRun, cutoff: datetime):
     that gives the saved value wins; if none does, the latest versions' result is the one reported."""
     if str(calc.get("formula", "")).startswith("outlook_"):
         return _recompute_outlook(calc, run)
+    if calc.get("formula") in ("typical_results_day_move", "option_implied_range"):
+        return _recompute_event_market_view(calc, run)
     ids = list(calc["inputs"].values())
     latest = None
     for chosen in product(*(run.versions.get(i, [])[::-1] or [None] for i in ids)):  # None: calculate says unknown
@@ -96,6 +99,38 @@ def _recompute(calc: dict, run: SavedRun, cutoff: datetime):
         if result.status in ("ok", "unsupported") and result.data["value"] == calc["value"]:
             return result
     return latest
+
+
+def _recompute_event_market_view(calc: dict, run: SavedRun) -> ToolResult:
+    """Recompute event-market-view calculations only from frozen price and observation inputs."""
+    inputs = calc.get("inputs") or {}
+    if calc.get("formula") == "option_implied_range":
+        spot = inputs.get("spot")
+        straddle = inputs.get("straddle")
+        if not isinstance(spot, (int, float)) or not isinstance(straddle, (int, float)) or spot <= 0:
+            return ToolResult(status="invalid", source="events",
+                              warnings=["Frozen option-implied range inputs are incomplete."])
+        value = round(straddle / spot, 8)
+        return ToolResult(status="ok", data={"value": value}, ids=[calc["id"]], source="frozen events")
+    prices = run.records.get(inputs.get("prices"))
+    dates = inputs.get("earnings_dates") or []
+    if not prices or not isinstance(dates, list):
+        return ToolResult(status="invalid", source="events",
+                          warnings=["Frozen results-day move inputs are incomplete."])
+    rows = {row["date"]: row["adj_close"] for row in prices.get("rows", [])}
+    ordered = sorted(rows)
+    moves = []
+    for filing_date in dates:
+        index = next((i for i, day in enumerate(ordered) if day >= filing_date), None)
+        if index is not None and index > 0:
+            prior, current = ordered[index - 1], ordered[index]
+            if rows[prior] != 0:
+                moves.append(abs(rows[current] / rows[prior] - 1))
+    if not moves:
+        return ToolResult(status="unavailable", source="events",
+                          warnings=["No frozen filing-day closes could be matched."])
+    value = round(statistics.median(moves), 8)
+    return ToolResult(status="ok", data={"value": value}, ids=[calc["id"]], source="frozen events")
 
 
 def _recompute_outlook(calc: dict, run: SavedRun) -> ToolResult:

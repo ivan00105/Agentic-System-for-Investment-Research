@@ -243,6 +243,7 @@ class OutlookOutcome(Record):
     resolved_at: AwareDatetime
     status: Literal["resolved", "unresolved", "missed"]
     actual: Decimal | None = None
+    benchmark_actual: Decimal | None = None
     error: Decimal | None = None
     note: str | None = None
 
