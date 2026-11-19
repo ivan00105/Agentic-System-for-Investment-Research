@@ -107,6 +107,7 @@ def run(args: GetOutlookInput, context: ToolContext) -> ToolResult:
         result = outcome.value
         prefix = make_id("outlook", stock_record["id"], benchmark_record["id"], horizon)
         metrics = {
+            "observations": (float(result.observations), "observations"),
             "own_return_low": (result.own_low, "ratio"),
             "own_return_high": (result.own_high, "ratio"),
             "relative_return_low": (result.relative_low, "ratio"),

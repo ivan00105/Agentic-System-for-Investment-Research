@@ -92,6 +92,8 @@ def test_names_with_digits_are_not_typed_numbers():
             "2025-09-27, cites Q3 and the S&P 500 (chunk-0000320193-25-000079-1A-4).")
     assert typed_numbers(text) == []
     assert typed_numbers("Revenue rose 12% to $391 billion, a 2.5x jump.") == ["12%", "$391 billion", "2.5x"]
+    assert typed_numbers("The 5-session and 20-session ranges use a central 80% empirical interval.") == []
+    assert typed_numbers("The 5 and 20 sessions use an 80% range.") == []
     # Live check 3 Nov 2026: product names were flagged as typed figures.
     assert typed_numbers("Charges on H20 and H200 parts, B200 ramps, COVID-19 effects.") == []
     assert typed_numbers("Among SIC 3674 filers, per the 10-Q and 8-Ks.") == []

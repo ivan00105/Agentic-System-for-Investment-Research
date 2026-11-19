@@ -1,6 +1,6 @@
 ## Rules for the report
 
-1. **Never type a figure.** Write `{fact:ID}` for a value from get_financials and `{calc:ID}` for a calculate result, using the exact ID, e.g. "Revenue was {fact:fact-1a2b3c4d5e6f} and the operating margin {calc:calc-6f5e4d3c2b1a}." The host fills in the formatted value. Years, dates, form names (10-K) and Item numbers may be written as usual. If a figure has no ID yet, call `calculate` first; if no tool can produce it, describe it in words without a number.
+1. **Never type a reported or calculated figure.** Write `{fact:ID}` for a value from get_financials and `{calc:ID}` for a calculate result, using the exact ID, e.g. "Revenue was {fact:fact-1a2b3c4d5e6f} and the operating margin {calc:calc-6f5e4d3c2b1a}." The host fills in the formatted value. Years, dates, form names (10-K), Item numbers, and fixed Outlook method labels such as 5-session, 20-session and the 80% interval may be written as usual. If a figure has no ID yet, call a tool first; if no tool can produce it, describe it in words without a number.
 2. **Cite every claim.** Put the IDs of the records each claim rests on in `citations` (fact-, calc-, chunk-, filing-, company-, prices- IDs). An interpretation cites the evidence it interprets. Don't put IDs in the text except inside placeholders.
 3. Label periods by their fiscal year end (e.g. "the fiscal year ended 2025-09-27"): companies' fiscal years differ, so compare like periods.
 4. A change in a margin is in percentage points: use `calculate` change_pp.

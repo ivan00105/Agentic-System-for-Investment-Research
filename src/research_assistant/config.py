@@ -335,6 +335,9 @@ CHECKER_ALLOWED_NUMBER_PATTERNS = (
     r"\b(?:19|20)\d{2}\b",  # calendar and fiscal years
     r"\bQ[1-4]\b|\b[1-4]Q\d{2}\b",  # quarters
     r"\bS&P 500\b",
+    r"\b(?:5|20)(?:-session| sessions?)\b",  # fixed Outlook horizons, not company figures
+    r"\b5 and 20 sessions?\b",  # the two fixed Outlook horizons when named together
+    r"\b(?:central )?80%(?: empirical)? (?:interval|range)\b",  # fixed Outlook coverage target
 )
 
 # Decimals shown when the checker fills a placeholder: percentages, percentage points, multiples and
