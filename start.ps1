@@ -5,11 +5,6 @@ function Check-Exit([string] $step) {
     if ($LASTEXITCODE -ne 0) { throw "$step failed (exit $LASTEXITCODE)." }
 }
 
-# Keep setup's temporary files inside the project on restricted Windows hosts.
-$taskTemp = Join-Path $PSScriptRoot '.tmp'
-New-Item -ItemType Directory -Force -Path $taskTemp | Out-Null
-$env:TEMP = $taskTemp
-$env:TMP = $taskTemp
 $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $python)) {
     python -m venv .venv
