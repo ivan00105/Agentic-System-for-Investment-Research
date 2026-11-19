@@ -1,7 +1,7 @@
 // An agent run's checked report, answer first: the answer and takeaways, key numbers and charts, the cases for and
 // against, risks, what the review changed, then limitations and sources folded away.
-import { useMemo, useRef, useState } from 'react'
-import { stamp } from '../../api'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { outlookApi, stamp } from '../../api'
 import type { AgentReport as Report, OutlookRecord } from '../../api'
 import { Badge } from '../Badge'
 import { RecordPanel } from '../EvidencePanel'
@@ -27,6 +27,12 @@ function outlookValue(record: OutlookRecord) {
 
 export function AgentReport({runId, report}: {runId: string; report: Report}) {
   const [trail, setTrail] = useState<string[]>([])
+  const [liveLogCount, setLiveLogCount] = useState<number | null>(null)
+  useEffect(() => {
+    let active = true
+    outlookApi.log().then(({entries}) => { if (active) setLiveLogCount(entries.length) }).catch(() => {})
+    return () => { active = false }
+  }, [])
   const trigger = useRef<HTMLElement | null>(null)
   const sources = useMemo(() => new Map(report.sources.map(s => [s.n, s])), [report.sources])
   const section = (key: string) => report.sections.find(s => s.key === key)
@@ -59,6 +65,8 @@ export function AgentReport({runId, report}: {runId: string; report: Report}) {
     {report.outlook && report.outlook.length > 0 && <section className="report-section outlook-section">
       <div className="section-heading"><h2>Outlook</h2><Badge tone="green">statistical records</Badge></div>
       <p className="muted">Host-made forecasts shown beside their evidence. No direction is a buy or sell call.</p>
+      <p className="muted">Live-log entries: {liveLogCount == null ? 'checking' : liveLogCount.toLocaleString('en-US')} ·
+        {' '}Check/Compare values are built by the host and cannot be edited in the agent report.</p>
       <div className="cases">
         {report.outlook.map(record => <div key={record.id}>
           <div className="section-heading">

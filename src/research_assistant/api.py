@@ -15,6 +15,7 @@ from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest,
 from .data import providers
 from .data.errors import DataError
 from .fixtures import FIXTURE_CUTOFF, seed
+from .outlook_scheduler import OutlookScheduler
 from .store import Store
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -59,9 +60,12 @@ def create_app(data_dir: Path | None = None):
             app.state.store = store
             app.state.application = Application(store)
             app.state.agent_runs = agent_api.AgentRuns(root / "traces")
+            app.state.outlook_scheduler = OutlookScheduler(store, root)
+            app.state.outlook_scheduler.start()
             try:
                 yield
             finally:
+                app.state.outlook_scheduler.close()
                 app.state.application.close()
                 app.state.agent_runs.stop_all()
 

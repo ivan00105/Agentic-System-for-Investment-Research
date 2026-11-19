@@ -4,6 +4,7 @@ import os
 import re
 import sqlite3
 import tempfile
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -16,6 +17,7 @@ class Store:
     def __init__(self, root: Path):
         self.root = root
         root.mkdir(parents=True, exist_ok=True)
+        self._outlook_lock = threading.RLock()
         (root / "snapshots").mkdir(exist_ok=True)
         self.path = root / "research.sqlite3"
         with self.connect() as db:
@@ -300,23 +302,30 @@ class Store:
 
     def append_outlook_record(self, record):
         """Append a forecast/event record; an existing record ID can never be changed."""
-        payload = record.model_dump(mode="json") if hasattr(record, "model_dump") else dict(record)
-        record_id = payload.get("id")
-        if not record_id:
-            raise DomainError("Outlook records require an id.", "invalid_outlook_record")
-        for entry in self.outlook_log():
-            if entry.kind == "record" and entry.payload.get("id") == record_id:
-                if entry.payload != payload:
-                    raise DomainError("Outlook record identifiers are immutable.", "immutable_record", 409)
-                return entry
-        return self._append_outlook("record", payload)
+        with self._outlook_lock:
+            payload = record.model_dump(mode="json") if hasattr(record, "model_dump") else dict(record)
+            record_id = payload.get("id")
+            if not record_id:
+                raise DomainError("Outlook records require an id.", "invalid_outlook_record")
+            for entry in self.outlook_log():
+                if entry.kind == "record" and entry.payload.get("id") == record_id:
+                    if entry.payload != payload:
+                        raise DomainError("Outlook record identifiers are immutable.", "immutable_record", 409)
+                    return entry
+            return self._append_outlook("record", payload)
 
     def append_outlook_outcome(self, outcome):
         """Append an observed outcome separately; forecasts themselves remain immutable."""
-        payload = outcome.model_dump(mode="json") if hasattr(outcome, "model_dump") else dict(outcome)
-        if not payload.get("forecast_id") or not payload.get("resolved_at"):
-            raise DomainError("Outcomes require forecast_id and resolved_at.", "invalid_outlook_outcome")
-        return self._append_outlook("outcome", payload)
+        with self._outlook_lock:
+            payload = outcome.model_dump(mode="json") if hasattr(outcome, "model_dump") else dict(outcome)
+            if not payload.get("forecast_id") or not payload.get("resolved_at"):
+                raise DomainError("Outcomes require forecast_id and resolved_at.", "invalid_outlook_outcome")
+            for entry in self.outlook_log():
+                if entry.kind == "outcome" and entry.payload.get("forecast_id") == payload["forecast_id"]:
+                    if entry.payload != payload:
+                        raise DomainError("Outlook outcome identifiers are immutable.", "immutable_record", 409)
+                    return entry
+            return self._append_outlook("outcome", payload)
 
     def recover(self):
         with self.connect() as db:

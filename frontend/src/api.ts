@@ -34,6 +34,7 @@ export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citat
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
 export interface OutlookRecord { id: string; formula: string; ticker: string | null; value: number | null; unit: string | null; start?: string | null; end?: string | null; status?: string; inputs?: Record<string, unknown>; notes?: string[]; data?: Record<string, unknown>; betas?: Record<string, number>; plain_words?: string; name?: string; annualized_return?: number; worst_drawdown?: number; losing_years?: number; correlations?: unknown[]; equal_weight_volatility?: number }
+export interface OutlookLogEntry { sequence: number; recorded_at: string; kind: 'record' | 'outcome'; payload: Record<string, unknown>; previous_hash: string | null; hash: string }
 export interface AgentSource { n: number; id: string; text: string; url: string | null; kind?: string | null; group?: string; label?: string }
 export interface KeyNumber { id: string; company: string | null; metric: string; period: string; value: string; change: string | null; change_id: string | null }
 export interface ChartPoint { end: string; value: number; label: string; ids: string[] }
@@ -60,6 +61,9 @@ export const agentApi = {
   record: (id: string, record: string) => request<AgentRecord>(`${run(id)}/records/${encodeURIComponent(record)}`),
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),
   universes: () => request<{items: UniverseInfo[]}>('/universes'),
+}
+export const outlookApi = {
+  log: () => request<{entries: OutlookLogEntry[]}>('/outlook-log'),
 }
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
