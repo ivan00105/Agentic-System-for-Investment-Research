@@ -25,6 +25,61 @@ function outlookValue(record: OutlookRecord) {
   return String(record.value)
 }
 
+function outlookMetric(records: OutlookRecord[], name: string) {
+  return records.find(record => record.formula === `outlook_${name}`)
+}
+
+function outlookHorizon(record: OutlookRecord) {
+  const horizon = record.inputs?.horizon
+  return typeof horizon === 'number' ? horizon : null
+}
+
+function OutlookHorizon({records, onOpen}: {records: OutlookRecord[]; onOpen: (id: string) => void}) {
+  const low = outlookMetric(records, 'own_return_low')
+  const high = outlookMetric(records, 'own_return_high')
+  const relativeLow = outlookMetric(records, 'relative_return_low')
+  const relativeHigh = outlookMetric(records, 'relative_return_high')
+  const trail = outlookMetric(records, 'trail_probability')
+  const volatility = outlookMetric(records, 'har_annualized_volatility')
+  const downBeta = outlookMetric(records, 'down_beta')
+  const worstSelloff = outlookMetric(records, 'worst_selloff_relative_return')
+  const observations = low?.notes?.[0]?.match(/^(\d+)/)?.[1]
+  const direction = outlookMetric(records, 'direction_probability')
+  const baseRate = outlookMetric(records, 'direction_base_rate')
+  const auc = outlookMetric(records, 'direction_auc')
+  const brierSkill = outlookMetric(records, 'direction_brier_skill')
+  const horizon = outlookHorizon(low ?? records[0])
+  const inspect = (record: OutlookRecord | undefined) => record && (
+    <button type="button" className="text-button" onClick={() => onOpen(record.id)}>
+      Inspect record
+    </button>
+  )
+  return <div>
+    <div className="section-heading">
+      <h3>{records[0]?.ticker ? `${records[0].ticker} · ` : ''}{horizon ?? ''}-session risk</h3>
+      {inspect(low)}
+    </div>
+    <ul>
+      <li>Own return range: {low && high ? `${outlookValue(low)} to ${outlookValue(high)}` : 'Unavailable'}</li>
+      <li>Relative to SPY: {relativeLow && relativeHigh ? `${outlookValue(relativeLow)} to ${outlookValue(relativeHigh)}` : 'Unavailable'}</li>
+      <li>Chance of trailing SPY by more than 10%: {trail ? outlookValue(trail) : 'Unavailable'}</li>
+    </ul>
+    {direction && <p><strong>Direction:</strong> {outlookValue(direction)} chance of beating SPY
+      {baseRate && ` (base rate ${outlookValue(baseRate)})`}
+      {brierSkill && `; measured skill ${outlookValue(brierSkill)}`}
+      {auc && `; AUC ${outlookValue(auc)}`}. Not a buy or sell signal.</p>}
+    <details>
+      <summary>Details</summary>
+      <ul>
+        {volatility && <li>HAR annualized volatility: {outlookValue(volatility)}</li>}
+        {downBeta && <li>Down-day beta: {outlookValue(downBeta)}</li>}
+        {worstSelloff && <li>Worst historical selloff relative return: {outlookValue(worstSelloff)}</li>}
+        {observations && <li>{observations} rolling observations</li>}
+      </ul>
+    </details>
+  </div>
+}
+
 export function AgentReport({runId, report}: {runId: string; report: Report}) {
   const [trail, setTrail] = useState<string[]>([])
   const [liveLogCount, setLiveLogCount] = useState<number | null>(null)
@@ -46,6 +101,15 @@ export function AgentReport({runId, report}: {runId: string; report: Report}) {
   const {level} = useLevel()
   const words = HEADINGS[level === 'beginner' ? 'plain' : 'usual']
   const texts = [...report.sections.flatMap(s => s.claims.map(c => c.text)), ...(figures?.table.map(r => r.metric) ?? []), ...report.limitations]
+  const outlookGroups = useMemo(() => {
+    const groups = new Map<number, OutlookRecord[]>()
+    for (const record of report.outlook ?? []) {
+      const horizon = outlookHorizon(record)
+      if (horizon == null) continue
+      groups.set(horizon, [...(groups.get(horizon) ?? []), record])
+    }
+    return [...groups.entries()].sort(([left], [right]) => left - right).map(([, records]) => records)
+  }, [report.outlook])
   return <div className="report-layout"><div className="report-body agent-report">
     <section className="report-section summary-section">
       <div className="section-heading"><div className="section-label">THE ANSWER</div><Badge tone={tone(report.status)}>{report.status_label}</Badge></div>
@@ -68,14 +132,7 @@ export function AgentReport({runId, report}: {runId: string; report: Report}) {
       <p className="muted">Live-log entries: {liveLogCount == null ? 'checking' : liveLogCount.toLocaleString('en-US')} ·
         {' '}Check/Compare values are built by the host and cannot be edited in the agent report.</p>
       <div className="cases">
-        {report.outlook.map(record => <div key={record.id}>
-          <div className="section-heading">
-            <h3>{record.ticker ? `${record.ticker} · ` : ''}{record.formula.replaceAll('_', ' ')}</h3>
-            <button type="button" className="text-button" onClick={() => open(record.id)}>Inspect record</button>
-          </div>
-          <p>{record.plain_words ?? outlookValue(record)}</p>
-          {(record.notes?.length ?? 0) > 0 && <ul>{record.notes?.map(note => <li key={note}>{note}</li>)}</ul>}
-        </div>)}
+        {outlookGroups.map(records => <OutlookHorizon key={outlookHorizon(records[0])} records={records} onOpen={open} />)}
       </div>
     </section>}
     <section className="report-section">
