@@ -107,6 +107,93 @@ class WalkForwardCoverage:
     by_year: dict[str, tuple[int, int, float]]
 
 
+@dataclass(frozen=True)
+class CoverageTest:
+    """Kupiec/Christoffersen count and independence diagnostics."""
+
+    observations: int
+    hits: int
+    hit_rate: float
+    kupiec_lr: float
+    kupiec_p_value: float
+    christoffersen_lr: float
+    christoffersen_p_value: float
+
+
+def _chi_square_p_value(value: float, degrees_of_freedom: int) -> float:
+    if degrees_of_freedom == 1:
+        return math.erfc(math.sqrt(max(value, 0.0) / 2))
+    if degrees_of_freedom == 2:
+        return math.exp(-max(value, 0.0) / 2)
+    raise ValueError("Only one- and two-degree-of-freedom tests are supported.")
+
+
+def coverage_tests(indicators: list[bool], target_coverage: float) -> Outcome:
+    """Kupiec coverage and Christoffersen independence tests for binary interval hits."""
+    if not (0 < target_coverage < 1):
+        return Outcome(None, "Coverage target must be between zero and one.")
+    if not indicators:
+        return Outcome(None, "Coverage tests need at least one observation.")
+    n = len(indicators)
+    hits = sum(indicators)
+    hit_rate = hits / n
+
+    def likelihood(probability: float) -> float:
+        if probability <= 0 or probability >= 1:
+            return 0.0
+        return (probability ** hits) * ((1 - probability) ** (n - hits))
+
+    likelihood_null = likelihood(target_coverage)
+    likelihood_fit = likelihood(hit_rate)
+    kupiec_lr = -2 * math.log(likelihood_null / likelihood_fit) if likelihood_fit and likelihood_null else 0.0
+
+    transitions = [[0, 0], [0, 0]]
+    for previous, current in zip(indicators, indicators[1:], strict=False):
+        transitions[int(previous)][int(current)] += 1
+    n00, n01 = transitions[0]
+    n10, n11 = transitions[1]
+    n0, n1 = n00 + n01, n10 + n11
+    pi0 = n01 / n0 if n0 else 0.0
+    pi1 = n11 / n1 if n1 else 0.0
+    pi = (n01 + n11) / (n0 + n1) if n0 + n1 else 0.0
+
+    def binomial_likelihood(successes: int, failures: int, probability: float) -> float:
+        if successes == 0:
+            left = 1.0
+        else:
+            left = probability ** successes
+        if failures == 0:
+            right = 1.0
+        else:
+            right = (1 - probability) ** failures
+        return left * right
+
+    independence_likelihood = (
+        binomial_likelihood(n01, n00, pi0) * binomial_likelihood(n11, n10, pi1)
+    )
+    pooled_likelihood = (
+        binomial_likelihood(n01 + n11, n00 + n10, pi)
+    )
+    christoffersen_lr = (
+        -2 * math.log(pooled_likelihood / independence_likelihood)
+        if independence_likelihood and pooled_likelihood else 0.0
+    )
+    return Outcome(CoverageTest(
+        observations=n,
+        hits=hits,
+        hit_rate=hit_rate,
+        kupiec_lr=kupiec_lr,
+        kupiec_p_value=_chi_square_p_value(kupiec_lr, 1),
+        christoffersen_lr=christoffersen_lr,
+        christoffersen_p_value=_chi_square_p_value(christoffersen_lr, 1),
+    ))
+
+
+def vix_split_unavailable() -> Outcome:
+    """The repository has no VIX/macro data adapter, so a calm/nervous split is not supported."""
+    return Outcome(None, "Calm/nervous/VIX walk-forward split unavailable: get_macro has no VIX series.")
+
+
 def _quantile(values: list[float], probability: float) -> float:
     if not values:
         raise ValueError("A quantile needs at least one observation.")

@@ -88,6 +88,28 @@ def test_walk_forward_coverage_only_scores_years_after_training_history():
     assert result.value.interval_score >= 0
 
 
+@pytest.mark.parametrize("indicators,target,expected", [
+    ([True] * 8 + [False] * 2, 0.8, 0.8),
+    ([True] * 5 + [False] * 5, 0.8, 0.5),
+    ([True, False, True, False, True, False], 0.8, 0.5),
+])
+def test_kupiec_and_christoffersen_walk_forward_coverage(indicators, target, expected):
+    result = risk.coverage_tests(indicators, target)
+    assert result.value is not None
+    assert result.value.observations == len(indicators)
+    assert result.value.hit_rate == pytest.approx(expected)
+    assert result.value.kupiec_lr >= 0
+    assert 0 <= result.value.kupiec_p_value <= 1
+    assert result.value.christoffersen_lr >= 0
+    assert 0 <= result.value.christoffersen_p_value <= 1
+
+
+def test_vix_split_is_clearly_unavailable():
+    result = risk.vix_split_unavailable()
+    assert result.value is None
+    assert "VIX" in result.reason
+
+
 def test_earnings_window_widens_intervals_by_historical_jump():
     dates = [f"2020-01-{index + 1:02d}" for index in range(10)]
     stock = [100.0, 110.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]

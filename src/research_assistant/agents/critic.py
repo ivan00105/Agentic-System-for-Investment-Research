@@ -9,7 +9,9 @@ corrected and backs with a citation, a withdrawal a claim gone from the report. 
 settle stays open for the next round; what is still open when the review stops is shown as unresolved, never dropped.
 """
 import json
+import re
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
 
@@ -33,6 +35,54 @@ SUBMIT_OBJECTIONS = Finish("submit_objections", "Hand in your objections: zero o
 SUBMIT_REVISION = Finish("submit_revision", "Hand in the revised report, every section, with one outcome per "
                          "objection. Every number is a {fact:ID} or {calc:ID} placeholder and every claim cites the "
                          "record IDs it rests on.", Revision)
+
+
+def base_rate_misleading_certainty(report: CheckedReport, records: dict) -> list[Objection]:
+    """Host-owned Phase 6 check (PROJECT_GUIDE §6, REFERENCE §6): flag growth/margin forecasts outside base_rates."""
+    objections = []
+    number = re.compile(r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?:\s*)(?:%|percentage points?|pp\b)",
+                        re.IGNORECASE)
+    for claims in report.sections.values():
+        for claim in claims:
+            base_record = next((records[cid] for cid in claim.citations
+                                if cid in records and records[cid].get("formula") == "base_rates"), None)
+            if base_record is None:
+                continue
+            data = base_record.get("data") or {}
+            text = claim.text.lower()
+            matches = [Decimal(match) / Decimal(100) for match in number.findall(claim.text)
+                       if match]
+            if not matches:
+                continue
+            outside = []
+            if "growth" in text or ("revenue" in text and "margin" not in text):
+                band = data.get("growth") or {}
+                outside.extend((value, "revenue growth", band, "growth") for value in matches
+                               if _outside_band(value, band))
+            if "margin" in text and re.search(r"change|expan|improv|widen|narrow|compress|declin|grow|drop",
+                                              text):
+                band = data.get("margin_change") or {}
+                outside.extend((value, "operating-margin change", band, "margin") for value in matches
+                               if _outside_band(value, band))
+            if outside:
+                value, metric, band, kind = outside[0]
+                p10, p90 = band.get("p10"), band.get("p90")
+                detail = (f"{metric} claim of {value:.2%} is outside the comparable base-rate band "
+                          f"{Decimal(str(p10)):.2%} to {Decimal(str(p90)):.2%}; presenting it as certain is misleading.")
+                objections.append(Objection(
+                    claim=claim.id, issue="misleading_certainty", material=True, problem=detail,
+                    evidence=[base_record["id"]],
+                    requested_check=f"Recheck the {kind} claim against get_base_rates calc {base_record['id']}.",
+                ))
+    return objections
+
+
+def _outside_band(value: Decimal, band: dict) -> bool:
+    try:
+        low, high = Decimal(str(band["p10"])), Decimal(str(band["p90"]))
+    except (KeyError, TypeError, InvalidOperation):
+        return False
+    return low is not None and high is not None and (value < low or value > high)
 
 
 def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
@@ -126,6 +176,11 @@ class Critic:
                 return None
             raised, repeats = [], []
             for objection in result.output.objections:
+                o, repeat = self._raise(objection, n, work.report)
+                raised += [o] if o else []
+                repeats += [repeat] if repeat else []
+            # Host guard: a prompt-only instruction can miss or soften the outside-view check.
+            for objection in base_rate_misleading_certainty(work.report, self.context.records):
                 o, repeat = self._raise(objection, n, work.report)
                 raised += [o] if o else []
                 repeats += [repeat] if repeat else []
