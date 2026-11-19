@@ -5,6 +5,19 @@ function Check-Exit([string] $step) {
     if ($LASTEXITCODE -ne 0) { throw "$step failed (exit $LASTEXITCODE)." }
 }
 
+# Recover from shells that still export the old project-local temporary path.
+$projectTemp = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.tmp')).TrimEnd('\') + '\'
+$systemTemp = Join-Path $env:LOCALAPPDATA 'Temp'
+foreach ($name in @('TEMP', 'TMP')) {
+    $current = [Environment]::GetEnvironmentVariable($name, 'Process')
+    if ($current) {
+        $currentPath = [System.IO.Path]::GetFullPath($current).TrimEnd('\') + '\'
+        if ($currentPath.StartsWith($projectTemp, [StringComparison]::OrdinalIgnoreCase)) {
+            Set-Item -Path "Env:$name" -Value $systemTemp
+        }
+    }
+}
+
 $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $python)) {
     python -m venv .venv
