@@ -35,6 +35,7 @@ def test_get_outlook_returns_citable_horizon_records(tmp_path, monkeypatch):
         metrics = result.data["horizons"][horizon]["metrics"]
         assert metrics["own_return_low"]["id"] in result.ids
         assert metrics["own_return_low"]["value"] == context.records[metrics["own_return_low"]["id"]]["value"]
+        assert "unavailable_metrics" in result.data["horizons"][horizon]
     saved = SavedRun([], context.records, {}, None, None)
     mismatches = [(record_id, context.records[record_id]["value"],
                    _recompute_outlook(context.records[record_id], saved).model_dump())

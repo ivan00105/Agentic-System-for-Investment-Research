@@ -225,7 +225,8 @@ class Critic:
         asked, before = len(self.desk.asked), {c.id for claims in work.report.sections.values() for c in claims}
         self.trace.write("revision_start", round=n, objections=[o.id for o in pending])
         work.messages.append({"role": "user", "content": self._request(work, n, pending)})
-        result = work.resume(SUBMIT_REVISION, max_steps=self.max_steps)  # each revision gets its own step guard
+        result = work.resume(SUBMIT_REVISION, max_steps=self.max_steps,
+                             force_finish_after_nudges=1)  # revision text must become submit_revision
         if result.output is None:
             work.notes.append(f"The revision in round {n} ended without a report ({result.error or result.status}); "
                               "the report before it is shown.")

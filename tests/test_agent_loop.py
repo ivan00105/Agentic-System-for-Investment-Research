@@ -70,6 +70,23 @@ def test_a_text_only_reply_gets_a_nudge(tmp_path):
     assert "nudge" in [e["kind"] for e in events(trace)]
 
 
+def test_revision_text_is_forced_back_to_the_finish_tool(tmp_path):
+    client = FakeClient(
+        reply("I will revise the report in plain text."),
+        reply(tool_calls=[("submit_answer", {"cik": "320193"})]),
+    )
+    result, _, trace = start(
+        tmp_path,
+        client,
+        force_finish_after_nudges=1,
+    )
+    assert result.status == "finished" and result.output.cik == "320193"
+    assert client.requests[-1]["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "submit_answer"},
+    }
+
+
 def test_a_repeated_call_is_not_run_again(tmp_path, monkeypatch):
     calls = []
     real = registry.call

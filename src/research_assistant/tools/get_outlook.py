@@ -121,8 +121,10 @@ def run(args: GetOutlookInput, context: ToolContext) -> ToolResult:
             "worst_selloff_relative_return": (result.worst_selloff_relative_return, "ratio"),
         }
         horizon_records = []
+        unavailable_metrics = []
         for metric, (value, unit) in metrics.items():
             if value is None:
+                unavailable_metrics.append(metric)
                 continue
             record = {
                 "id": make_id(prefix, metric), "kind": "calc", "formula": f"outlook_{metric}",
@@ -147,6 +149,7 @@ def run(args: GetOutlookInput, context: ToolContext) -> ToolResult:
         summaries[str(horizon)] = {
             "observations": result.observations,
             "records": [r["id"] for r in horizon_records],
+            "unavailable_metrics": sorted(unavailable_metrics),
             "metrics": {
                 record["formula"].removeprefix("outlook_"): {
                     "value": record["value"], "unit": record["unit"], "id": record["id"]

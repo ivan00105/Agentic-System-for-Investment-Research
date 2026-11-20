@@ -338,6 +338,8 @@ CHECKER_ALLOWED_NUMBER_PATTERNS = (
     r"\b(?:5|20)(?:-session| sessions?)\b",  # fixed Outlook horizons, not company figures
     r"\b5 and 20 sessions?\b",  # the two fixed Outlook horizons when named together
     r"\b(?:central )?80%(?: empirical)? (?:interval|range)\b",  # fixed Outlook coverage target
+    r"\b80%(?: empirical)? confidence(?: range| interval)?\b",
+    r"\bRule 10b5-1\b",  # SEC rule name, not a numeric metric
 )
 
 # Decimals shown when the checker fills a placeholder: percentages, percentage points, multiples and

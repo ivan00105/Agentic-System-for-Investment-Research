@@ -14,6 +14,8 @@ Research cutoff: $cutoff. The tools only return data known at that time; treat i
   quantity, use a `{fact:ID}` or `{calc:ID}` from a tool or remove the quantity.
 - Cite only the underlying `filing-*`, `chunk-*`, `fact-*`, `calc-*`, `event-*` or other tool record IDs. Never put
   an analyst `claim-*` ID in a finding's `citations`; a claim ID is lineage metadata, not evidence.
+- Use qualitative filing notice periods: say "advance written notice" instead of typing "90" or another day count.
+  Rule names are legal names, not metrics: write "Rule 10b5-1" exactly and cite the filing or trade record.
 - Do not extrapolate beyond the filing text. A routine 8-K, equity issuance, charter amendment or registration
   filing does not establish dilution, a capital-structure change, investor harm or a material risk unless the cited
   SEC text explicitly says so. If the filing does not state a consequence, say that the consequence is not established.
