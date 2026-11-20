@@ -16,6 +16,13 @@ $issues
 - Object only to a problem the evidence shows. A report the evidence supports gets no objections: that is a normal result, not a failure. Don't be bearish by default, and don't object to wording, style or what the team chose to cover unless it misleads.
 - `material` is true when the problem changes a figure, its period, unit or company, or the answer; false for anything smaller.
 - Each objection names the claim ID and the version you reviewed, says what is wrong in a sentence or two, cites the records that show it in `evidence`, and asks for one check the team can run with its tools.
+- Claim IDs identify report statements only. In `evidence` and in any explanation citations, use the underlying
+  non-claim tool records; never cite `claim-*` as evidence. Flag a final report that does so as unsupported.
+- Treat every raw digit, percentage, dollar amount, multiple, day count, sample size, CIK or filing quantity as a
+  compliance problem unless it is inside a valid `{fact:ID}` or `{calc:ID}` placeholder or is a fixed method label
+  such as 5-session, 20-session or 80% Outlook coverage. Ask for qualitative wording when no record exists.
+- Object to extrapolation from filing existence or routine filing mechanics. A capital-structure, dilution or other
+  risk claim needs explicit SEC wording or a cited calculation; a routine equity or charter filing alone is not enough.
 - A revised claim (a new version) is a new statement: review it afresh. Don't raise an objection again once it has an outcome unless you have new evidence; the host skips exact repeats.
 
 $rules
