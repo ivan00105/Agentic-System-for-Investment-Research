@@ -294,4 +294,3 @@ def shortlist_risk(
                 selloff_windows.append(index)
         selloff = worst if selloff_windows else worst
     return Outcome(ShortlistRisk(len(tickers), len(dates), correlations, basket_vol, parts, selloff))
-
