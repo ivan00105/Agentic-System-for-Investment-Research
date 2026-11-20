@@ -144,7 +144,16 @@ def run(args: GetOutlookInput, context: ToolContext) -> ToolResult:
             context.remember(record)
             horizon_records.append(record)
         records.extend(horizon_records)
-        summaries[str(horizon)] = {"observations": result.observations, "records": [r["id"] for r in horizon_records]}
+        summaries[str(horizon)] = {
+            "observations": result.observations,
+            "records": [r["id"] for r in horizon_records],
+            "metrics": {
+                record["formula"].removeprefix("outlook_"): {
+                    "value": record["value"], "unit": record["unit"], "id": record["id"]
+                }
+                for record in horizon_records
+            },
+        }
 
         direction = quant.direction_forecast(
             closes, benchmark, horizon,
@@ -202,8 +211,9 @@ def run(args: GetOutlookInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool(
     "get_outlook",
-    "Build host-owned empirical risk forecasts from adjusted stock and SPY prices. Returns citable records for "
-    "80% own/relative return ranges, trailing-SPY probability, HAR volatility, down-day beta and selloff context.",
+    "Build host-owned empirical risk forecasts from adjusted stock and SPY prices. Returns citable records and a "
+    "metric summary containing each value with its record ID for citation. Returns 80% own/relative return ranges, "
+    "trailing-SPY probability, HAR volatility, down-day beta and selloff context.",
     GetOutlookInput,
     run,
     "outlook",

@@ -28,8 +28,9 @@ class Finish:
     model: type[BaseModel]
 
     def schema(self) -> dict:
+        parameters = _model_schema_for_tool(self.model)
         return {"type": "function", "function": {
-            "name": self.name, "description": self.description, "parameters": self.model.model_json_schema()}}
+            "name": self.name, "description": self.description, "parameters": parameters}}
 
 
 @dataclass
@@ -42,6 +43,28 @@ class LoopResult:
 
 class BadReply(OpenAIError):
     """A model reply whose body isn't JSON, even after retries."""
+
+
+def _model_schema_for_tool(model: type[BaseModel]) -> dict:
+    """Make nullable Pydantic fields acceptable to providers with limited tool-schema support.
+
+    Validation still uses the original model, so omitted or null optional values retain their normal semantics.
+    """
+    schema = model.model_json_schema()
+
+    def normalize(value):
+        if isinstance(value, dict):
+            branches = value.get("anyOf")
+            if isinstance(branches, list) and len(branches) == 2:
+                non_null = [branch for branch in branches if branch.get("type") != "null"]
+                if len(non_null) == 1:
+                    return normalize(non_null[0])
+            return {key: normalize(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        return value
+
+    return normalize(schema)
 
 
 def create(client, **kwargs):

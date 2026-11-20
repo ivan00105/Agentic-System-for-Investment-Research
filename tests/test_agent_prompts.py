@@ -1,5 +1,9 @@
+import json
+
 from research_assistant.agents import prompts
 from research_assistant.agents.draft import Draft
+from research_assistant.agents.loop import Finish
+from research_assistant.agents.objections import Objections, Revision
 from research_assistant.agents.objections import Objection, issue_list
 
 ROLES = ("single_agent", "coordinator", "fundamentals", "filings", "market", "critic")
@@ -33,3 +37,11 @@ def test_report_writers_put_the_answer_first_and_one_figure_per_key_number():
     schema = Draft.model_json_schema()["properties"]
     assert schema["summary"]["description"].startswith("The answer first")
     assert "caveats about how figures were found" in schema["limitations"]["description"]
+
+
+def test_finish_tool_schemas_avoid_nullable_anyof_for_limited_providers():
+    for model in (Draft, Objections, Revision):
+        schema = Finish("finish", "finish", model).schema()
+        encoded = json.dumps(schema)
+        assert '"anyOf": [{"type": "string"}, {"type": "null"}]' not in encoded
+        assert '"anyOf": [{"type": "integer"}, {"type": "null"}]' not in encoded
