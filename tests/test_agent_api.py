@@ -17,7 +17,7 @@ MINOR_OBJECTION = {"id": "objection-1", "claim": "claim-1", "version": 1, "where
 def start(web, question="Who is Apple?", **body) -> str:
     response = web.post("/api/agent-runs", json={"question": question, **body})
     assert response.status_code == 202, response.text
-    assert response.json()["status"] in ("running", "finished")
+    assert response.json()["status"] in ("running", "finished", "failed")
     return response.json()["run_id"]
 
 

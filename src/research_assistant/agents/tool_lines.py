@@ -191,6 +191,15 @@ def _screen(args, data, seen):
     return f"{screened}{_n(filters, 'filter')}{ranked}", returned
 
 
+def _filing_changes(args, data, seen):
+    items = ", ".join(f"Item {alert['item']}" for alert in data.get("alerts") or [])
+    prior = data.get("prior", {}).get("accession")
+    current = data.get("current", {}).get("accession")
+    where = seen.who(data.get("cik") or args.get("cik"))
+    years = f"{prior[:4]} → {current[:4]}" if prior and current else ""
+    return f"{where}: {items}{' ' + years if years else ''}", _n(len(data.get("alerts") or []), "change alert")
+
+
 def _ask(args, data, seen):  # the analyst's own task line shows what was asked
     findings, gaps = len(data.get("findings") or []), len(data.get("gaps") or [])
     stopped = f" ({str(data['status']).replace('_', ' ')})" if data.get("status") not in (None, "finished") else ""
@@ -199,6 +208,7 @@ def _ask(args, data, seen):  # the analyst's own task line shows what was asked
 
 DESCRIBE = {"find_company": _find_company, "get_financials": _get_financials, "calculate": _calculate,
             "get_prices": _get_prices, "read_filing_section": _read_filing_section, "list_filings": _list_filings,
+            "get_filing_change_alerts": _filing_changes,
             "verify_against_filing": _verify, "get_peers": _get_peers, "get_macro": _get_macro,
             "get_insider_trades": _insider_trades, "screen": _screen,
             "ask_fundamentals": _ask, "ask_filings": _ask, "ask_market": _ask}

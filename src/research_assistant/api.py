@@ -15,6 +15,7 @@ from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest,
 from .data import providers
 from .data.errors import DataError
 from .fixtures import FIXTURE_CUTOFF, seed
+from .outlook_scheduler import OutlookScheduler
 from .store import Store
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -59,9 +60,12 @@ def create_app(data_dir: Path | None = None):
             app.state.store = store
             app.state.application = Application(store)
             app.state.agent_runs = agent_api.AgentRuns(root / "traces")
+            app.state.outlook_scheduler = OutlookScheduler(store, root)
+            app.state.outlook_scheduler.start()
             try:
                 yield
             finally:
+                app.state.outlook_scheduler.close()
                 app.state.application.close()
                 app.state.agent_runs.stop_all()
 
@@ -100,6 +104,11 @@ def create_app(data_dir: Path | None = None):
     def config():
         connections = app.state.application.connections()
         return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
+
+    @app.get("/api/outlook-log")
+    def outlook_log():
+        """Expose only the verified hash-chained live outlook log; no outlook number is recalculated here."""
+        return {"entries": [entry.model_dump(mode="json") for entry in app.state.store.outlook_log()]}
 
     @app.get("/api/status")
     def data_status():

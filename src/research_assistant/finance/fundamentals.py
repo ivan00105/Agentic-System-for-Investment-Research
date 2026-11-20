@@ -58,3 +58,32 @@ def multiple(market_cap: Decimal, denominator: Decimal, what: str) -> Outcome:
 
 def enterprise_value(market_cap: Decimal, debt: Decimal, cash: Decimal) -> Outcome:
     return Outcome(market_cap + debt - cash, note="Enterprise value = market cap + debt - cash; leases are not included.")
+
+
+def implied_growth(market_cap: Decimal, revenue: Decimal, margin: Decimal, reinvestment_rate: Decimal,
+                   discount_rate: Decimal, terminal_growth: Decimal, years: int = 10) -> Outcome:
+    """Solve the constant revenue growth that makes a simple reverse DCF equal market cap."""
+    if market_cap <= 0 or revenue <= 0 or years <= 0:
+        return Outcome(None, "Implied growth needs positive market cap, revenue and years.")
+    if discount_rate <= terminal_growth or not 0 <= margin <= 1 or not 0 <= reinvestment_rate <= 1:
+        return Outcome(None, "Implied growth needs discount rate above terminal growth and rates between zero and one.")
+
+    def value(growth_rate: Decimal) -> Decimal:
+        cash_rate = margin * (1 - reinvestment_rate)
+        total = Decimal(0)
+        for year in range(1, years + 1):
+            total += revenue * (1 + growth_rate) ** year * cash_rate / (1 + discount_rate) ** year
+        terminal = revenue * (1 + growth_rate) ** years * cash_rate * (1 + terminal_growth)
+        total += terminal / (discount_rate - terminal_growth) / (1 + discount_rate) ** years
+        return total
+
+    low, high = Decimal("-0.99"), Decimal("2")
+    if value(low) > market_cap or value(high) < market_cap:
+        return Outcome(None, "Market cap is outside the reverse-DCF growth range (-99% to 200%).")
+    for _ in range(100):
+        middle = (low + high) / 2
+        if value(middle) < market_cap:
+            low = middle
+        else:
+            high = middle
+    return Outcome((low + high) / 2, note=f"Reverse DCF over {years} years; terminal growth is {terminal_growth}.")

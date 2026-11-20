@@ -28,8 +28,9 @@ class Finish:
     model: type[BaseModel]
 
     def schema(self) -> dict:
+        parameters = _model_schema_for_tool(self.model)
         return {"type": "function", "function": {
-            "name": self.name, "description": self.description, "parameters": self.model.model_json_schema()}}
+            "name": self.name, "description": self.description, "parameters": parameters}}
 
 
 @dataclass
@@ -42,6 +43,28 @@ class LoopResult:
 
 class BadReply(OpenAIError):
     """A model reply whose body isn't JSON, even after retries."""
+
+
+def _model_schema_for_tool(model: type[BaseModel]) -> dict:
+    """Make nullable Pydantic fields acceptable to providers with limited tool-schema support.
+
+    Validation still uses the original model, so omitted or null optional values retain their normal semantics.
+    """
+    schema = model.model_json_schema()
+
+    def normalize(value):
+        if isinstance(value, dict):
+            branches = value.get("anyOf")
+            if isinstance(branches, list) and len(branches) == 2:
+                non_null = [branch for branch in branches if branch.get("type") != "null"]
+                if len(non_null) == 1:
+                    return normalize(non_null[0])
+            return {key: normalize(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        return value
+
+    return normalize(schema)
 
 
 def create(client, **kwargs):
@@ -63,14 +86,14 @@ def toolset(tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: 
 
 def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], context: ToolContext, finish: Finish,
              trace: Trace, *, tool_names: list[str] | tuple[str, ...] | None = None, extra_tools: tuple[Tool, ...] = (),
-             max_steps: int = config.AGENT_MAX_STEPS) -> LoopResult:
+             max_steps: int = config.AGENT_MAX_STEPS, force_finish_after_nudges: int = 0) -> LoopResult:
     """Ask, run the requested tools, repeat. `messages` grows in place, so a caller can continue the
     same conversation later (e.g. to send checker flags back). The role's tools are `tool_names` (None: every
     registry tool) plus `extra_tools`; the loop runs no other tool, whatever the model asks for."""
     allowed = toolset(tool_names, extra_tools)
     tools = [tool.schema() for tool in allowed.values()] + [finish.schema()]
     seen: dict[str, tuple[int, ToolResult]] = {}
-    steps = 0
+    steps, text_nudges = 0, 0
     try:
         while steps < max_steps:
             if context.stop.is_set():
@@ -79,8 +102,31 @@ def run_loop(client, model: str, request_kwargs: dict, messages: list[dict], con
             steps += 1
             message = _ask(client, model, request_kwargs, messages, tools, trace, steps)
             if message is None or not message.tool_calls:
+                text_nudges += 1
                 messages.append({"role": "user", "content": f"Call a tool, or call {finish.name} to hand in your answer."})
                 trace.write("nudge", step=steps)
+                if force_finish_after_nudges and text_nudges >= force_finish_after_nudges:
+                    messages.append({"role": "user", "content": (
+                        f"Stop returning prose. Call {finish.name} now with the complete answer; "
+                        "do not answer as plain text.")})
+                    steps += 1
+                    forced = _ask(client, model, request_kwargs, messages, tools, trace, steps,
+                                  tool_choice={"type": "function", "function": {"name": finish.name}})
+                    output = None
+                    for call in (forced.tool_calls if forced else []) or []:
+                        if call.function.name == finish.name:
+                            output = _finish(call, finish, messages, trace, steps) or output
+                        else:
+                            messages.append({
+                                "role": "tool", "tool_call_id": call.id,
+                                "content": "Not run: this call must use the finish tool.",
+                            })
+                    if output is not None:
+                        return LoopResult("finished", output, steps)
+                    trace.write("stopped_at_limit", step=steps, max_steps=max_steps,
+                                reason="revision returned text instead of the finish tool")
+                    return LoopResult("stopped_at_limit", None, steps,
+                                      f"The revision returned text instead of calling {finish.name}.")
                 continue
             output = None
             for call in message.tool_calls:
