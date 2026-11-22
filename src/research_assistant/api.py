@@ -15,6 +15,7 @@ from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest,
 from .data import providers
 from .data.errors import DataError
 from .fixtures import FIXTURE_CUTOFF, seed
+from .model_access import load_model_sources
 from .outlook_scheduler import OutlookScheduler
 from .store import Store
 
@@ -103,7 +104,8 @@ def create_app(data_dir: Path | None = None):
     @app.get("/api/config")
     def config():
         connections = app.state.application.connections()
-        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
+        sources = load_model_sources()
+        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "model_sources": [{"id": s.id, "label": s.label, "provider": s.provider, "model": s.model, "configured": s.configured} for s in sources], "forecast_available": False, "connections": connections}
 
     @app.get("/api/outlook-log")
     def outlook_log():

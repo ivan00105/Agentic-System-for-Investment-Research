@@ -1,6 +1,7 @@
 export type View = 'research' | 'history' | 'setup'
 // /api/config: the configured model, which Advanced options shows as the default.
-export interface Config { model: string | null; model_configured: boolean }
+export interface ModelSource { id: string; label: string; provider: string; model: string; configured: boolean }
+export interface Config { model: string | null; model_configured: boolean; model_sources?: ModelSource[] }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -44,7 +45,7 @@ export interface DiscoverResult { spec: string[] | null; counts: Record<string, 
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
 export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; outlook?: OutlookRecord[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; agent_models?: Record<string, string>; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})

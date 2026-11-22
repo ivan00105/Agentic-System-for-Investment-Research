@@ -10,13 +10,14 @@ from openai import (
 )
 
 from research_assistant import config
-from research_assistant.model_access import decoding_record, load_model_settings, safe_model_error
+from research_assistant.model_access import (decoding_record, load_model_settings, load_model_sources,
+                                             resolve_model_source, safe_model_error)
 
 
 @pytest.fixture(autouse=True)
 def isolated_config(monkeypatch):
     for name in ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENAI_API_KEY",
-                 "OPENROUTER_API_KEY", "OPENAI_BASE_URL"):
+                 "OPENROUTER_API_KEY", "OPENAI_BASE_URL", "RESEARCH_MODEL_SOURCES"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -61,6 +62,24 @@ def test_openrouter_uses_only_its_key_and_pins_request_policy(monkeypatch):
     assert settings.request_kwargs(fallbacks=True)["extra_body"]["provider"]["allow_fallbacks"] is True
     assert settings.metadata()["model"] == "vendor/model:free"
     assert "router-secret" not in repr(settings)
+
+
+def test_multiple_model_sources_and_role_routing(monkeypatch):
+    monkeypatch.setenv("RESEARCH_MODEL_PROVIDER", "openrouter")
+    monkeypatch.setenv("RESEARCH_MODEL", "primary/model")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("RESEARCH_MODEL_SOURCES",
+                       '[{"id":"openai-fast","label":"OpenAI Fast","provider":"openai","model":"gpt-fast","api_key_env":"OPENAI_API_KEY"}]')
+    sources = load_model_sources()
+    assert [source.id for source in sources] == ["default", "openai-fast"]
+    routed = resolve_model_source("openai-fast")
+    assert routed.provider == "openai"
+    assert routed.model == "gpt-fast"
+    assert routed.api_key == "openai-key"
+    settings = load_model_settings().with_routes({"fundamentals": "openai-fast", "filings": "default"})
+    assert settings.for_role("fundamentals").model == "gpt-fast"
+    assert settings.for_role("filings").model == "primary/model"
 
 
 def test_agents_send_only_the_decoding_settings_config_pins(monkeypatch):

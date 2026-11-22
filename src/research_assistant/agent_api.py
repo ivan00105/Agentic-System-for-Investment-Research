@@ -18,7 +18,7 @@ from .agents.trace import Trace
 from .contracts import DomainError
 from .data import universe as universes
 from .data.errors import DataError
-from .model_access import load_model_settings
+from .model_access import load_model_settings, load_model_sources
 from .tools.result import ToolContext
 
 router = APIRouter(prefix="/api/agent-runs")
@@ -44,6 +44,8 @@ class StartRun(BaseModel):
     discover: Universe | None = None
     # Another model ID of the configured provider (Advanced options); empty: RESEARCH_MODEL.
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    # Optional source ID for each agent role. Source IDs come from /api/config.model_sources.
+    agent_models: dict[str, str] | None = None
     # Discover: wait for the user to check or edit the drafted spec, even when it has no vague terms.
     edit_spec: bool = False
     # Discover: how many to return, from the page's count box; sent apart so a hand-edited question can't lose it.
@@ -236,6 +238,20 @@ def start(body: StartRun, request: Request):
     condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
     cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
     settings = replace(settings, model=body.model) if body.model else settings
+    if body.agent_models:
+        allowed_roles = {"coordinator", "fundamentals", "filings", "market", "critic", "single_agent", "screener"}
+        unknown_roles = set(body.agent_models) - allowed_roles
+        if unknown_roles:
+            raise DomainError(f"Unknown agent role: {', '.join(sorted(unknown_roles))}.", "bad_agent_model", 422)
+        available = {source.id for source in load_model_sources()}
+        unknown_sources = set(body.agent_models.values()) - available
+        if unknown_sources:
+            raise DomainError(f"Unknown model source: {', '.join(sorted(unknown_sources))}.", "bad_model_source", 422)
+        settings = settings.with_routes(body.agent_models)
+        for role in body.agent_models:
+            routed = settings.for_role(role)
+            if not routed.configured:
+                raise DomainError(f"The model source for {role} is not configured.", "model_source_not_configured", 409)
     question = preferences.attach(body.question, body.preferences)
     return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
                                                   body.edit_spec and declared is not None, body.top_k,

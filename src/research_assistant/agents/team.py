@@ -12,7 +12,7 @@ from typing import Callable
 from pydantic import BaseModel, Field
 
 from .. import config
-from ..model_access import ModelSettings
+from ..model_access import ModelSettings, client_for_role
 from ..tools.result import Tool, ToolContext, ToolResult
 from . import prompts
 from .checker import check_claims, fill
@@ -53,8 +53,7 @@ class Desk:
 
     def __init__(self, question: str, client, settings: ModelSettings, trace: Trace, ledger: ClaimLedger,
                  max_steps: int):
-        self.question, self.client, self.model, self.trace, self.ledger = question, client, settings.model, trace, ledger
-        self.kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
+        self.question, self.base_client, self.base_settings, self.trace, self.ledger = question, client, settings, trace, ledger
         self.max_steps = max_steps  # per request: the same guard as any other agent's loop
         self.conversations: dict[str, list[dict]] = {}
         self.log: list[str] = []  # one line per request, for the report's "Who did what"
@@ -68,6 +67,8 @@ class Desk:
 
     def ask(self, role: Role, args: AnalystTask, context: ToolContext) -> ToolResult:
         follow_up = role.name in self.conversations
+        role_client, role_settings = client_for_role(self.base_client, self.base_settings, role.name)
+        model, kwargs = role_settings.model, role_settings.agent_kwargs()
         self.asked.append(role.name)
         if follow_up:
             messages = self.conversations[role.name]
@@ -83,7 +84,7 @@ class Desk:
                                             f"Your task from the coordinator:\n{args.task}"}]
         with self.trace.acting_as(role.name):
             self.trace.write("analyst_start", task=args.task, follow_up=follow_up)
-            result = run_loop(self.client, self.model, self.kwargs, messages, context, SUBMIT_FINDINGS, self.trace,
+            result = run_loop(role_client, model, kwargs, messages, context, SUBMIT_FINDINGS, self.trace,
                               tool_names=role.tools, max_steps=self.max_steps)
             findings = result.output or Findings()
             checked = check_claims(findings.findings, "findings", context.records)

@@ -40,7 +40,7 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
   const [guided, setGuided] = useState(level === 'beginner' && !initial?.length)
   const [note, setNote] = useState('') // the preferences note "Guide me" wrote; the user can edit it
   const [sector, setSector] = useState('') // the sector Guide me chose, e.g. "in health care"
-  const [options, setOptions] = useState<Options>({condition: '', model: '', editSpec: level === 'professional', cutoff: ''})
+  const [options, setOptions] = useState<Options>({condition: '', model: '', agentModels: {}, editSpec: level === 'professional', cutoff: ''})
   useEffect(() => setOptions(o => ({...o, editSpec: level === 'professional'})), [level])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -78,8 +78,9 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
     event.preventDefault()
     if (busy || !question.trim()) return
     if (find && among === 'mine' && !companies.length) { setError('Pick at least one company for your own list, or choose a bundled list.'); return }
-    const {condition, model, editSpec, cutoff} = options
-    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(note.trim() && {preferences: note.trim()}), ...(link && !find && {parent_run_id: link}),
+    const {condition, model, agentModels, editSpec, cutoff} = options
+    const routed = Object.fromEntries(Object.entries(agentModels).filter(([, source]) => source && source !== 'default'))
+    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(Object.keys(routed).length && {agent_models: routed}), ...(note.trim() && {preferences: note.trim()}), ...(link && !find && {parent_run_id: link}),
       ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(topK && {top_k: topK}), ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
     setBusy(true); setError('')
     try { onStarted((await agentApi.start(body)).run_id) }

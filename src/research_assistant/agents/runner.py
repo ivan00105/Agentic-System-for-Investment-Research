@@ -11,7 +11,7 @@ from typing import Callable
 from openai import OpenAIError
 
 from .. import config
-from ..model_access import ModelSettings, decoding_record, safe_model_error
+from ..model_access import ModelSettings, client_for_role, decoding_record, safe_model_error
 from ..tools.result import Tool, ToolContext
 from . import prompts
 from .checker import CheckedReport, check
@@ -64,17 +64,18 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     they fill with one line per request, shown in the report. `review` gets the finished work and may revise it
     (condition D's critic)."""
     ledger = ledger or ClaimLedger()
+    role_client, role_settings = client_for_role(client, settings, lead.name)
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), historical=context.historical,
-                condition=condition, lead=lead.name, provider=settings.provider, model=settings.model,
+                condition=condition, lead=lead.name, provider=role_settings.provider, model=role_settings.model,
                 decoding=decoding_record(), max_steps=max_steps)
     with trace.acting_as(lead.name):
-        work = _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps,
+        work = _work(question, role_client, role_settings, context, lead, trace, ledger, extra_tools, max_steps,
                      self_review_passes)
         if review and work.draft is not None and work.status not in ("failed", "stopped"):
             review(work)
     if context.stop.is_set():  # cancelled: what got done is the partial result, never an error
         work.status = "stopped"
-    return close(trace, question, settings, context, ledger, work, condition, team)
+    return close(trace, question, role_settings, context, ledger, work, condition, team)
 
 
 def _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps, passes) -> Work:

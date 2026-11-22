@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from .. import config
-from ..model_access import ModelSettings
+from ..model_access import ModelSettings, client_for_role
 from ..tools.result import ToolContext, make_id
 from . import prompts
 from .checker import CITATION, CheckedReport, Flag, fill, lookup, typed_numbers
@@ -130,9 +130,10 @@ class Raised:
 class Critic:
     def __init__(self, question: str, client, settings: ModelSettings, context: ToolContext, trace: Trace,
                  ledger: ClaimLedger, desk: Desk, max_steps: int, rounds: int):
-        self.question, self.client, self.model, self.context = question, client, settings.model, context
+        critic_client, critic_settings = client_for_role(client, settings, CRITIC.name)
+        self.question, self.client, self.model, self.context = question, critic_client, critic_settings.model, context
         self.trace, self.ledger, self.desk, self.max_steps, self.rounds = trace, ledger, desk, max_steps, rounds
-        self.kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
+        self.kwargs = critic_settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
         self.raised: list[Raised] = []
 
     def review(self, work: Work) -> None:

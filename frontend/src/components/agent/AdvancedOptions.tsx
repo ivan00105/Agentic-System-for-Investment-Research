@@ -2,21 +2,35 @@
 // Professional view, folded away otherwise.
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
-import type { Condition } from '../../api'
+import type { Condition, ModelSource } from '../../api'
 import { useLevel } from '../../level'
 import { CONDITIONS } from './labels'
 
-export interface Options { condition: Condition | ''; model: string; editSpec: boolean; cutoff: string }
+export interface Options { condition: Condition | ''; model: string; agentModels: Record<string, string>; editSpec: boolean; cutoff: string }
 
 export function AdvancedOptions({find, options, onChange}: {find: boolean; options: Options; onChange: (next: Partial<Options>) => void}) {
   const {level} = useLevel()
   const [defaultModel, setDefaultModel] = useState<string | null>(null)
-  useEffect(() => { api.config().then(c => setDefaultModel(c.model)).catch(() => setDefaultModel(null)) }, [])
+  const [sources, setSources] = useState<ModelSource[]>([])
+  useEffect(() => { api.config().then(c => {setDefaultModel(c.model); setSources(c.model_sources ?? [])}).catch(() => {setDefaultModel(null); setSources([])}) }, [])
+  const roles: {key: string; label: string}[] = [
+    {key: 'coordinator', label: 'Coordinator'},
+    {key: 'fundamentals', label: 'Fundamentals analyst'},
+    {key: 'filings', label: 'Filings & events analyst'},
+    {key: 'market', label: 'Market & valuation analyst'},
+    {key: 'critic', label: 'Critic'},
+    {key: 'screener', label: 'Discover screener'},
+  ]
   return <details className="agent-options" open={level === 'professional'}><summary>Advanced options</summary>
     <label>Agents<select value={options.condition} onChange={e => onChange({condition: e.target.value as Condition | ''})}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{c} · {CONDITIONS[c]}</option>)}</select></label>
     <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is D: three analysts write the report and a critic checks it.'}</p>
     <label>Model<input value={options.model} onChange={e => onChange({model: e.target.value})} placeholder={defaultModel ?? 'the model set in .env'} spellCheck={false} /></label>
     <p className="form-note">Leave empty for {defaultModel ? <code>{defaultModel}</code> : 'the model set in .env'}. Another model ID of the same provider must support tool calling.</p>
+    {sources.filter(source => source.configured).length > 1 && <fieldset className="agent-models"><legend>Choose a model source for each agent</legend>
+      {roles.filter(role => role.key !== 'screener' || find).map(role => <label key={role.key}>{role.label}<select value={options.agentModels[role.key] ?? 'default'} onChange={e => onChange({agentModels: {...options.agentModels, [role.key]: e.target.value}})}>
+        {sources.filter(source => source.configured).map(source => <option key={source.id} value={source.id}>{source.label}: {source.model}</option>)}
+      </select></label>)}
+    </fieldset>}
     {find ? <>
       <label className="radio"><input type="checkbox" checked={options.editSpec} onChange={e => onChange({editSpec: e.target.checked})} /><span>Let me check and edit the screen spec before it runs<small>The run waits for you even when no word in the request is vague.</small></span></label>
       <p className="form-note">Find uses current data only, so it has no cutoff.</p>

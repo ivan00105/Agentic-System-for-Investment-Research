@@ -1,6 +1,7 @@
 """Explicit model credentials and request policy; configuration never probes a provider."""
 
 import ipaddress
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Literal
@@ -25,6 +26,16 @@ from .contracts import DomainError
 
 
 @dataclass(frozen=True)
+class ModelSource:
+    id: str
+    label: str
+    provider: Literal["openai", "openrouter", "compatible"]
+    model: str
+    configured: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True)
 class ModelSettings:
     provider: Literal["openai", "openrouter", "compatible"]
     label: str
@@ -32,6 +43,9 @@ class ModelSettings:
     api_key: str | None = field(repr=False)
     base_url: str | None = field(repr=False)
     error: str | None = None
+    source_id: str = "default"
+    sources: tuple["ModelSource", ...] = ()
+    role_routes: dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
     def configured(self) -> bool:
@@ -70,6 +84,16 @@ class ModelSettings:
             "model": self.model,
             "schema_version": "financial-review-v3",
         }
+
+    def with_routes(self, routes: dict[str, str] | None) -> "ModelSettings":
+        return ModelSettings(self.provider, self.label, self.model, self.api_key, self.base_url, self.error,
+                             self.source_id, self.sources, dict(routes or {}))
+
+    def for_role(self, role: str) -> "ModelSettings":
+        source_id = self.role_routes.get(role)
+        if not source_id:
+            return self
+        return resolve_model_source(source_id, fallback=self)
 
 
 def decoding() -> dict:
@@ -138,8 +162,106 @@ def load_model_settings() -> ModelSettings:
             error = "OPENAI_BASE_URL must use HTTPS (or loopback HTTP) without credentials, query or fragment."
         return ModelSettings("compatible", "OpenAI-compatible", model,
                              _setting("OPENAI_API_KEY"), custom_url, error)
-    return ModelSettings("openai", "OpenAI", model,
-                         _setting("OPENAI_API_KEY"), "https://api.openai.com/v1")
+    settings = ModelSettings("openai", "OpenAI", model,
+                             _setting("OPENAI_API_KEY"), "https://api.openai.com/v1")
+    return settings
+
+
+def _source_settings(entry: dict) -> tuple[ModelSource, ModelSettings]:
+    source_id = str(entry.get("id", "")).strip()
+    label = str(entry.get("label", "")).strip()
+    provider = str(entry.get("provider", "")).strip().lower()
+    model = str(entry.get("model", "")).strip()
+    if not source_id or not label or provider not in {"openai", "openrouter", "compatible"} or not model:
+        return (ModelSource(source_id or "invalid", label or "Invalid model source",
+                            provider if provider in {"openai", "openrouter", "compatible"} else "compatible",
+                            model, False, "Each source needs id, label, provider and model."),
+                ModelSettings("compatible", "Invalid model source", model, None, None,
+                              "Invalid model source.", source_id))
+    key_env = str(entry.get("api_key_env", "")).strip()
+    if not key_env:
+        key_env = "OPENROUTER_API_KEY" if provider == "openrouter" else "OPENAI_API_KEY"
+    api_key = _setting(key_env)
+    custom_url = str(entry.get("base_url", "")).strip() or (_setting("OPENAI_BASE_URL") if provider == "compatible" else None)
+    error = None
+    if provider == "openrouter":
+        base_url = "https://openrouter.ai/api/v1"
+        if custom_url:
+            error = "OpenRouter sources must not set base_url."
+    elif provider == "compatible":
+        base_url = custom_url
+        if not base_url:
+            error = f"Set base_url or OPENAI_BASE_URL for source {source_id}."
+        elif not _valid_endpoint(base_url):
+            error = f"Source {source_id} has an invalid base_url."
+    else:
+        base_url = "https://api.openai.com/v1"
+    settings = ModelSettings(provider, label, model, api_key, base_url, error, source_id)
+    source = ModelSource(source_id, label, provider, model, settings.configured, error)
+    return source, settings
+
+
+def load_model_sources() -> tuple[ModelSource, ...]:
+    """The primary setting and optional RESEARCH_MODEL_SOURCES are both usable model choices."""
+    primary = load_model_settings()
+    sources = [ModelSource("default", primary.label, primary.provider, primary.model or "",
+                           primary.configured, primary.error)]
+    raw = _setting("RESEARCH_MODEL_SOURCES")
+    if not raw:
+        return tuple(sources)
+    try:
+        entries = json.loads(raw)
+    except json.JSONDecodeError:
+        sources.append(ModelSource("invalid", "Invalid model sources", "compatible", "", False,
+                                   "RESEARCH_MODEL_SOURCES must be a JSON array."))
+        return tuple(sources)
+    if not isinstance(entries, list):
+        sources.append(ModelSource("invalid", "Invalid model sources", "compatible", "", False,
+                                   "RESEARCH_MODEL_SOURCES must be a JSON array."))
+        return tuple(sources)
+    seen = {"default"}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        source, _ = _source_settings(entry)
+        if source.id in seen:
+            continue
+        seen.add(source.id)
+        sources.append(source)
+    return tuple(sources)
+
+
+def resolve_model_source(source_id: str, fallback: ModelSettings | None = None) -> ModelSettings:
+    primary = fallback or load_model_settings()
+    if source_id == "default":
+        return primary
+    raw = _setting("RESEARCH_MODEL_SOURCES")
+    if raw:
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError:
+            entries = []
+        if isinstance(entries, list):
+            for entry in entries:
+                if isinstance(entry, dict) and str(entry.get("id", "")).strip() == source_id:
+                    _, settings = _source_settings(entry)
+                    settings = settings.with_routes(primary.role_routes)
+                    return settings
+    if fallback is not None:
+        return fallback
+    return load_model_settings()
+
+
+def make_model_client(settings: ModelSettings):
+    """Create a provider-specific client for a routed role; cli.model_client remains the testable factory."""
+    return OpenAI(**settings.client_kwargs, max_retries=config.AGENT_MODEL_RETRIES)
+
+
+def client_for_role(base_client, base_settings: ModelSettings, role: str):
+    routed = base_settings.for_role(role)
+    if routed.source_id == base_settings.source_id and routed.provider == base_settings.provider and routed.model == base_settings.model:
+        return base_client, routed
+    return make_model_client(routed), routed
 
 
 def safe_model_error(exc: Exception) -> DomainError:
