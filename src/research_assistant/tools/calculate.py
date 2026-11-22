@@ -32,12 +32,14 @@ ROLES = {
     "beta": ("prices", "benchmark"),
     "sharpe": ("prices", "risk_free"),
     "relative_return": ("prices", "benchmark"),  # e.g. against the sector ETF from get_peers
+    "implied_growth": ("market_cap", "revenue", "margin", "reinvestment_rate", "discount_rate", "terminal_growth", "years"),
 }
 # Roles a formula takes only sometimes: a 20-F/40-F share count needs its filing's ADS ratio.
 OPTIONAL_ROLES = {"market_cap": ("ads_ratio",)}
 UNITS = {"ratio": "ratio", "growth": "ratio", "change_pp": "pp", "cagr": "ratio", "fcf": "USD", "market_cap": "USD",
          "pe": "x", "ps": "x", "pb": "x", "fcf_yield": "ratio", "ev": "USD", "total_return": "ratio",
          "volatility": "ratio", "max_drawdown": "ratio", "beta": "x", "sharpe": "x", "relative_return": "pp"}
+UNITS["implied_growth"] = "ratio"
 PRICE_FORMULAS = {"total_return", "volatility", "max_drawdown", "beta", "sharpe", "relative_return"}
 # A Sharpe ratio's risk-free rate: get_macro's average 3-month T-bill rate over the price series' dates.
 RISK_FREE_METRIC = "tbill_3m_avg"
@@ -114,6 +116,10 @@ def _check_roles(r: dict[str, dict]) -> None:
             raise Rejected(f"{record['id']} is {_label(record)} in {record.get('unit')}, not a USD amount ({role}).")
         if role in USD_ROLES and _label(record) != USD_ROLES[role]:
             raise Rejected(f"{record['id']} is {_label(record)}, not {USD_ROLES[role]} ({role}).")
+        if role in {"margin", "reinvestment_rate", "discount_rate", "terminal_growth"} and record.get("unit") != "ratio":
+            raise Rejected(f"{record['id']} must be a ratio ({role}).")
+        if role == "years" and record.get("unit") not in {"years", "ratio"}:
+            raise Rejected(f"{record['id']} must contain the forecast horizon in years.")
         if role == "risk_free" and (record["kind"] != "fact" or record.get("metric") != RISK_FREE_METRIC):
             raise Rejected(f"{record['id']} is {_label(record)}, not get_macro's tbill_3m average over the price "
                            "series' dates (risk_free).")
@@ -263,6 +269,11 @@ def _compute(formula: str, r: dict[str, dict], warnings: list[str]):
         mc, debt, cash = r["market_cap"], r["debt"], r["cash"]
         notes += _same_period(debt, cash)
         return fundamentals.enterprise_value(_number(mc), _number(debt), _number(cash)), None, _period(mc)[1], notes
+    if formula == "implied_growth":
+        values = {role: _number(record) for role, record in r.items()}
+        years = int(values.pop("years"))
+        outcome = fundamentals.implied_growth(years=years, **values)
+        return outcome, None, _period(r["market_cap"])[1], notes
     current, previous = (r["current"], r["previous"]) if "current" in r else (r["last"], r["first"])
     years = _ordered(current, previous, same_metric=formula != "change_pp")
     start, end = _period(previous)[0], _period(current)[1]
@@ -320,4 +331,4 @@ def run(args: CalculateInput, context: ToolContext) -> ToolResult:
 
 TOOL = Tool("calculate", "Compute a finance formula from IDs returned by other tools (never from typed numbers): "
             "ratio (margins), growth, change_pp, cagr, fcf, market_cap, pe, ps, pb, fcf_yield, ev, total_return, "
-            "volatility, max_drawdown, beta, sharpe, relative_return. Returns a calc ID to cite.", CalculateInput, run, "calculate")
+            "volatility, max_drawdown, beta, sharpe, relative_return, implied_growth. Returns a calc ID to cite.", CalculateInput, run, "calculate")

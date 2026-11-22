@@ -5,6 +5,8 @@ import re
 import pytest
 from fake_llm import resubmit
 from test_agent_critic import CLEAN, COMPANY, PLAN, calls, claim_in, objection, run_d
+from research_assistant.agents.checker import CheckedClaim, CheckedReport
+from research_assistant.agents.critic import base_rate_misleading_certainty
 
 SUMMARY = [{"text": "Apple Inc. files annual reports with the SEC.", "citations": [COMPANY]},
            {"text": "Apple Inc. is listed in the United States.", "citations": [COMPANY]}]
@@ -69,3 +71,28 @@ def test_a_missing_risk_needs_a_new_risks_claim_and_a_tool_record(tmp_path, answ
     assert (o["outcome"], o["new_claims"]) == ("unresolved", [])
     assert ("Round 1: a claim was added, but it stays open: that needs a new Risks claim and an outcome that each "
             "cite a tool record.") in o["notes"]
+
+
+@pytest.mark.parametrize(("text", "metric"), [
+    ("Revenue growth will reach 30% every year.", "revenue growth"),
+    ("The bull case expects revenue growth of 25%.", "revenue growth"),
+    ("Operating margin will expand by 15 percentage points.", "operating-margin change"),
+])
+def test_host_critic_flags_overoptimistic_base_rate_claims(text, metric):
+    record = {
+        "id": "base-rates-test",
+        "kind": "calc",
+        "formula": "base_rates",
+        "data": {
+            "growth": {"p10": "0.00", "p50": "0.10", "p90": "0.20"},
+            "margin_change": {"p10": "-0.02", "p50": "0.01", "p90": "0.05"},
+        },
+    }
+    claim = CheckedClaim(text=text, kind="interpretation", citations=[record["id"]],
+                         materiality="central", id="claim-bull", version=1)
+    report = CheckedReport(sections={"bull_case": [claim]}, limitations=[], flags=[], sources=[record["id"]])
+    objections = base_rate_misleading_certainty(report, {record["id"]: record})
+    assert len(objections) == 1
+    assert objections[0].issue == "misleading_certainty"
+    assert metric in objections[0].problem
+    assert record["id"] in objections[0].evidence

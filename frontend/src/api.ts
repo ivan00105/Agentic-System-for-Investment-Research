@@ -33,6 +33,8 @@ export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
+export interface OutlookRecord { id: string; formula: string; ticker: string | null; value: number | null; unit: string | null; start?: string | null; end?: string | null; status?: string; inputs?: Record<string, unknown>; notes?: string[]; data?: Record<string, unknown>; betas?: Record<string, number>; plain_words?: string; name?: string; annualized_return?: number; worst_drawdown?: number; losing_years?: number; correlations?: unknown[]; equal_weight_volatility?: number }
+export interface OutlookLogEntry { sequence: number; recorded_at: string; kind: 'record' | 'outcome'; payload: Record<string, unknown>; previous_hash: string | null; hash: string }
 export interface AgentSource { n: number; id: string; text: string; url: string | null; kind?: string | null; group?: string; label?: string }
 export interface KeyNumber { id: string; company: string | null; metric: string; period: string; value: string; change: string | null; change_id: string | null }
 export interface ChartPoint { end: string; value: number; label: string; ids: string[] }
@@ -40,7 +42,7 @@ export interface CompanyChart { cik: string; company: string; revenue: ChartPoin
 export interface DiscoverCandidate { rank: number; cik: string; name: string | null; tickers?: string[]; outcome: string; verdict: string | null; run_id: string | null; lines: {state: string; text: string; ids: string[]}[]; answer: string | null; citations?: string[]; warnings?: string[]; run_status?: string | null }
 export interface DiscoverResult { spec: string[] | null; counts: Record<string, number>; candidates: DiscoverCandidate[]; notes?: string[] }
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
-export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
+export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; outlook?: OutlookRecord[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
 export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
@@ -59,6 +61,9 @@ export const agentApi = {
   record: (id: string, record: string) => request<AgentRecord>(`${run(id)}/records/${encodeURIComponent(record)}`),
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),
   universes: () => request<{items: UniverseInfo[]}>('/universes'),
+}
+export const outlookApi = {
+  log: () => request<{entries: OutlookLogEntry[]}>('/outlook-log'),
 }
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
