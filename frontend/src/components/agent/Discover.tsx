@@ -83,9 +83,23 @@ export function DiscoverReport({result, onOpenRun, onCompare}: {result: Discover
       <div className="screen-stats">{COUNTS.map(([key, label]) => <span key={key}><strong>{result.counts[key] ?? 0}</strong>{label}</span>)}</div>
       {/* <-- ADDED: explain why only `checkedCount` of `eligibleCount` were checked + show next ranked names */}
       {eligibleCount > 0 && <p className="muted">
-        The {eligibleCount} companies that passed the screen are ranked by the rule in "The screen", then checked in that order until {targetPicks} {targetPicks === 1 ? 'pick is' : 'picks are'} found{uncheckedCount > 0 ? `, so the other ${uncheckedCount} are never checked` : ''}.
-        {nextInLine.length > 0 && <> Next in line (not checked): {nextInLine.map((c, i) => <span key={c.cik}>{i > 0 ? ', ' : ''}{c.name ?? c.cik}{c.tickers?.[0] ? ` (${c.tickers[0]})` : ''} (rank {c.rank})</span>)}.</>}
-      </p>}
+    The {eligibleCount} companies that passed the screen are ranked by the rule
+  in "The screen", then checked in that order until {targetPicks}{" "}
+  {targetPicks === 1 ? 'pick is' : 'picks are'} found
+  {uncheckedCount > 0
+    ? `, so the other ${uncheckedCount} are never checked`
+    : ''}.
+  {nextInLine.length > 0 && <>
+    {' '}Next in line (not checked): {nextInLine.map((c, i) =>
+      <span key={c.cik}>
+        {i > 0 ? ', ' : ''}
+        {c.name ?? c.cik}
+        {c.tickers?.[0] ? ` (${c.tickers[0]})` : ''}
+        {' '}(rank {c.rank})
+      </span>
+    )}.
+  </>}
+</p>}
     </section>}
     <section className="report-section">
       <h2>Shortlist</h2>
