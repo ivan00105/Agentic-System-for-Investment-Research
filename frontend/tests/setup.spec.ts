@@ -202,7 +202,7 @@ test('multiple model providers can be chosen as default and per-agent in Setup a
   await page.getByLabel('Detail level').selectOption('professional')
   await expect(page.getByLabel('Default model source')).toHaveValue('openai')
   await expect(page.getByLabel('Fundamentals analyst')).toHaveValue('default')
-  await page.getByLabel('Critic').selectOption('default')
+  await page.locator('.agent-models label').filter({hasText: 'Critic'}).locator('select').selectOption('default')
   await page.getByRole('button', {name: 'How profitable is Microsoft, and is its operating margin rising?'}).click()
   await page.getByRole('button', {name: 'Research this question →'}).click()
   await expect.poll(() => startedBody.agent_models).toEqual({fundamentals: 'default', critic: 'default'})
