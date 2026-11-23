@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from ..contracts import DomainError
-from ..model_access import check_model, load_model_settings
+from ..model_access import BUILTIN_PROVIDERS, check_model, load_model_sources, load_provider_settings
 from . import events, fx, macro, prices, prices_tiingo, prices_yfinance
 from .errors import DataError
 from .sec import SecClient
@@ -48,6 +48,8 @@ class Provider:
     missing: Callable[[], list[str]] | None = None  # what to set when not configured; default: its unset env names
     problem: Callable[[], str | None] = lambda: None  # why settings that are set still don't work
     note: str = ""  # what this provider covers, when it isn't everything its card does
+    source_id: str | None = None  # for llm providers: matching /api/config.model_sources id
+    model: str | None = None  # for llm providers: configured model ID
 
 
 def _unset(names) -> list[str]:
@@ -73,17 +75,53 @@ def _sec_check() -> str:
     return "SEC answered with the User-Agent from SEC_USER_AGENT."
 
 
-def _model_provider(name: str, label: str, tier: int, env: tuple[str, ...]) -> Provider:
-    """One model service. Only the one RESEARCH_MODEL_PROVIDER selects (default: openai) can be active."""
-    def selected() -> bool:
-        return load_model_settings().provider == name
+def _model_provider(name: str, label: str, tier: int, env: tuple[str, ...], note: str = "") -> Provider:
+    """One model service; multiple services can be configured in .env at once."""
+    def settings():
+        return load_provider_settings(name)  # type: ignore[arg-type]
 
     def missing() -> list[str]:
-        choose = [] if selected() else [f"RESEARCH_MODEL_PROVIDER={name}"]
-        return choose + _unset(n for n in env if n != "RESEARCH_MODEL_PROVIDER")
+        s = settings()
+        items: list[str] = []
+        if name == "compatible" and not s.base_url:
+            items.append("COMPATIBLE_BASE_URL")
+        if not s.model:
+            items.append(env[1] if name == "compatible" else env[0])
+        if not s.api_key:
+            items.append(env[-1])
+        return items
 
-    return Provider(name, "llm", label, tier, env, lambda: selected() and load_model_settings().configured,
-                    check_model, missing, lambda: load_model_settings().error if selected() else None)
+    def problem() -> str | None:
+        s = settings()
+        if name == "compatible" and not s.base_url and (os.getenv("RESEARCH_MODEL_PROVIDER", "").strip().lower() != "compatible"):
+            return None
+        return s.error
+
+    return Provider(name, "llm", label, tier, env, lambda: settings().configured,
+                    lambda: check_model(name), missing, problem, note=note, source_id=name,
+                    model=settings().model)
+
+
+def _custom_source_providers() -> list[Provider]:
+    if not os.getenv("RESEARCH_MODEL_SOURCES", "").strip():
+        return []
+    tier = {"openrouter": 2, "openai": 2, "compatible": 0}
+    providers = []
+    for source in load_model_sources():
+        if source.id == "default" or source.id in BUILTIN_PROVIDERS:
+            continue
+        sid = source.id
+        providers.append(Provider(
+            f"source:{sid}" if sid != "invalid" else "source:invalid", "llm", source.label,
+            tier.get(source.provider, 0), ("RESEARCH_MODEL_SOURCES",),
+            lambda ok=source.configured: ok,
+            (lambda s=sid: check_model(s)) if source.configured else None,
+            lambda: [],
+            lambda err=source.error: err,
+            note=f"Extra source from RESEARCH_MODEL_SOURCES ({source.provider}: {source.model})." if source.model else "",
+            source_id=sid, model=source.model or None,
+        ))
+    return providers
 
 
 def all_providers() -> list[Provider]:
@@ -111,10 +149,14 @@ def all_providers() -> list[Provider]:
                    a.check, note=a.NOTE) for a in fx_adapters],
         *[Provider(a.NAME, "events", a.LABEL, a.TIER, a.ENV, a.configured,
                    a.check if hasattr(a, "check") else None) for a in event_adapters],
-        _model_provider("openrouter", "OpenRouter", 2, ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENROUTER_API_KEY")),
-        _model_provider("openai", "OpenAI", 2, ("RESEARCH_MODEL", "OPENAI_API_KEY")),
+        _model_provider("openrouter", "OpenRouter", 2, ("OPENROUTER_MODEL", "OPENROUTER_API_KEY"),
+                        note="Also accepts RESEARCH_MODEL_PROVIDER=openrouter with RESEARCH_MODEL."),
+        _model_provider("openai", "OpenAI", 2, ("OPENAI_MODEL", "OPENAI_API_KEY"),
+                        note="Also accepts RESEARCH_MODEL_PROVIDER=openai with RESEARCH_MODEL."),
         _model_provider("compatible", "OpenAI-compatible endpoint (e.g. local Ollama)", 0,
-                        ("OPENAI_BASE_URL", "RESEARCH_MODEL", "OPENAI_API_KEY")),
+                        ("COMPATIBLE_BASE_URL", "COMPATIBLE_MODEL", "COMPATIBLE_API_KEY"),
+                        note="Also accepts OPENAI_BASE_URL, RESEARCH_MODEL and OPENAI_API_KEY."),
+        *_custom_source_providers(),
     ]
 
 
@@ -122,7 +164,7 @@ def _missing(provider: Provider) -> list[str]:
     return provider.missing() if provider.missing else _unset(provider.env)
 
 
-def status(checks: dict[str, dict]) -> list[dict]:
+def status(checks: dict[str, dict], default_llm: str | None = None) -> list[dict]:
     """One entry per kind: its providers in priority order and which one is active (the first configured)."""
     kinds = {kind: {"kind": kind, "label": label, "purpose": purpose, "active": None, "providers": []}
              for kind, (label, purpose) in KINDS.items()}
@@ -138,10 +180,22 @@ def status(checks: dict[str, dict]) -> list[dict]:
         kind = kinds[provider.kind]
         if configured and kind["active"] is None:
             kind["active"] = provider.name
-        kind["providers"].append({
+        entry = {
             "name": provider.name, "label": provider.label, "tier": provider.tier, "env": list(provider.env),
-            "configured": configured, "missing_env": [] if configured else _missing(provider), "problem": None if configured else provider.problem(),
-            "status": state, "last_check": last, "can_check": provider.check is not None, "note": provider.note or None})
+            "configured": configured, "missing_env": [] if configured else _missing(provider),
+            "problem": None if configured else provider.problem(),
+            "status": state, "last_check": last, "can_check": provider.check is not None, "note": provider.note or None,
+        }
+        if provider.source_id is not None:
+            entry["source_id"] = provider.source_id
+        if provider.model:
+            entry["model"] = provider.model
+        kind["providers"].append(entry)
+    if default_llm and (llm_kind := kinds.get("llm")):
+        match = next((p for p in llm_kind["providers"]
+                      if p["configured"] and (p["name"] == default_llm or p.get("source_id") == default_llm)), None)
+        if match:
+            llm_kind["active"] = match["name"]
     return [kind for kind in kinds.values() if kind["providers"]]
 
 

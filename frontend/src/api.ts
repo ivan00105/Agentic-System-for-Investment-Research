@@ -1,6 +1,7 @@
 export type View = 'research' | 'history' | 'setup'
 // /api/config: the configured model, which Advanced options shows as the default.
-export interface Config { model: string | null; model_configured: boolean }
+export interface ModelSource { id: string; label: string; provider: string; model: string; configured: boolean }
+export interface Config { model: string | null; model_configured: boolean; default_model_source?: string | null; default_agent_models?: Record<string, string>; model_sources?: ModelSource[] }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -44,7 +45,7 @@ export interface DiscoverResult { spec: string[] | null; counts: Record<string, 
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
 export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; outlook?: OutlookRecord[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; model_source?: string; agent_models?: Record<string, string>; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
@@ -67,12 +68,14 @@ export const outlookApi = {
 }
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
-export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null }
+export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null; source_id?: string | null; model?: string | null }
 export interface DataKind { kind: string; label: string; purpose: string; active: string | null; providers: ProviderStatus[] }
 export const setupApi = {
   status: () => request<{kinds: DataKind[]}>('/status'),
   // No browser timeout: a model check can take a while, and the provider's own timeout ends it.
   check: (name: string) => request<{kinds: DataKind[]}>(`/status/${encodeURIComponent(name)}/check`, {...post({}), signal: new AbortController().signal}),
+  saveModelPreferences: (body: {default_source?: string | null; agent_models?: Record<string, string>}) =>
+    request<Config & {kinds: DataKind[]}>('/config/models', post(body)),
 }
 export const agentRunning = (status: string) => status === 'running' || status === 'stopping' || status === 'waiting'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.

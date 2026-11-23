@@ -40,7 +40,9 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
   const [guided, setGuided] = useState(level === 'beginner' && !initial?.length)
   const [note, setNote] = useState('') // the preferences note "Guide me" wrote; the user can edit it
   const [sector, setSector] = useState('') // the sector Guide me chose, e.g. "in health care"
-  const [options, setOptions] = useState<Options>({condition: '', model: '', editSpec: level === 'professional', cutoff: ''})
+  const [options, setOptions] = useState<Options>({condition: '', model: '', modelSource: '', agentModels: {}, editSpec: level === 'professional', cutoff: ''})
+  const [savedDefaults, setSavedDefaults] = useState<{modelSource: string; agentModels: Record<string, string>}>({modelSource: 'default', agentModels: {}})
+  const [optionsEdited, setOptionsEdited] = useState(false)
   useEffect(() => setOptions(o => ({...o, editSpec: level === 'professional'})), [level])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -78,8 +80,10 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
     event.preventDefault()
     if (busy || !question.trim()) return
     if (find && among === 'mine' && !companies.length) { setError('Pick at least one company for your own list, or choose a bundled list.'); return }
-    const {condition, model, editSpec, cutoff} = options
-    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(note.trim() && {preferences: note.trim()}), ...(link && !find && {parent_run_id: link}),
+    const {condition, model, modelSource, agentModels, editSpec, cutoff} = options
+    const routed = Object.fromEntries(Object.entries(agentModels).filter(([role, source]) => Boolean(source) || role in savedDefaults.agentModels))
+    const sendSource = modelSource && modelSource !== savedDefaults.modelSource ? modelSource : undefined
+    const body: StartAgentRun = {question, ...(condition && {condition}), ...(model.trim() && {model: model.trim()}), ...(sendSource && {model_source: sendSource}), ...(Object.keys(routed).length && {agent_models: routed}), ...(note.trim() && {preferences: note.trim()}), ...(link && !find && {parent_run_id: link}),
       ...(find ? {discover: among === 'mine' ? {tickers: companies.map(c => c.tickers[0])} : {name: among}, ...(topK && {top_k: topK}), ...(editSpec && {edit_spec: true})} : cutoff ? {cutoff} : {})}
     setBusy(true); setError('')
     try { onStarted((await agentApi.start(body)).run_id) }
@@ -105,7 +109,7 @@ export function QuestionBox({onStarted, initial, parent}: {onStarted: (id: strin
       {note && <div className="preferences-note"><label>Your preferences (the agents read this note)<textarea rows={4} value={note} onChange={e => setNote(e.target.value)} /></label>
         <button type="button" className="text-button" onClick={() => setNote('')}>Remove the note</button></div>}
       {edited && built && built !== question && <button type="button" className="text-button" onClick={() => { setQuestion(built); setEdited(false) }}>Use the question built from your choices</button>}
-      <AdvancedOptions find={find} options={options} onChange={next => setOptions(o => ({...o, ...next}))} />
+      <AdvancedOptions find={find} options={options} onChange={next => { setOptionsEdited(true); setOptions(o => ({...o, ...next})) }} onDefaults={d => { setSavedDefaults(d); if (!optionsEdited) setOptions(o => ({...o, modelSource: d.modelSource, agentModels: d.agentModels})) }} />
       <div className="submit-row"><button className="primary" disabled={busy || !question.trim()}>{busy ? 'Starting…' : find ? 'Find companies →' : 'Research this question →'}</button>
         {willScreen && <span className="will-screen" role="status">{willScreen}</span>}</div>
     </form>

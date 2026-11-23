@@ -11,10 +11,12 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import agent_api, companies_api
 from .application import Application
-from .contracts import DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
+from .contracts import ConnectionInfo, DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
 from .data import providers
 from .data.errors import DataError
 from .fixtures import FIXTURE_CUTOFF, seed
+from .model_access import load_model_settings, load_model_sources
+from .model_prefs import active_preferences, effective_model_settings, save_model_preferences
 from .outlook_scheduler import OutlookScheduler
 from .store import Store
 
@@ -70,6 +72,7 @@ def create_app(data_dir: Path | None = None):
                 app.state.agent_runs.stop_all()
 
     app = FastAPI(title="Fieldnote Research", version="0.1.0", lifespan=lifespan)
+    app.state.data_dir = root
     app.state.provider_checks = {}  # last live check per provider, for this server's lifetime
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])
 
@@ -100,10 +103,49 @@ def create_app(data_dir: Path | None = None):
         messages = [f"{'.'.join(str(x) for x in e['loc'])}: {e['msg']}" for e in exc.errors()]
         return JSONResponse({"error": {"code": "validation", "message": " ".join(messages)}}, status_code=422)
 
+    def _config_payload():
+        connections = app.state.application.connections()
+        prefs = active_preferences(app.state.data_dir)
+        effective = effective_model_settings(app.state.data_dir)
+        sources = load_model_sources()
+        default_source = prefs["default_source"] or "default"
+        if prefs["default_source"]:
+            connections = {**connections, "model": ConnectionInfo(
+                configured=effective.configured, provider=effective.label, model=effective.model,
+                configuration_error=effective.error, check=connections["model"].check,
+            )}
+        model_configured = effective.configured or any(s.configured for s in sources)
+        return {
+            "companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()],
+            "fixture_cutoff": FIXTURE_CUTOFF.isoformat(),
+            "sec_configured": connections["sec"].configured,
+            "model_configured": model_configured,
+            "model": effective.model,
+            "default_model_source": default_source,
+            "default_agent_models": prefs["agent_models"],
+            "model_sources": [
+                {"id": s.id, "label": s.label, "provider": s.provider, "model": s.model, "configured": s.configured}
+                for s in sources
+            ],
+            "forecast_available": False,
+            "connections": connections,
+        }
+
+    def _active_llm() -> str | None:
+        prefs = active_preferences(app.state.data_dir)
+        if prefs["default_source"]:
+            return prefs["default_source"]
+        primary = load_model_settings()
+        return primary.provider if primary.configured else None
+
     @app.get("/api/config")
     def config():
-        connections = app.state.application.connections()
-        return {"companies": [{"ticker": k, **v} for k, v in UNIVERSE.items()], "fixture_cutoff": FIXTURE_CUTOFF.isoformat(), "sec_configured": connections["sec"].configured, "model_configured": connections["model"].configured, "model": connections["model"].model, "forecast_available": False, "connections": connections}
+        return _config_payload()
+
+    @app.post("/api/config/models")
+    def save_models(body: agent_api.ModelPreferences):
+        save_model_preferences(app.state.data_dir, body.default_source, body.agent_models)
+        return {**_config_payload(), "kinds": providers.status(app.state.provider_checks, default_llm=_active_llm())}
 
     @app.get("/api/outlook-log")
     def outlook_log():
@@ -113,7 +155,7 @@ def create_app(data_dir: Path | None = None):
     @app.get("/api/status")
     def data_status():
         """Every data provider by kind: tier, which settings are set (never their values), and the last check."""
-        return {"kinds": providers.status(app.state.provider_checks)}
+        return {"kinds": providers.status(app.state.provider_checks, default_llm=_active_llm())}
 
     @app.post("/api/status/{name}/check")
     def check_provider(name: str):
@@ -124,7 +166,7 @@ def create_app(data_dir: Path | None = None):
         except DataError as exc:
             raise DomainError(str(exc), exc.code, 409) from None
         app.state.provider_checks[name] = {**result, "checked_at": utcnow().isoformat()}
-        return {"kinds": providers.status(app.state.provider_checks)}
+        return {"kinds": providers.status(app.state.provider_checks, default_llm=_active_llm())}
 
     app.include_router(agent_api.router)
     app.include_router(companies_api.router)
