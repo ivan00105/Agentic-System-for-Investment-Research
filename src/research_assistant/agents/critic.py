@@ -93,9 +93,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     trace, ledger = trace or Trace.new(trace_dir, echo), ClaimLedger()
     desk = Desk(question, client, settings, trace, ledger, max_steps)
     critic = Critic(question, client, settings, context, trace, ledger, desk, max_steps, critic_rounds)
-    return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
-                    extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
-                    self_review_passes=self_review_passes, review=critic.review)
+    try:
+        return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
+                        extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
+                        self_review_passes=self_review_passes, review=critic.review)
+    finally:
+        critic.close()
+        desk.close()
 
 
 @dataclass
@@ -131,10 +135,16 @@ class Critic:
     def __init__(self, question: str, client, settings: ModelSettings, context: ToolContext, trace: Trace,
                  ledger: ClaimLedger, desk: Desk, max_steps: int, rounds: int):
         critic_client, critic_settings = client_for_role(client, settings, CRITIC.name)
+        self._base_client = client
         self.question, self.client, self.model, self.context = question, critic_client, critic_settings.model, context
+        self.provider = critic_settings.provider
         self.trace, self.ledger, self.desk, self.max_steps, self.rounds = trace, ledger, desk, max_steps, rounds
         self.kwargs = critic_settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
         self.raised: list[Raised] = []
+
+    def close(self):
+        if self.client is not self._base_client and hasattr(self.client, "close"):
+            self.client.close()
 
     def review(self, work: Work) -> None:
         """Review, revise, review again, until no material objection is open (or the guard). Changes `work`."""
@@ -167,7 +177,7 @@ class Critic:
         messages = [{"role": "system", "content": prompts.role(CRITIC.name, cutoff, issues=issue_list())},
                     {"role": "user", "content": self._brief(work.report, n)}]
         with self.trace.acting_as(CRITIC.name):
-            self.trace.write("critic_start", round=n)
+            self.trace.write("critic_start", round=n, provider=self.provider, model=self.model)
             result = run_loop(self.client, self.model, self.kwargs, messages, self.context, SUBMIT_OBJECTIONS,
                               self.trace, tool_names=CRITIC.tools, max_steps=self.max_steps)
             if result.output is None:

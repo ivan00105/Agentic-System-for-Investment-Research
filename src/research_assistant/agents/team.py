@@ -41,9 +41,12 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     """`trace` is one the host made already, so it knows the run ID before the run starts (the web app)."""
     trace, ledger = trace or Trace.new(trace_dir, echo), ClaimLedger()
     desk = Desk(question, client, settings, trace, ledger, max_steps)
-    return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
-                    extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
-                    self_review_passes=self_review_passes)
+    try:
+        return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
+                        extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
+                        self_review_passes=self_review_passes)
+    finally:
+        desk.close()
 
 
 class Desk:
@@ -58,6 +61,24 @@ class Desk:
         self.conversations: dict[str, list[dict]] = {}
         self.log: list[str] = []  # one line per request, for the report's "Who did what"
         self.asked: list[str] = []  # the role asked, per request, so the critic's routing can be checked
+        self._clients: dict[tuple, object] = {}
+
+    def _client_for(self, role_name: str):
+        routed = self.base_settings.for_role(role_name)
+        key = (routed.provider, routed.base_url, routed.api_key, routed.model)
+        base_key = (self.base_settings.provider, self.base_settings.base_url,
+                    self.base_settings.api_key, self.base_settings.model)
+        if key == base_key:
+            return self.base_client, routed
+        if key not in self._clients:
+            self._clients[key], _ = client_for_role(self.base_client, self.base_settings, role_name)
+        return self._clients[key], routed
+
+    def close(self):
+        for client in self._clients.values():
+            if client is not self.base_client and hasattr(client, "close"):
+                client.close()
+        self._clients.clear()
 
     def tools(self) -> tuple[Tool, ...]:
         return tuple(Tool(f"ask_{role.name}", f"Ask the {role.title} analyst. {role.brief} Its tools: "
@@ -67,7 +88,7 @@ class Desk:
 
     def ask(self, role: Role, args: AnalystTask, context: ToolContext) -> ToolResult:
         follow_up = role.name in self.conversations
-        role_client, role_settings = client_for_role(self.base_client, self.base_settings, role.name)
+        role_client, role_settings = self._client_for(role.name)
         model, kwargs = role_settings.model, role_settings.agent_kwargs()
         self.asked.append(role.name)
         if follow_up:
@@ -83,7 +104,8 @@ class Desk:
                 {"role": "user", "content": f"The user's question: {self.question}\n\n"
                                             f"Your task from the coordinator:\n{args.task}"}]
         with self.trace.acting_as(role.name):
-            self.trace.write("analyst_start", task=args.task, follow_up=follow_up)
+            self.trace.write("analyst_start", task=args.task, follow_up=follow_up,
+                             provider=role_settings.provider, model=role_settings.model)
             result = run_loop(role_client, model, kwargs, messages, context, SUBMIT_FINDINGS, self.trace,
                               tool_names=role.tools, max_steps=self.max_steps)
             findings = result.output or Findings()

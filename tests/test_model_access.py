@@ -10,14 +10,15 @@ from openai import (
 )
 
 from research_assistant import config
-from research_assistant.model_access import (decoding_record, load_model_settings, load_model_sources,
-                                             resolve_model_source, safe_model_error)
+from research_assistant.model_access import (client_for_role, decoding_record, load_model_settings, load_model_sources,
+                                             load_provider_settings, resolve_model_source, safe_model_error)
 
 
 @pytest.fixture(autouse=True)
 def isolated_config(monkeypatch):
-    for name in ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENAI_API_KEY",
-                 "OPENROUTER_API_KEY", "OPENAI_BASE_URL", "RESEARCH_MODEL_SOURCES"):
+    for name in ("RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "OPENAI_API_KEY", "OPENAI_MODEL",
+                 "OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENAI_BASE_URL",
+                 "COMPATIBLE_BASE_URL", "COMPATIBLE_MODEL", "COMPATIBLE_API_KEY", "RESEARCH_MODEL_SOURCES"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -80,6 +81,50 @@ def test_multiple_model_sources_and_role_routing(monkeypatch):
     settings = load_model_settings().with_routes({"fundamentals": "openai-fast", "filings": "default"})
     assert settings.for_role("fundamentals").model == "gpt-fast"
     assert settings.for_role("filings").model == "primary/model"
+
+
+def test_multiple_builtin_providers_configured_together_without_json(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "deepseek/deepseek-v4.1-flash")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("COMPATIBLE_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("COMPATIBLE_MODEL", "qwen3:8b")
+    monkeypatch.setenv("COMPATIBLE_API_KEY", "ollama")
+
+    assert load_provider_settings("openrouter").configured
+    assert load_provider_settings("openai").configured
+    assert load_provider_settings("compatible").configured
+    sources = load_model_sources()
+    assert [s.id for s in sources] == ["default", "openrouter", "compatible"]
+    assert resolve_model_source("openrouter").model == "deepseek/deepseek-v4.1-flash"
+    assert resolve_model_source("compatible").base_url == "http://localhost:11434/v1"
+    assert resolve_model_source("openai").model == "gpt-5-mini"
+
+    seen_clients = []
+    settings = load_model_settings().with_routes({"fundamentals": "openrouter", "critic": "compatible"})
+    from dataclasses import replace
+    settings = replace(settings, client_factory=lambda s: seen_clients.append((s.provider, s.model, s.base_url)) or object())
+    base_client = object()
+    c_coord, s_coord = client_for_role(base_client, settings, "coordinator")
+    c_fund, s_fund = client_for_role(base_client, settings, "fundamentals")
+    c_critic, s_critic = client_for_role(base_client, settings, "critic")
+    assert c_coord is base_client and s_coord.provider == "openai"
+    assert c_fund is not base_client and s_fund.provider == "openrouter"
+    assert c_critic is not base_client and s_critic.provider == "compatible"
+    assert seen_clients == [
+        ("openrouter", "deepseek/deepseek-v4.1-flash", "https://openrouter.ai/api/v1"),
+        ("compatible", "qwen3:8b", "http://localhost:11434/v1"),
+    ]
+
+
+def test_openrouter_source_in_json_rejects_auto_and_online(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-key")
+    monkeypatch.setenv("RESEARCH_MODEL_SOURCES",
+                       '[{"id":"bad-auto","label":"Auto","provider":"openrouter","model":"openrouter/auto"}]')
+    sources = {s.id: s for s in load_model_sources()}
+    assert not sources["bad-auto"].configured
+    assert "automatic routing" in (sources["bad-auto"].error or "")
 
 
 def test_agents_send_only_the_decoding_settings_config_pins(monkeypatch):

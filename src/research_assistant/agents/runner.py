@@ -65,17 +65,22 @@ def research(question: str, client, settings: ModelSettings, context: ToolContex
     (condition D's critic)."""
     ledger = ledger or ClaimLedger()
     role_client, role_settings = client_for_role(client, settings, lead.name)
+    extra_start = {"role_routes": dict(settings.role_routes)} if settings.role_routes else {}
     trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), historical=context.historical,
                 condition=condition, lead=lead.name, provider=role_settings.provider, model=role_settings.model,
-                decoding=decoding_record(), max_steps=max_steps)
-    with trace.acting_as(lead.name):
-        work = _work(question, role_client, role_settings, context, lead, trace, ledger, extra_tools, max_steps,
-                     self_review_passes)
-        if review and work.draft is not None and work.status not in ("failed", "stopped"):
-            review(work)
-    if context.stop.is_set():  # cancelled: what got done is the partial result, never an error
-        work.status = "stopped"
-    return close(trace, question, role_settings, context, ledger, work, condition, team)
+                decoding=decoding_record(), max_steps=max_steps, **extra_start)
+    try:
+        with trace.acting_as(lead.name):
+            work = _work(question, role_client, role_settings, context, lead, trace, ledger, extra_tools, max_steps,
+                         self_review_passes)
+            if review and work.draft is not None and work.status not in ("failed", "stopped"):
+                review(work)
+        if context.stop.is_set():  # cancelled: what got done is the partial result, never an error
+            work.status = "stopped"
+        return close(trace, question, role_settings, context, ledger, work, condition, team)
+    finally:
+        if role_client is not client and hasattr(role_client, "close"):
+            role_client.close()
 
 
 def _work(question, client, settings, context, lead, trace, ledger, extra_tools, max_steps, passes) -> Work:

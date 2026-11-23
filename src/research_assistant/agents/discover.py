@@ -63,16 +63,20 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, un
     (discover_spec.interpret). `top_k` is a count the user set apart from the question; it replaces the spec's."""
     trace = trace or Trace.new(trace_dir, echo)
     screener_client, screener_settings = client_for_role(client, settings, "screener")
-    trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=f"Discover ({condition})",
-                lead="screener", provider=screener_settings.provider, model=screener_settings.model, decoding=decoding_record(),
-                universe=universe.name, replacements=replacements)
-    with trace.acting_as("screener"):
-        found = interpret(question, universe, screener_client, screener_settings, context, trace, ask=ask, defined=defined,
-                          edit=edit, review=review, top_k=top_k, on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
-                              "questions", terms=[t.model_dump() for t in terms], shown=spec_lines(
-                                  draft, dict.fromkeys((t.term for t in terms), "proposed"), universe,
-                                  draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition),
-                              spec=draft.model_dump(mode="json")))
+    try:
+        trace.write("run_start", question=question, cutoff=context.cutoff.isoformat(), condition=f"Discover ({condition})",
+                    lead="screener", provider=screener_settings.provider, model=screener_settings.model,
+                    decoding=decoding_record(), universe=universe.name, replacements=replacements)
+        with trace.acting_as("screener"):
+            found = interpret(question, universe, screener_client, screener_settings, context, trace, ask=ask, defined=defined,
+                              edit=edit, review=review, top_k=top_k, on_questions=lambda draft, terms: trace.write(  # shown before the user is asked
+                                  "questions", terms=[t.model_dump() for t in terms], shown=spec_lines(
+                                      draft, dict.fromkeys((t.term for t in terms), "proposed"), universe,
+                                      draft.top_k or config.DISCOVER_DEFAULT_TOP_K, condition),
+                                  spec=draft.model_dump(mode="json")))
+    finally:
+        if screener_client is not client and hasattr(screener_client, "close"):
+            screener_client.close()
     if found.spec is None or context.stop.is_set():  # cancelled, perhaps while the user was asked: nothing is screened
         return _close(trace, question, settings, context, universe, found, condition, [], {}, [],
                       None if context.stop.is_set() else found.error)

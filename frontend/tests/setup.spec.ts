@@ -50,7 +50,7 @@ test('with no keys, every kind of data has a card that names the variables to se
   await expect(prices.getByText('Active: Yahoo Finance (yfinance)', {exact: true})).toBeVisible()
   await expect(row(prices, 'Yahoo Finance (yfinance)').getByText('Ready (no key needed)', {exact: true})).toBeVisible()
   await expect(row(prices, 'Tiingo').locator('.provider-missing')).toContainText('TIINGO_API_KEY')
-  await expect(row(card(page, 'Model'), 'OpenRouter').locator('.provider-missing')).toContainText('RESEARCH_MODEL_PROVIDER=openrouter')
+  await expect(row(card(page, 'Model'), 'OpenRouter').locator('.provider-missing')).toContainText('OPENROUTER_API_KEY')
 
   // Sources that aren't built are only named behind one collapsed line, with a link to the catalogue.
   const others = page.locator('details').filter({hasText: 'Other sources we know about (not built)'})
@@ -142,4 +142,68 @@ test('a status outage shows an error with a retry, never stale cards', async ({p
   await page.getByRole('button', {name: 'Retry connection'}).click()
   await expect(card(page, 'Model')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
+test('multiple model providers can be chosen as default and per-agent in Setup and Advanced options', async ({page}) => {
+  const sources = [
+    {id: 'default', label: 'OpenRouter', provider: 'openrouter', model: 'deepseek/flash', configured: true},
+    {id: 'openai', label: 'OpenAI', provider: 'openai', model: 'gpt-5-mini', configured: true},
+  ]
+  const multiKinds = (activeName = 'openrouter') => [
+    {kind: 'llm', label: 'Model', purpose: 'The language model that writes the report.', active: activeName, providers: [
+      {name: 'openrouter', source_id: 'default', label: 'OpenRouter', tier: 2, env: ['OPENROUTER_MODEL', 'OPENROUTER_API_KEY'], configured: true, missing_env: [], problem: null, status: 'configured', last_check: null, can_check: true, model: 'deepseek/flash'},
+      {name: 'openai', source_id: 'openai', label: 'OpenAI', tier: 2, env: ['OPENAI_MODEL', 'OPENAI_API_KEY'], configured: true, missing_env: [], problem: null, status: 'configured', last_check: null, can_check: true, model: 'gpt-5-mini'},
+    ]},
+  ]
+  let savedPrefs: Record<string, unknown> | null = null
+  let defaultSource = 'default'
+  let agentModels: Record<string, string> = {}
+  await page.route('**/api/status', route => route.fulfill({json: {kinds: multiKinds(defaultSource === 'openai' ? 'openai' : 'openrouter')}}))
+  await page.route('**/api/config', route => route.fulfill({json: {
+    model: defaultSource === 'openai' ? 'gpt-5-mini' : 'deepseek/flash',
+    model_configured: true,
+    default_model_source: defaultSource,
+    default_agent_models: agentModels,
+    model_sources: sources,
+  }}))
+  await page.route('**/api/config/models', route => {
+    savedPrefs = route.request().postDataJSON()
+    if (typeof savedPrefs?.default_source === 'string') defaultSource = savedPrefs.default_source
+    if (savedPrefs?.agent_models && typeof savedPrefs.agent_models === 'object') {
+      agentModels = Object.fromEntries(Object.entries(savedPrefs.agent_models as Record<string, string>).filter(([, v]) => Boolean(v)))
+    }
+    return route.fulfill({json: {
+      model: defaultSource === 'openai' ? 'gpt-5-mini' : 'deepseek/flash',
+      model_configured: true,
+      default_model_source: defaultSource,
+      default_agent_models: agentModels,
+      model_sources: sources,
+      kinds: multiKinds(defaultSource === 'openai' ? 'openai' : 'openrouter'),
+    }})
+  })
+
+  await page.goto('/?view=setup')
+  const modelCard = card(page, 'Model')
+  await expect(modelCard.getByText('Active: OpenRouter', {exact: true})).toBeVisible()
+  await row(modelCard, 'OpenAI').getByRole('button', {name: 'Set as default'}).click()
+  await expect.poll(() => savedPrefs).toEqual({default_source: 'openai'})
+  await expect(modelCard.getByText('Active: OpenAI', {exact: true})).toBeVisible()
+  await modelCard.getByLabel('Fundamentals analyst').selectOption('default')
+  await modelCard.getByRole('button', {name: 'Save agent defaults'}).click()
+  await expect.poll(() => agentModels).toEqual({fundamentals: 'default'})
+
+  let startedBody: Record<string, unknown> = {}
+  await page.route('**/api/agent-runs', route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    startedBody = route.request().postDataJSON()
+    return route.fulfill({status: 202, json: {run_id: '20261105-090000-abc123', status: 'running'}})
+  })
+  await page.goto('/')
+  await page.getByLabel('Detail level').selectOption('professional')
+  await expect(page.getByLabel('Default model source')).toHaveValue('openai')
+  await expect(page.getByLabel('Fundamentals analyst')).toHaveValue('default')
+  await page.getByLabel('Critic').selectOption('default')
+  await page.getByRole('button', {name: 'How profitable is Microsoft, and is its operating margin rising?'}).click()
+  await page.getByRole('button', {name: 'Research this question →'}).click()
+  await expect.poll(() => startedBody.agent_models).toEqual({fundamentals: 'default', critic: 'default'})
 })

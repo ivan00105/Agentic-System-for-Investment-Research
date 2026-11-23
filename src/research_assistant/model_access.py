@@ -3,8 +3,8 @@
 import ipaddress
 import json
 import os
-from dataclasses import dataclass, field
-from typing import Literal
+from dataclasses import dataclass, field, replace
+from typing import Callable, Literal
 from urllib.parse import urlsplit
 
 from openai import (
@@ -23,6 +23,8 @@ from openai import (
 
 from . import config
 from .contracts import DomainError
+
+BUILTIN_PROVIDERS = ("openrouter", "openai", "compatible")
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,7 @@ class ModelSettings:
     source_id: str = "default"
     sources: tuple["ModelSource", ...] = ()
     role_routes: dict[str, str] = field(default_factory=dict, repr=False)
+    client_factory: Callable | None = field(default=None, repr=False, compare=False)
 
     @property
     def configured(self) -> bool:
@@ -86,8 +89,7 @@ class ModelSettings:
         }
 
     def with_routes(self, routes: dict[str, str] | None) -> "ModelSettings":
-        return ModelSettings(self.provider, self.label, self.model, self.api_key, self.base_url, self.error,
-                             self.source_id, self.sources, dict(routes or {}))
+        return replace(self, role_routes=dict(routes or {}))
 
     def for_role(self, role: str) -> "ModelSettings":
         source_id = self.role_routes.get(role)
@@ -136,35 +138,75 @@ def _valid_endpoint(value: str) -> bool:
         return False
 
 
-def load_model_settings() -> ModelSettings:
-    provider = (_setting("RESEARCH_MODEL_PROVIDER") or "openai").lower()
-    model = _setting("RESEARCH_MODEL")
-    custom_url = _setting("OPENAI_BASE_URL")
-    if provider not in {"openai", "openrouter", "compatible"}:
-        return ModelSettings("openai", "Model access", model, None, None,
-                             "RESEARCH_MODEL_PROVIDER must be openai, openrouter or compatible.")
+def _validate_openrouter_model(model: str | None) -> str | None:
+    if model and (
+        model.lower().split(":", 1)[0] in {"openrouter/auto", "openrouter/free"}
+        or "online" in model.lower().split(":")[1:]
+    ):
+        return "Choose an explicit OpenRouter model without automatic routing or online search."
+    return None
+
+
+def load_provider_settings(provider: Literal["openai", "openrouter", "compatible"]) -> ModelSettings:
+    """Settings for one built-in provider, so multiple providers can be configured in .env together."""
+    explicit = (_setting("RESEARCH_MODEL_PROVIDER") or "").lower() or None
+    research_model = _setting("RESEARCH_MODEL")
+    openai_base_url = _setting("OPENAI_BASE_URL")
     if provider == "openrouter":
+        model = (research_model if explicit == "openrouter" else None) or _setting("OPENROUTER_MODEL")
         error = None
-        if custom_url:
+        if explicit == "openrouter" and openai_base_url:
             error = "Remove OPENAI_BASE_URL when selecting OpenRouter; its endpoint is fixed."
-        elif model and (
-            model.lower().split(":", 1)[0] in {"openrouter/auto", "openrouter/free"}
-            or "online" in model.lower().split(":")[1:]
-        ):
-            error = "Choose an explicit OpenRouter model without automatic routing or online search."
-        return ModelSettings("openrouter", "OpenRouter", model,
-                             _setting("OPENROUTER_API_KEY"), "https://openrouter.ai/api/v1", error)
-    if custom_url or provider == "compatible":
+        else:
+            error = _validate_openrouter_model(model)
+        return ModelSettings("openrouter", "OpenRouter", model, _setting("OPENROUTER_API_KEY"),
+                             "https://openrouter.ai/api/v1", error, "openrouter")
+    if provider == "compatible":
+        compat_url = _setting("COMPATIBLE_BASE_URL")
+        legacy_url = openai_base_url if explicit != "openrouter" else None
+        custom_url = compat_url or legacy_url
+        model = (research_model if (explicit == "compatible" or legacy_url) else None) or _setting("COMPATIBLE_MODEL")
+        api_key = _setting("COMPATIBLE_API_KEY") or _setting("OPENAI_API_KEY")
         error = None
         if not custom_url:
-            error = "Set OPENAI_BASE_URL for the compatible provider."
+            error = "Set COMPATIBLE_BASE_URL or OPENAI_BASE_URL for the compatible provider."
         elif not _valid_endpoint(custom_url):
-            error = "OPENAI_BASE_URL must use HTTPS (or loopback HTTP) without credentials, query or fragment."
-        return ModelSettings("compatible", "OpenAI-compatible", model,
+            name = "COMPATIBLE_BASE_URL" if compat_url else "OPENAI_BASE_URL"
+            error = f"{name} must use HTTPS (or loopback HTTP) without credentials, query or fragment."
+        return ModelSettings("compatible", "OpenAI-compatible", model, api_key, custom_url, error, "compatible")
+    model = (research_model if (explicit in (None, "openai") and not openai_base_url) else None) or _setting("OPENAI_MODEL")
+    return ModelSettings("openai", "OpenAI", model, _setting("OPENAI_API_KEY"),
+                         "https://api.openai.com/v1", None, "openai")
+
+
+def load_model_settings() -> ModelSettings:
+    explicit = _setting("RESEARCH_MODEL_PROVIDER")
+    model = _setting("RESEARCH_MODEL")
+    custom_url = _setting("OPENAI_BASE_URL")
+    if explicit:
+        provider = explicit.lower()
+        if provider not in BUILTIN_PROVIDERS:
+            return ModelSettings("openai", "Model access", model, None, None,
+                                 "RESEARCH_MODEL_PROVIDER must be openai, openrouter or compatible.")
+        if provider == "openai" and custom_url:
+            error = None if _valid_endpoint(custom_url) else (
+                "OPENAI_BASE_URL must use HTTPS (or loopback HTTP) without credentials, query or fragment.")
+            return ModelSettings("compatible", "OpenAI-compatible", model or _setting("COMPATIBLE_MODEL"),
+                                 _setting("OPENAI_API_KEY"), custom_url, error)
+        return replace(load_provider_settings(provider), source_id="default")  # type: ignore[arg-type]
+    if custom_url:
+        error = None if _valid_endpoint(custom_url) else (
+            "OPENAI_BASE_URL must use HTTPS (or loopback HTTP) without credentials, query or fragment.")
+        return ModelSettings("compatible", "OpenAI-compatible", model or _setting("COMPATIBLE_MODEL"),
                              _setting("OPENAI_API_KEY"), custom_url, error)
-    settings = ModelSettings("openai", "OpenAI", model,
-                             _setting("OPENAI_API_KEY"), "https://api.openai.com/v1")
-    return settings
+    for name in ("openai", "openrouter", "compatible"):
+        candidate = load_provider_settings(name)  # type: ignore[arg-type]
+        if candidate.configured:
+            return replace(candidate, source_id="default")
+    for source in _custom_model_sources():
+        if source[0].configured:
+            return replace(source[1], source_id="default")
+    return replace(load_provider_settings("openai"), source_id="default")
 
 
 def _source_settings(entry: dict) -> tuple[ModelSource, ModelSettings]:
@@ -172,58 +214,71 @@ def _source_settings(entry: dict) -> tuple[ModelSource, ModelSettings]:
     label = str(entry.get("label", "")).strip()
     provider = str(entry.get("provider", "")).strip().lower()
     model = str(entry.get("model", "")).strip()
-    if not source_id or not label or provider not in {"openai", "openrouter", "compatible"} or not model:
+    if not source_id or not label or provider not in BUILTIN_PROVIDERS or not model:
         return (ModelSource(source_id or "invalid", label or "Invalid model source",
-                            provider if provider in {"openai", "openrouter", "compatible"} else "compatible",
+                            provider if provider in BUILTIN_PROVIDERS else "compatible",
                             model, False, "Each source needs id, label, provider and model."),
                 ModelSettings("compatible", "Invalid model source", model, None, None,
                               "Invalid model source.", source_id))
     key_env = str(entry.get("api_key_env", "")).strip()
     if not key_env:
-        key_env = "OPENROUTER_API_KEY" if provider == "openrouter" else "OPENAI_API_KEY"
+        key_env = "OPENROUTER_API_KEY" if provider == "openrouter" else (
+            "COMPATIBLE_API_KEY" if provider == "compatible" and _setting("COMPATIBLE_API_KEY") else "OPENAI_API_KEY")
     api_key = _setting(key_env)
-    custom_url = str(entry.get("base_url", "")).strip() or (_setting("OPENAI_BASE_URL") if provider == "compatible" else None)
+    custom_url = str(entry.get("base_url", "")).strip() or (
+        (_setting("COMPATIBLE_BASE_URL") or _setting("OPENAI_BASE_URL")) if provider == "compatible" else None)
     error = None
     if provider == "openrouter":
         base_url = "https://openrouter.ai/api/v1"
-        if custom_url:
-            error = "OpenRouter sources must not set base_url."
+        error = "OpenRouter sources must not set base_url." if custom_url else _validate_openrouter_model(model)
     elif provider == "compatible":
         base_url = custom_url
         if not base_url:
-            error = f"Set base_url or OPENAI_BASE_URL for source {source_id}."
+            error = f"Set base_url or COMPATIBLE_BASE_URL for source {source_id}."
         elif not _valid_endpoint(base_url):
             error = f"Source {source_id} has an invalid base_url."
     else:
         base_url = "https://api.openai.com/v1"
-    settings = ModelSettings(provider, label, model, api_key, base_url, error, source_id)
-    source = ModelSource(source_id, label, provider, model, settings.configured, error)
-    return source, settings
+    settings = ModelSettings(provider, label, model, api_key, base_url, error, source_id)  # type: ignore[arg-type]
+    return ModelSource(source_id, label, provider, model, settings.configured, error), settings  # type: ignore[arg-type]
 
 
-def load_model_sources() -> tuple[ModelSource, ...]:
-    """The primary setting and optional RESEARCH_MODEL_SOURCES are both usable model choices."""
-    primary = load_model_settings()
-    sources = [ModelSource("default", primary.label, primary.provider, primary.model or "",
-                           primary.configured, primary.error)]
+def _custom_model_sources() -> list[tuple[ModelSource, ModelSettings]]:
     raw = _setting("RESEARCH_MODEL_SOURCES")
     if not raw:
-        return tuple(sources)
+        return []
     try:
         entries = json.loads(raw)
     except json.JSONDecodeError:
-        sources.append(ModelSource("invalid", "Invalid model sources", "compatible", "", False,
-                                   "RESEARCH_MODEL_SOURCES must be a JSON array."))
-        return tuple(sources)
+        err = ModelSource("invalid", "Invalid model sources", "compatible", "", False,
+                          "RESEARCH_MODEL_SOURCES must be a JSON array.")
+        return [(err, ModelSettings("compatible", err.label, "", None, None, err.error, "invalid"))]
     if not isinstance(entries, list):
-        sources.append(ModelSource("invalid", "Invalid model sources", "compatible", "", False,
-                                   "RESEARCH_MODEL_SOURCES must be a JSON array."))
-        return tuple(sources)
+        err = ModelSource("invalid", "Invalid model sources", "compatible", "", False,
+                          "RESEARCH_MODEL_SOURCES must be a JSON array.")
+        return [(err, ModelSettings("compatible", err.label, "", None, None, err.error, "invalid"))]
+    return [_source_settings(entry) for entry in entries if isinstance(entry, dict)]
+
+
+def load_model_sources() -> tuple[ModelSource, ...]:
+    """The primary setting, other configured built-in providers and RESEARCH_MODEL_SOURCES are all usable choices."""
+    primary = load_model_settings()
+    sources = [ModelSource("default", primary.label, primary.provider, primary.model or "",
+                           primary.configured, primary.error)]
     seen = {"default"}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        source, _ = _source_settings(entry)
+    for name in BUILTIN_PROVIDERS:
+        candidate = load_provider_settings(name)  # type: ignore[arg-type]
+        same_as_primary = (
+            candidate.provider == primary.provider
+            and candidate.model == primary.model
+            and candidate.base_url == primary.base_url
+            and candidate.api_key == primary.api_key
+        )
+        if candidate.configured and not same_as_primary:
+            seen.add(name)
+            sources.append(ModelSource(name, candidate.label, candidate.provider, candidate.model or "",
+                                       candidate.configured, candidate.error))
+    for source, _ in _custom_model_sources():
         if source.id in seen:
             continue
         seen.add(source.id)
@@ -235,18 +290,12 @@ def resolve_model_source(source_id: str, fallback: ModelSettings | None = None) 
     primary = fallback or load_model_settings()
     if source_id == "default":
         return primary
-    raw = _setting("RESEARCH_MODEL_SOURCES")
-    if raw:
-        try:
-            entries = json.loads(raw)
-        except json.JSONDecodeError:
-            entries = []
-        if isinstance(entries, list):
-            for entry in entries:
-                if isinstance(entry, dict) and str(entry.get("id", "")).strip() == source_id:
-                    _, settings = _source_settings(entry)
-                    settings = settings.with_routes(primary.role_routes)
-                    return settings
+    if source_id in BUILTIN_PROVIDERS:
+        settings = load_provider_settings(source_id)  # type: ignore[arg-type]
+        return replace(settings, role_routes=primary.role_routes, client_factory=primary.client_factory)
+    for source, settings in _custom_model_sources():
+        if source.id == source_id:
+            return replace(settings, role_routes=primary.role_routes, client_factory=primary.client_factory)
     if fallback is not None:
         return fallback
     return load_model_settings()
@@ -254,12 +303,17 @@ def resolve_model_source(source_id: str, fallback: ModelSettings | None = None) 
 
 def make_model_client(settings: ModelSettings):
     """Create a provider-specific client for a routed role; cli.model_client remains the testable factory."""
+    if settings.client_factory is not None:
+        return settings.client_factory(settings)
     return OpenAI(**settings.client_kwargs, max_retries=config.AGENT_MODEL_RETRIES)
 
 
 def client_for_role(base_client, base_settings: ModelSettings, role: str):
     routed = base_settings.for_role(role)
-    if routed.source_id == base_settings.source_id and routed.provider == base_settings.provider and routed.model == base_settings.model:
+    if (routed.provider == base_settings.provider
+            and routed.base_url == base_settings.base_url
+            and routed.api_key == base_settings.api_key
+            and routed.model == base_settings.model):
         return base_client, routed
     return make_model_client(routed), routed
 
@@ -291,10 +345,10 @@ CHECK_TOOL = {"type": "function", "function": {
     "name": "confirm", "description": "Confirm that you can call tools.", "parameters": {"type": "object", "properties": {}}}}
 
 
-def check_model() -> str:
+def check_model(source_id: str | None = None) -> str:
     """One short request with one tool, sent the way agent runs send theirs: it proves the key, the model and
     tool calling. It costs a fraction of a cent, so the Setup page asks for no consent."""
-    settings = load_model_settings()
+    settings = resolve_model_source(source_id) if source_id else load_model_settings()
     try:
         with OpenAI(**settings.client_kwargs) as client:
             reply = client.chat.completions.create(

@@ -18,7 +18,7 @@ from .agents.trace import Trace
 from .contracts import DomainError
 from .data import universe as universes
 from .data.errors import DataError
-from .model_access import load_model_settings, load_model_sources
+from .model_prefs import effective_model_settings
 from .tools.result import ToolContext
 
 router = APIRouter(prefix="/api/agent-runs")
@@ -44,6 +44,8 @@ class StartRun(BaseModel):
     discover: Universe | None = None
     # Another model ID of the configured provider (Advanced options); empty: RESEARCH_MODEL.
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    # Optional default model source ID from /api/config.model_sources (overrides .env / saved default for this run).
+    model_source: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
     # Optional source ID for each agent role. Source IDs come from /api/config.model_sources.
     agent_models: dict[str, str] | None = None
     # Discover: wait for the user to check or edit the drafted spec, even when it has no vague terms.
@@ -54,6 +56,12 @@ class StartRun(BaseModel):
     preferences: str | None = None
     # The Discover run whose "Compare these" started this one; History nests it there.
     parent_run_id: Annotated[str, StringConstraints(pattern=saved.RUN_ID.pattern)] | None = None
+
+
+class ModelPreferences(BaseModel):
+    """Saved webapp defaults for the default model source and per-agent overrides."""
+    default_source: str | None = None
+    agent_models: dict[str, str] | None = None
 
 
 class RunPatch(BaseModel):
@@ -220,11 +228,18 @@ def runs(request: Request) -> AgentRuns:
 
 @router.post("", status_code=202)
 def start(body: StartRun, request: Request):
-    settings = load_model_settings()
+    settings = effective_model_settings(
+        runs(request).folder.parent,
+        default_source=body.model_source,
+        model=body.model,
+        agent_models=body.agent_models,
+    )
     if not settings.configured:  # degrade, never crash: say what to set
-        raise DomainError(settings.error or "Model access is not configured: set RESEARCH_MODEL_PROVIDER, "
-                          "RESEARCH_MODEL and the provider's API key in .env (see .env.example).",
+        raise DomainError(settings.error or "Model access is not configured: set OPENROUTER_API_KEY + OPENROUTER_MODEL, "
+                          "OPENAI_API_KEY + OPENAI_MODEL, or RESEARCH_MODEL_PROVIDER, RESEARCH_MODEL and the provider's "
+                          "API key in .env (see .env.example).",
                           "model_not_configured", 409)
+    settings = replace(settings, client_factory=cli.model_client)
     if body.discover and body.cutoff:  # REFERENCE §4 rule 9
         raise DomainError("Discover runs on current data only, so it takes no cutoff.", "discover_cutoff", 422)
     declared = None
@@ -237,21 +252,6 @@ def start(body: StartRun, request: Request):
             raise DomainError(str(exc), "bad_universe", 422) from exc
     condition = body.condition or (config.WEB_DISCOVER_CONDITION if declared else "D")
     cutoff = datetime.combine(body.cutoff, time.max, timezone.utc) if body.cutoff else None
-    settings = replace(settings, model=body.model) if body.model else settings
-    if body.agent_models:
-        allowed_roles = {"coordinator", "fundamentals", "filings", "market", "critic", "single_agent", "screener"}
-        unknown_roles = set(body.agent_models) - allowed_roles
-        if unknown_roles:
-            raise DomainError(f"Unknown agent role: {', '.join(sorted(unknown_roles))}.", "bad_agent_model", 422)
-        available = {source.id for source in load_model_sources()}
-        unknown_sources = set(body.agent_models.values()) - available
-        if unknown_sources:
-            raise DomainError(f"Unknown model source: {', '.join(sorted(unknown_sources))}.", "bad_model_source", 422)
-        settings = settings.with_routes(body.agent_models)
-        for role in body.agent_models:
-            routed = settings.for_role(role)
-            if not routed.configured:
-                raise DomainError(f"The model source for {role} is not configured.", "model_source_not_configured", 409)
     question = preferences.attach(body.question, body.preferences)
     return runs(request).view(runs(request).start(question, condition, settings, cutoff, declared,
                                                   body.edit_spec and declared is not None, body.top_k,
