@@ -195,10 +195,12 @@ def _close(trace, question, settings, context, universe, found, condition, ranke
     markdown = render(question=question, status=status, cutoff=context.cutoff.isoformat(), model=model,
                       run_id=trace.run_id, error=error, condition=condition, universe=universe, found=found,
                       top_k=top_k, counts=counts, candidates=ranked, records=context.records, notes=notes)
+    reached = [c for c in ranked if c.outcome != "not reached"]
+    not_reached = [c for c in ranked if c.outcome == "not reached"][:5]           
     trace.write("run_end", status=status, error=error, totals=totals, own_totals=dict(trace.totals),
                 by_agent=by_agent, counts=counts, terms=found.sources,
                 candidates=[{"rank": c.rank, "cik": c.cik, "name": c.name, "outcome": c.outcome,
                              "verdict": c.verdict and c.verdict.state, "run_id": c.run and c.run.run_id,
-                             "trace": c.run and str(c.run.trace_path)} for c in ranked if c.outcome != "not reached"],
+                             "trace": c.run and str(c.run.trace_path)} for c in [*reached, *not_reached]],
                 notes=notes, markdown=markdown)
     return DiscoverRun(trace.run_id, status, found, counts, ranked, markdown, trace.path, totals, error, notes)
