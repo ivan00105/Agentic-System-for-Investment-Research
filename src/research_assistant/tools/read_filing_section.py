@@ -15,7 +15,8 @@ ANNUAL_REPORTS = {"10-K", "20-F", "40-F"}
 class ReadSectionInput(BaseModel):
     cik: str = Field(pattern=r"^[0-9]{1,10}$", description="The company's CIK from find_company.")
     item: str = Field(min_length=1, max_length=10, description='Item number, e.g. "1A" (risk factors), "7" (MD&A), '
-                      '"7A"; on a 20-F "3" (risk factors are 3.D) or "5" (operating review).')
+                      '"7A"; on a 20-F "3" (risk factors are 3.D) or "5" (operating review); on an 8-K "2.02" '
+                      '(results).')
     accession: str | None = Field(None, pattern=r"^\d{10}-\d{2}-\d{6}$", description="A filing from list_filings; "
                                   "default: the latest annual report (10-K, 20-F or 40-F) before the cutoff.")
     part: str | None = Field(None, description='Part of a 10-Q ("I" or "II") when the item number repeats.')
