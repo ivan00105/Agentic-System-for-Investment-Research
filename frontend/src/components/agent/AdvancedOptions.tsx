@@ -53,7 +53,7 @@ export function AdvancedOptions({find, options, onChange, onDefaults}: {
     finally { setSaving(false) }
   }
   return <details className="agent-options" open={level === 'professional'}><summary>Advanced options</summary>
-    <label>Agents<select value={options.condition} onChange={e => onChange({condition: e.target.value as Condition | ''})}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{c} · {CONDITIONS[c]}</option>)}</select></label>
+    <label>Agents<select value={options.condition} onChange={e => onChange({condition: e.target.value as Condition | ''})}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{CONDITIONS[c]}</option>)}</select></label>
     <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is D: three analysts write the report and a critic checks it.'}</p>
     {configured.length > 1 && <label>Default model source<select value={options.modelSource || configured[0].id} onChange={e => { setSavedMsg(''); onChange({modelSource: e.target.value}) }}>
       {configured.map(source => <option key={source.id} value={source.id}>{source.label}: {source.model}</option>)}
