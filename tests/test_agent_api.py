@@ -17,7 +17,7 @@ MINOR_OBJECTION = {"id": "objection-1", "claim": "claim-1", "version": 1, "where
 def start(web, question="Who is Apple?", **body) -> str:
     response = web.post("/api/agent-runs", json={"question": question, **body})
     assert response.status_code == 202, response.text
-    assert response.json()["status"] in ("running", "finished")
+    assert response.json()["status"] in ("running", "finished", "failed")
     return response.json()["run_id"]
 
 
@@ -174,3 +174,43 @@ def test_the_note_splits_off_wherever_it_sits_in_a_question():
                                         "shortlist pick 1 of the 3 asked for.", "Comfort with price swings: low.")
     assert preferences.split("Who is Apple?") == ("Who is Apple?", None)
     assert preferences.attach("Who is Apple?", "  ") == "Who is Apple?"
+
+
+def test_webapp_can_select_default_and_per_agent_model_sources(web, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("COMPATIBLE_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("COMPATIBLE_MODEL", "qwen3:8b")
+    monkeypatch.setenv("COMPATIBLE_API_KEY", "ollama")
+
+    cfg = web.get("/api/config").json()
+    assert [s["id"] for s in cfg["model_sources"]] == ["default", "openai", "compatible"]
+
+    # Save webapp defaults (OpenAI as default, compatible for single_agent), then override per-run.
+    saved = web.post("/api/config/models", json={"default_source": "openai", "agent_models": {"single_agent": "compatible"}})
+    assert saved.status_code == 200
+    assert saved.json()["default_model_source"] == "openai"
+
+    seen = []
+
+    def tracking_client(settings):
+        seen.append((settings.source_id, settings.provider, settings.model))
+        return web.model
+
+    monkeypatch.setattr(cli, "model_client", tracking_client)
+
+    # Run 1: inherits saved defaults -> single_agent uses compatible (qwen3:8b).
+    web.model = FakeClient(reply("1. find_company"), FIND_APPLE, reply(tool_calls=[("submit_report", REPORT)]), resubmit)
+    run1 = wait(web, start(web, "Who is Apple?", condition="B"))
+    assert run1["status"] == "finished" and run1["model"] == "qwen3:8b"
+
+    # Run 2: per-run override switches default to openrouter ("default") and clears single_agent override.
+    web.model = FakeClient(reply("1. find_company"), FIND_APPLE, reply(tool_calls=[("submit_report", REPORT)]), resubmit)
+    run2 = wait(web, start(web, "Who is Apple?", condition="B", model_source="default", agent_models={"single_agent": ""}))
+    assert run2["status"] == "finished" and run2["model"] == "fake-model"
+    assert seen == [
+        ("openai", "openai", "gpt-5-mini"),
+        ("compatible", "compatible", "qwen3:8b"),
+        ("default", "openrouter", "fake-model"),
+    ]
+

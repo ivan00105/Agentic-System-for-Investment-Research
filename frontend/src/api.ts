@@ -1,6 +1,7 @@
 export type View = 'research' | 'history' | 'setup'
-// /api/config: the configured model and each mode's set-up, which Advanced options show as the defaults.
-export interface Config { model: string | null; model_configured: boolean; agents: {research: Condition; find: Condition} }
+// /api/config: the configured model, its sources and each mode's set-up, which Advanced options show as the defaults.
+export interface ModelSource { id: string; label: string; provider: string; model: string; configured: boolean }
+export interface Config { model: string | null; model_configured: boolean; agents: {research: Condition; find: Condition}; default_model_source?: string | null; default_agent_models?: Record<string, string>; model_sources?: ModelSource[] }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -33,6 +34,8 @@ export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
 export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained' | 'none found'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
+export interface OutlookRecord { id: string; formula: string; ticker: string | null; value: number | null; unit: string | null; start?: string | null; end?: string | null; status?: string; inputs?: Record<string, unknown>; notes?: string[]; data?: Record<string, unknown>; betas?: Record<string, number>; plain_words?: string; name?: string; annualized_return?: number; worst_drawdown?: number; losing_years?: number; correlations?: unknown[]; equal_weight_volatility?: number }
+export interface OutlookLogEntry { sequence: number; recorded_at: string; kind: 'record' | 'outcome'; payload: Record<string, unknown>; previous_hash: string | null; hash: string }
 export interface AgentSource { n: number; id: string; text: string; url: string | null; kind?: string | null; group?: string; label?: string }
 export interface KeyNumber { id: string; company: string | null; metric: string; period: string; value: string; change: string | null; change_id: string | null }
 export interface ChartPoint { end: string; value: number; label: string; ids: string[] }
@@ -40,9 +43,9 @@ export interface CompanyChart { cik: string; company: string; revenue: ChartPoin
 export interface DiscoverCandidate { rank: number; cik: string; name: string | null; tickers?: string[]; outcome: string; verdict: string | null; run_id: string | null; lines: {state: string; text: string; ids: string[]}[]; answer: string | null; citations?: string[]; warnings?: string[]; run_status?: string | null }
 export interface DiscoverResult { spec: string[] | null; counts: Record<string, number>; candidates: DiscoverCandidate[]; notes?: string[] }
 export interface RawFigure { id: string; kind: 'fact' | 'calc'; cik: string | null; company: string | null; label: string; period: string; value: string | null; unit: string | null; shown: string; start: string | null; end: string | null; formula: string | null; inputs: Record<string, string>; tag: string | null; form: string | null; accession: string | null; filed: string | null; url: string | null; notes: string[]; reason: string | null }
-export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; discover?: DiscoverResult | null; markdown: string }
+export interface AgentReport extends AgentRunSummary { status_label: string; error: string | null; sections: AgentSection[]; limitations: string[]; flags: string[]; objections: AgentObjection[]; sources: AgentSource[]; figures?: {table: KeyNumber[]; charts: CompanyChart[]} | null; raw?: RawFigure[]; outlook?: OutlookRecord[]; discover?: DiscoverResult | null; markdown: string }
 export interface AgentRecord { id: string; kind: string | null; group: string; title: string; excerpt: string; available_at: string | null; url: string | null; rows: {label: string; value: string}[]; links: {id: string; label: string}[] }
-export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
+export interface StartAgentRun { question: string; condition?: Condition; cutoff?: string; discover?: {name: string} | {tickers: string[]}; top_k?: number; model?: string; model_source?: string; agent_models?: Record<string, string>; edit_spec?: boolean; preferences?: string; parent_run_id?: string }
 export interface CompanyMatch { cik: string; name: string; tickers: string[]; exchanges: string[] }
 export interface UniverseInfo { id: string; name: string; companies: number | null; as_of: string; note: string; available?: boolean; problem?: string | null; dynamic?: boolean }
 const post = (body: unknown): RequestInit => ({method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
@@ -60,14 +63,19 @@ export const agentApi = {
   companies: (q: string, signal?: AbortSignal) => request<{items: CompanyMatch[]; total: number}>(`/companies?q=${encodeURIComponent(q)}`, {signal}),
   universes: () => request<{items: UniverseInfo[]}>('/universes'),
 }
+export const outlookApi = {
+  log: () => request<{entries: OutlookLogEntry[]}>('/outlook-log'),
+}
 // Setup & status (/api/status): every data provider by kind. Only whether a setting is set, never its value.
 export interface ProviderCheck { ok: boolean; message: string; checked_at: string }
-export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null }
+export interface ProviderStatus { name: string; label: string; tier: number; env: string[]; configured: boolean; missing_env: string[]; problem: string | null; status: 'ready' | 'configured' | 'not_configured' | 'check_failed'; last_check: ProviderCheck | null; can_check: boolean; note?: string | null; source_id?: string | null; model?: string | null }
 export interface DataKind { kind: string; label: string; purpose: string; active: string | null; providers: ProviderStatus[] }
 export const setupApi = {
   status: () => request<{kinds: DataKind[]}>('/status'),
   // No browser timeout: a model check can take a while, and the provider's own timeout ends it.
   check: (name: string) => request<{kinds: DataKind[]}>(`/status/${encodeURIComponent(name)}/check`, {...post({}), signal: new AbortController().signal}),
+  saveModelPreferences: (body: {default_source?: string | null; agent_models?: Record<string, string>}) =>
+    request<Config & {kinds: DataKind[]}>('/config/models', post(body)),
 }
 export const agentRunning = (status: string) => status === 'running' || status === 'stopping' || status === 'waiting'
 // Only link to SEC pages; source URLs come from our own tools, but a saved trace is still a file on disk.

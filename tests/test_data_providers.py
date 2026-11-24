@@ -30,7 +30,7 @@ def scripted_model(monkeypatch, *script):
 
 def test_zero_configuration_degrades_to_not_configured_and_tier_zero_prices():
     kinds = by_kind(providers.status({}))
-    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "macro", "fx", "insiders", "peers", "llm"]
+    assert list(kinds) == ["filings", "fundamentals", "identity", "prices", "macro", "fx", "insiders", "peers", "events", "factors", "llm"]
     assert kinds["prices"]["label"] == "Daily prices" and kinds["prices"]["purpose"]
     sec = provider(kinds["fundamentals"], "sec_companyfacts")
     assert (sec["status"], sec["missing_env"], sec["tier"], sec["problem"]) == ("not_configured", ["SEC_USER_AGENT"], 0, None)
@@ -41,9 +41,9 @@ def test_zero_configuration_degrades_to_not_configured_and_tier_zero_prices():
     llm = kinds["llm"]
     assert [p["name"] for p in llm["providers"]] == ["openrouter", "openai", "compatible"]
     assert {p["status"] for p in llm["providers"]} == {"not_configured"} and llm["active"] is None
-    # OpenAI is the default service, so only OpenRouter asks for the selector.
-    assert provider(llm, "openrouter")["missing_env"] == ["RESEARCH_MODEL_PROVIDER=openrouter", "RESEARCH_MODEL", "OPENROUTER_API_KEY"]
-    assert provider(llm, "openai")["missing_env"] == ["RESEARCH_MODEL", "OPENAI_API_KEY"]
+    assert provider(llm, "openrouter")["missing_env"] == ["OPENROUTER_MODEL", "OPENROUTER_API_KEY"]
+    assert provider(llm, "openai")["missing_env"] == ["OPENAI_MODEL", "OPENAI_API_KEY"]
+    assert provider(llm, "compatible")["missing_env"] == ["COMPATIBLE_BASE_URL", "COMPATIBLE_MODEL", "COMPATIBLE_API_KEY"]
 
 
 def test_keys_activate_providers_in_priority_order(monkeypatch):
@@ -58,16 +58,42 @@ def test_keys_activate_providers_in_priority_order(monkeypatch):
     assert by_kind(providers.status({}))["prices"]["active"] == "yfinance"
 
 
-def test_only_the_selected_model_service_is_active(monkeypatch):
+def test_multiple_model_services_can_be_configured_and_checked_together(tmp_path, monkeypatch):
     openrouter(monkeypatch)
     llm = by_kind(providers.status({}))["llm"]
     assert llm["active"] == "openrouter"
     assert provider(llm, "openrouter")["status"] == "configured" and provider(llm, "openrouter")["configured"]
     assert not provider(llm, "openai")["configured"]
-    assert provider(llm, "openai")["missing_env"] == ["RESEARCH_MODEL_PROVIDER=openai", "OPENAI_API_KEY"]
+    assert provider(llm, "openai")["missing_env"] == ["OPENAI_MODEL", "OPENAI_API_KEY"]
+
+    # Configuring OpenAI and a compatible endpoint alongside OpenRouter keeps all three active/checkable.
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-5-mini")
+    monkeypatch.setenv("COMPATIBLE_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("COMPATIBLE_MODEL", "qwen3:8b")
+    monkeypatch.setenv("COMPATIBLE_API_KEY", "ollama")
+    llm = by_kind(providers.status({}))["llm"]
+    assert all(provider(llm, name)["configured"] for name in ("openrouter", "openai", "compatible"))
+    scripted_model(monkeypatch, reply(tool_calls=[("confirm", {})]))
+    assert providers.run_check("openai")["ok"]
+
+    # Webapp can switch the active default provider and save per-agent defaults without modifying .env.
+    with TestClient(create_app(tmp_path), base_url="http://localhost:8000") as client:
+        saved = client.post("/api/config/models", json={
+            "default_source": "openai",
+            "agent_models": {"fundamentals": "openrouter", "critic": "compatible"},
+        })
+        assert saved.status_code == 200
+        body = saved.json()
+        assert body["default_model_source"] == "openai"
+        assert body["model"] == "gpt-5-mini"
+        assert body["default_agent_models"] == {"fundamentals": "default", "critic": "compatible"}
+        assert by_kind(body["kinds"])["llm"]["active"] == "openai"
+
+    # Conflicting OPENAI_BASE_URL with explicit RESEARCH_MODEL_PROVIDER=openrouter still reports its problem.
     monkeypatch.setenv("OPENAI_BASE_URL", "https://example.invalid/v1")
     llm = by_kind(providers.status({}))["llm"]
-    assert llm["active"] is None
+    assert not provider(llm, "openrouter")["configured"]
     assert provider(llm, "openrouter")["problem"].startswith("Remove OPENAI_BASE_URL")
 
 
@@ -129,8 +155,8 @@ def test_an_unconfigured_provider_is_not_tested(tmp_path, monkeypatch):
     with TestClient(create_app(tmp_path), base_url="http://localhost:8000") as client:
         refused = client.post("/api/status/openrouter/check", json={})
         assert refused.status_code == 409
-        assert refused.json()["error"]["message"] == ("OpenRouter is not configured yet. Set RESEARCH_MODEL_PROVIDER=openrouter, "
-                                                      "RESEARCH_MODEL, OPENROUTER_API_KEY in .env. Restart the server after changing .env.")
+        assert "OpenRouter is not configured yet." in refused.json()["error"]["message"]
+        assert "OPENROUTER_API_KEY" in refused.json()["error"]["message"]
         openrouter_entry = provider(by_kind(client.get("/api/status").json()["kinds"])["llm"], "openrouter")
         assert openrouter_entry["last_check"] is None and openrouter_entry["status"] == "not_configured"
 

@@ -69,11 +69,38 @@ const COMPARE_MAX = 4 // what a comparison takes (the question box's limit)
 
 export function DiscoverReport({result, onOpenRun, onCompare}: {result: DiscoverResult; onOpenRun: (id: string) => void; onCompare: (companies: CompanyMatch[]) => void}) {
   const picks = result.candidates.filter(c => c.outcome === 'picked')
-  const others = result.candidates.filter(c => c.outcome !== 'picked')
+  const unchecked = result.candidates.filter(c => c.outcome === 'not reached')
+  const others = result.candidates.filter(c => c.outcome !== 'picked'&& c.outcome !== 'not reached')
   const comparable = picks.filter(c => c.tickers?.length).map(c => ({cik: c.cik, name: c.name ?? c.cik, tickers: c.tickers!, exchanges: []}))
+  const eligibleCount = result.counts.eligible ?? 0
+  const checkedCount = result.counts.checked ?? 0
+  const uncheckedCount = Math.max(0, eligibleCount - checkedCount)
+  const targetPicks = result.counts.returned || picks.length || 3
+  const nextInLine = unchecked.slice(0, 5)  
   return <div className="report-body">
     {result.spec && <section className="report-section"><div className="section-label">THE SCREEN</div><ul className="spec-lines">{result.spec.map((line, i) => <li key={i}>{line}</li>)}</ul></section>}
-    {Object.keys(result.counts).length > 0 && <section className="report-section"><div className="screen-stats">{COUNTS.map(([key, label]) => <span key={key}><strong>{result.counts[key] ?? 0}</strong>{label}</span>)}</div></section>}
+    {Object.keys(result.counts).length > 0 && <section className="report-section">
+      <div className="screen-stats">{COUNTS.map(([key, label]) => <span key={key}><strong>{result.counts[key] ?? 0}</strong>{label}</span>)}</div>
+      {/* <-- ADDED: explain why only `checkedCount` of `eligibleCount` were checked + show next ranked names */}
+      {eligibleCount > 0 && <p className="muted">
+    The {eligibleCount} companies that passed the screen are ranked by the rule
+  in "The screen", then checked in that order until {targetPicks}{" "}
+  {targetPicks === 1 ? 'pick is' : 'picks are'} found
+  {uncheckedCount > 0
+    ? `, so the other ${uncheckedCount} are never checked`
+    : ''}.
+  {nextInLine.length > 0 && <>
+    {' '}Next in line (not checked): {nextInLine.map((c, i) =>
+      <span key={c.cik}>
+        {i > 0 ? ', ' : ''}
+        {c.name ?? c.cik}
+        {c.tickers?.[0] ? ` (${c.tickers[0]})` : ''}
+        {' '}(rank {c.rank})
+      </span>
+    )}.
+  </>}
+</p>}
+    </section>}
     <section className="report-section">
       <h2>Shortlist</h2>
       {picks.length === 0 ? <p className="empty-inline">No candidate made the shortlist. The candidates below say why.</p> : <ol className="shortlist">{picks.map(c => <li key={c.cik}>

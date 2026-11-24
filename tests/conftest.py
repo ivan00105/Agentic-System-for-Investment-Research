@@ -14,8 +14,9 @@ def isolate_configuration(monkeypatch):
     """Tests use explicit doubles, never local credentials or the real data directory."""
     monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     for name in (
-        "SEC_USER_AGENT", "RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL",
-        "OPENROUTER_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL",
+        "SEC_USER_AGENT", "RESEARCH_MODEL_PROVIDER", "RESEARCH_MODEL", "RESEARCH_MODEL_SOURCES",
+        "OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENAI_API_KEY", "OPENAI_MODEL",
+        "OPENAI_BASE_URL", "COMPATIBLE_BASE_URL", "COMPATIBLE_MODEL", "COMPATIBLE_API_KEY",
         "OPENAI_ORG_ID", "OPENAI_PROJECT_ID", "RESEARCH_DATA_DIR", "TIINGO_API_KEY", "PRICE_PROVIDERS",
         "FRED_API_KEY", "MACRO_PROVIDERS", "FX_PROVIDERS",
     ):

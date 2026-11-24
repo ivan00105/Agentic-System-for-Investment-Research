@@ -13,7 +13,7 @@ from typing import Callable
 
 from .. import config
 from ..data.sec import SecClient
-from ..model_access import ModelSettings, decoding_record
+from ..model_access import ModelSettings, client_for_role, decoding_record
 from ..tools.result import ToolContext
 from . import evidence, prompts
 from .claims import ClaimLedger
@@ -48,35 +48,42 @@ def run(path: Path, client, settings: ModelSettings, sec: SecClient, *, inject: 
                                        for c in claims if c.get("id")]
     condition = f"D review of saved run {Path(path).stem}" + (f", with an injected {inject} defect" if inject else "")
     trace = Trace.new(trace_dir, echo)
+    role_client, role_settings = client_for_role(client, settings, COORDINATOR.name)
     trace.write("run_start", question=question, cutoff=cutoff.isoformat(), historical=context.historical,
                 condition=condition, lead=COORDINATOR.name,
-                provider=settings.provider, model=settings.model, decoding=decoding_record(), max_steps=max_steps,
-                reviewed=str(path))
+                provider=role_settings.provider, model=role_settings.model, decoding=decoding_record(),
+                max_steps=max_steps, reviewed=str(path))
     # The evidence it starts from, frozen here too: this trace can be rechecked or reviewed again on its own, even
     # if no tool runs during the review.
     trace.write("evidence", records=trace.new_records(context.records))
     desk = Desk(question, client, settings, trace, ledger, max_steps)
     critic = Critic(question, client, settings, context, trace, ledger, desk, max_steps, critic_rounds)
     work = Work(status="finished", draft=Draft.model_validate(saved.end["draft"]))
-    with trace.acting_as(COORDINATOR.name):
-        work.report = check_draft(work.draft, context, trace, ledger, COORDINATOR.name)  # every claim unchanged
-        if inject:
-            found = DEFECTS[inject](Draft.model_validate(draft_with_ids(work.draft, work.report)), context.records)
-            if found is None:
-                work.notes.append(f"No claim could take an injected {inject} defect, so the draft is as saved.")
-            else:
-                work.draft, change = found
-                trace.write("injected", defect=inject, change=change)
-                work.notes.append(f"Test defect injected before the review ({inject}): {change}")
-                work.report = check_draft(work.draft, context, trace, ledger, "injected")
-        work.messages = [
-            {"role": "system", "content": prompts.role(COORDINATOR.name, cutoff.isoformat())},
-            {"role": "user", "content": f"{question}\n\nYour team researched this question and you handed in a "
-                                        "report. A critic now reviews it, and you answer its objections with your "
-                                        "analysts' help. Your analysts start fresh, so give them the company's "
-                                        "name, ticker and CIK again."}]
-        work.resume = partial(run_loop, client, settings.model, settings.agent_kwargs(),
-                              work.messages, context, trace=trace, tool_names=COORDINATOR.tools,
-                              extra_tools=desk.tools())
-        critic.review(work)
-    return close(trace, question, settings, context, ledger, work, condition, desk.log)
+    try:
+        with trace.acting_as(COORDINATOR.name):
+            work.report = check_draft(work.draft, context, trace, ledger, COORDINATOR.name)  # every claim unchanged
+            if inject:
+                found = DEFECTS[inject](Draft.model_validate(draft_with_ids(work.draft, work.report)), context.records)
+                if found is None:
+                    work.notes.append(f"No claim could take an injected {inject} defect, so the draft is as saved.")
+                else:
+                    work.draft, change = found
+                    trace.write("injected", defect=inject, change=change)
+                    work.notes.append(f"Test defect injected before the review ({inject}): {change}")
+                    work.report = check_draft(work.draft, context, trace, ledger, "injected")
+            work.messages = [
+                {"role": "system", "content": prompts.role(COORDINATOR.name, cutoff.isoformat())},
+                {"role": "user", "content": f"{question}\n\nYour team researched this question and you handed in a "
+                                            "report. A critic now reviews it, and you answer its objections with your "
+                                            "analysts' help. Your analysts start fresh, so give them the company's "
+                                            "name, ticker and CIK again."}]
+            work.resume = partial(run_loop, role_client, role_settings.model, role_settings.agent_kwargs(),
+                                  work.messages, context, trace=trace, tool_names=COORDINATOR.tools,
+                                  extra_tools=desk.tools())
+            critic.review(work)
+        return close(trace, question, role_settings, context, ledger, work, condition, desk.log)
+    finally:
+        critic.close()
+        desk.close()
+        if role_client is not client and hasattr(role_client, "close"):
+            role_client.close()

@@ -9,12 +9,14 @@ corrected and backs with a citation, a withdrawal a claim gone from the report. 
 settle stays open for the next round; what is still open when the review stops is shown as unresolved, never dropped.
 """
 import json
+import re
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
 
 from .. import config
-from ..model_access import ModelSettings
+from ..model_access import ModelSettings, client_for_role
 from ..tools.result import ToolContext, make_id
 from . import prompts
 from .checker import CITATION, CheckedReport, Flag, fill, lookup, typed_numbers
@@ -35,6 +37,54 @@ SUBMIT_REVISION = Finish("submit_revision", "Hand in the revised report, every s
                          "record IDs it rests on.", Revision)
 
 
+def base_rate_misleading_certainty(report: CheckedReport, records: dict) -> list[Objection]:
+    """Host-owned Phase 6 check (PROJECT_GUIDE §6, REFERENCE §6): flag growth/margin forecasts outside base_rates."""
+    objections = []
+    number = re.compile(r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?:\s*)(?:%|percentage points?|pp\b)",
+                        re.IGNORECASE)
+    for claims in report.sections.values():
+        for claim in claims:
+            base_record = next((records[cid] for cid in claim.citations
+                                if cid in records and records[cid].get("formula") == "base_rates"), None)
+            if base_record is None:
+                continue
+            data = base_record.get("data") or {}
+            text = claim.text.lower()
+            matches = [Decimal(match) / Decimal(100) for match in number.findall(claim.text)
+                       if match]
+            if not matches:
+                continue
+            outside = []
+            if "growth" in text or ("revenue" in text and "margin" not in text):
+                band = data.get("growth") or {}
+                outside.extend((value, "revenue growth", band, "growth") for value in matches
+                               if _outside_band(value, band))
+            if "margin" in text and re.search(r"change|expan|improv|widen|narrow|compress|declin|grow|drop",
+                                              text):
+                band = data.get("margin_change") or {}
+                outside.extend((value, "operating-margin change", band, "margin") for value in matches
+                               if _outside_band(value, band))
+            if outside:
+                value, metric, band, kind = outside[0]
+                p10, p90 = band.get("p10"), band.get("p90")
+                detail = (f"{metric} claim of {value:.2%} is outside the comparable base-rate band "
+                          f"{Decimal(str(p10)):.2%} to {Decimal(str(p90)):.2%}; presenting it as certain is misleading.")
+                objections.append(Objection(
+                    claim=claim.id, issue="misleading_certainty", material=True, problem=detail,
+                    evidence=[base_record["id"]],
+                    requested_check=f"Recheck the {kind} claim against get_base_rates calc {base_record['id']}.",
+                ))
+    return objections
+
+
+def _outside_band(value: Decimal, band: dict) -> bool:
+    try:
+        low, high = Decimal(str(band["p10"])), Decimal(str(band["p90"]))
+    except (KeyError, TypeError, InvalidOperation):
+        return False
+    return low is not None and high is not None and (value < low or value > high)
+
+
 def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
         max_steps: int = config.AGENT_MAX_STEPS, self_review_passes: int = config.AGENT_SELF_REVIEW_PASSES,
         critic_rounds: int = config.AGENT_CRITIC_ROUNDS, trace_dir: Path | None = None,
@@ -43,9 +93,13 @@ def run(question: str, client, settings: ModelSettings, context: ToolContext, *,
     trace, ledger = trace or Trace.new(trace_dir, echo), ClaimLedger()
     desk = Desk(question, client, settings, trace, ledger, max_steps)
     critic = Critic(question, client, settings, context, trace, ledger, desk, max_steps, critic_rounds)
-    return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
-                    extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
-                    self_review_passes=self_review_passes, review=critic.review)
+    try:
+        return research(question, client, settings, context, COORDINATOR, trace, condition=CONDITION,
+                        extra_tools=desk.tools(), ledger=ledger, team=desk.log, max_steps=max_steps,
+                        self_review_passes=self_review_passes, review=critic.review)
+    finally:
+        critic.close()
+        desk.close()
 
 
 @dataclass
@@ -80,10 +134,17 @@ class Raised:
 class Critic:
     def __init__(self, question: str, client, settings: ModelSettings, context: ToolContext, trace: Trace,
                  ledger: ClaimLedger, desk: Desk, max_steps: int, rounds: int):
-        self.question, self.client, self.model, self.context = question, client, settings.model, context
+        critic_client, critic_settings = client_for_role(client, settings, CRITIC.name)
+        self._base_client = client
+        self.question, self.client, self.model, self.context = question, critic_client, critic_settings.model, context
+        self.provider = critic_settings.provider
         self.trace, self.ledger, self.desk, self.max_steps, self.rounds = trace, ledger, desk, max_steps, rounds
-        self.kwargs = settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
+        self.kwargs = critic_settings.agent_kwargs()  # no output-token cap (PROJECT_GUIDE §5)
         self.raised: list[Raised] = []
+
+    def close(self):
+        if self.client is not self._base_client and hasattr(self.client, "close"):
+            self.client.close()
 
     def review(self, work: Work) -> None:
         """Review, revise, review again, until no material objection is open (or the guard). Changes `work`."""
@@ -116,7 +177,7 @@ class Critic:
         messages = [{"role": "system", "content": prompts.role(CRITIC.name, cutoff, issues=issue_list())},
                     {"role": "user", "content": self._brief(work.report, n)}]
         with self.trace.acting_as(CRITIC.name):
-            self.trace.write("critic_start", round=n)
+            self.trace.write("critic_start", round=n, provider=self.provider, model=self.model)
             result = run_loop(self.client, self.model, self.kwargs, messages, self.context, SUBMIT_OBJECTIONS,
                               self.trace, tool_names=CRITIC.tools, max_steps=self.max_steps)
             if result.output is None:
@@ -126,6 +187,11 @@ class Critic:
                 return None
             raised, repeats = [], []
             for objection in result.output.objections:
+                o, repeat = self._raise(objection, n, work.report)
+                raised += [o] if o else []
+                repeats += [repeat] if repeat else []
+            # Host guard: a prompt-only instruction can miss or soften the outside-view check.
+            for objection in base_rate_misleading_certainty(work.report, self.context.records):
                 o, repeat = self._raise(objection, n, work.report)
                 raised += [o] if o else []
                 repeats += [repeat] if repeat else []
@@ -170,7 +236,8 @@ class Critic:
         asked, before = len(self.desk.asked), {c.id for claims in work.report.sections.values() for c in claims}
         self.trace.write("revision_start", round=n, objections=[o.id for o in pending])
         work.messages.append({"role": "user", "content": self._request(work, n, pending)})
-        result = work.resume(SUBMIT_REVISION, max_steps=self.max_steps)  # each revision gets its own step guard
+        result = work.resume(SUBMIT_REVISION, max_steps=self.max_steps,
+                             force_finish_after_nudges=1)  # revision text must become submit_revision
         why = (f"ended without a report ({result.error or result.status})" if result.output is None
                else drops_answer(work.draft, result.output))
         if why:

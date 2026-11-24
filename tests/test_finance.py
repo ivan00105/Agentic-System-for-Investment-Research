@@ -1,8 +1,9 @@
 from decimal import Decimal
+from datetime import date, timedelta
 
 import pytest
 
-from research_assistant.finance import fundamentals, risk
+from research_assistant.finance import fundamentals, quant, risk
 
 
 def test_ratio_guards_zero_and_negative_denominators():
@@ -49,3 +50,118 @@ def test_beta_of_a_stock_moving_twice_the_benchmark():
     stock = {"d0": 50.0, "d1": 100.0, "d2": 102.0, "d3": 99.980198, "d4": 103.979406}
     outcome = risk.beta(stock, bench)
     assert outcome.value == pytest.approx(2.0, rel=1e-3) and "4 shared trading days" in outcome.note
+
+
+def test_risk_forecast_uses_forward_returns_and_requires_enough_history():
+    stock = [100 + index * 0.2 for index in range(80)]
+    benchmark = [100 + index * 0.1 for index in range(80)]
+    result = risk.forecast(
+        stock, benchmark, 5, periods_per_year=252, quantile_low=0.1, quantile_high=0.9,
+        trailing_threshold=-0.1, har_week_days=5, har_month_days=22, conformal_coverage=0.8,
+        conformal_learning_rate=0.01, min_observations=60,
+    )
+    assert result.value.observations == 75
+    assert result.value.own_low < result.value.own_high
+    assert result.value.trail_probability == 0
+    assert result.value.own_conformal_scale > 0
+
+    insufficient = risk.forecast(
+        stock[:20], benchmark[:20], 5, periods_per_year=252, quantile_low=0.1, quantile_high=0.9,
+        trailing_threshold=-0.1, har_week_days=5, har_month_days=22, conformal_coverage=0.8,
+        conformal_learning_rate=0.01, min_observations=60,
+    )
+    assert insufficient.value is None and "60" in insufficient.reason
+
+
+def test_walk_forward_coverage_only_scores_years_after_training_history():
+    dates = [(date(2018, 1, 1) + timedelta(days=index)).isoformat() for index in range(1500)]
+    stock = [100.0 + index * 0.02 for index in range(len(dates))]
+    benchmark = [100.0 + index * 0.01 for index in range(len(dates))]
+    result = risk.walk_forward_coverage(
+        dates, stock, benchmark, 5, quantile_low=0.1, quantile_high=0.9,
+        conformal_coverage=0.8, conformal_learning_rate=0.01,
+        min_training_observations=60,
+    )
+    assert result.value.observations > 0
+    assert set(result.value.by_year) == {"2019", "2020", "2021", "2022"}
+    assert 0 <= result.value.coverage <= 1
+    assert result.value.interval_score >= 0
+
+
+@pytest.mark.parametrize("indicators,target,expected", [
+    ([True] * 8 + [False] * 2, 0.8, 0.8),
+    ([True] * 5 + [False] * 5, 0.8, 0.5),
+    ([True, False, True, False, True, False], 0.8, 0.5),
+])
+def test_kupiec_and_christoffersen_walk_forward_coverage(indicators, target, expected):
+    result = risk.coverage_tests(indicators, target)
+    assert result.value is not None
+    assert result.value.observations == len(indicators)
+    assert result.value.hit_rate == pytest.approx(expected)
+    assert result.value.kupiec_lr >= 0
+    assert 0 <= result.value.kupiec_p_value <= 1
+    assert result.value.christoffersen_lr >= 0
+    assert 0 <= result.value.christoffersen_p_value <= 1
+
+
+def test_vix_split_is_clearly_unavailable():
+    result = risk.vix_split_unavailable()
+    assert result.value is None
+    assert "VIX" in result.reason
+
+
+def test_earnings_window_widens_intervals_by_historical_jump():
+    dates = [f"2020-01-{index + 1:02d}" for index in range(10)]
+    stock = [100.0, 110.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+    benchmark = [100.0] * len(stock)
+    common = dict(
+        periods_per_year=252, quantile_low=0.1, quantile_high=0.9, trailing_threshold=-0.1,
+        har_week_days=2, har_month_days=3, conformal_coverage=0.8,
+        conformal_learning_rate=0.01, min_observations=1, session_dates=dates,
+        earnings_dates={"2020-01-02"},
+    )
+    ordinary = risk.forecast(stock, benchmark, 1, **common)
+    adjusted = risk.forecast(stock, benchmark, 1, **common, earnings_in_window=True)
+    assert adjusted.value.earnings_jump == pytest.approx(0.1)
+    assert adjusted.value.earnings_in_window
+    assert adjusted.value.own_high - adjusted.value.own_low > ordinary.value.own_high - ordinary.value.own_low
+
+
+def test_direction_logistic_is_regularised_and_reports_no_unproven_edge():
+    stock = [100.0 + index * 0.25 for index in range(400)]
+    benchmark = [100.0 + index * 0.20 for index in range(400)]
+    result = quant.direction_forecast(
+        stock, benchmark, 20, min_observations=252,
+        regularization=0.01, learning_rate=0.05, max_iterations=100,
+    )
+    assert result.value is not None
+    assert 0 <= result.value.probability <= 1
+    assert result.value.observations >= 252
+    assert isinstance(result.value.reliable_edge, bool)
+
+
+def test_factor_exposure_and_shortlist_are_pure():
+    stock = [0.01, -0.02, 0.03, 0.01, -0.01]
+    factors = {"MKT": [0.02, -0.01, 0.02, 0.01, -0.02],
+               "SMB": [0.01, 0.01, -0.01, 0.02, 0.01]}
+    exposure = quant.factor_exposure(stock, factors, ("MKT", "SMB"))
+    assert exposure.value is not None
+    assert set(exposure.value.betas) == {"MKT", "SMB"}
+
+    aligned = {
+        "A": {f"d{i}": 100 * (1.001 ** i) for i in range(30)},
+        "B": {f"d{i}": 100 * (1.002 ** i) for i in range(30)},
+    }
+    shortlist = quant.shortlist_risk(aligned, None, 252)
+    assert shortlist.value is not None
+    assert shortlist.value.equal_weight_volatility >= 0
+    assert len(shortlist.value.correlations) == 1
+
+
+def test_strategy_summary_has_drawdown_and_losing_year_count():
+    dates = [f"{year}-01-01" for year in range(2018, 2022)]
+    returns = [0.1, -0.2, 0.05, 0.08]
+    result = quant.strategy_stats("value", dates, returns, 252)
+    assert result.value is not None
+    assert result.value.worst_drawdown < 0
+    assert result.value.losing_years == 1
