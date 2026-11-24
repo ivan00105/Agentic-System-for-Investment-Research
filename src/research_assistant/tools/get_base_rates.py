@@ -50,13 +50,18 @@ def run(args: GetBaseRatesInput, context: ToolContext) -> ToolResult:
                                         context.cutoff.date().isoformat())
         samples.extend(base_rates.next_year_changes(years))
     data = base_rates.forecast(samples, args.growth_thresholds)
+    if len(ciks) == 1:
+        warnings.insert(0, "No comparable companies were passed, so this is the company's own history, not an outside "
+                        "view.")
     data.update({"target_cik": target, "reference_class_size": len(ciks), "revenue_floor": str(args.revenue_floor),
-                 "first_reported": True, "survivorship_free_input": True})
+                 "first_reported": True,
+                 "sample": "the companies passed in" if len(ciks) > 1 else "the company's own history"})
     record = {"id": make_id("base-rates", target, *(sorted(ciks)), context.cutoff.isoformat()),
               "kind": "calc", "formula": "base_rates", "cik": target, "value": None, "unit": "distribution",
               "status": "ok" if samples else "unavailable", "data": data,
-              "notes": ["Each period uses its earliest filed annual value; later restatements are excluded.",
-                        "The reference class is supplied by CIK, so dead and acquired filers can be included."]}
+              "notes": ["Each fiscal year uses its earliest filed full-year value; later restatements are excluded.",
+                        "The sample is only the CIKs passed in, so it leans to survivors unless dead and acquired "
+                        "filers are among them."]}
     context.remember(record)
     return ToolResult(status=record["status"], data=data, ids=[record["id"]], source="SEC companyfacts (first-reported)",
                       warnings=warnings + ([] if samples else ["No comparable annual pairs were available."]))

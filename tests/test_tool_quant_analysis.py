@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sec_files import make_context
 
-from research_assistant.tools import get_factor_exposures, get_shortlist_risk
+from research_assistant.tools import get_factor_exposures, get_shortlist_risk, get_strategy_lab
 from research_assistant.tools.result import ToolResult, make_id
 
 
@@ -61,3 +61,19 @@ def test_shortlist_risk_handles_mocked_price_series(tmp_path, monkeypatch):
     )
     assert result.status in ("ok", "partial")
     assert result.ids
+
+
+def test_strategy_lab_stops_at_the_cutoff(tmp_path, monkeypatch):
+    days = ["20151230", "20151231", "20160104", "20260102"]
+    monkeypatch.setattr(get_strategy_lab.factors, "five_factors", lambda _cache: {
+        day: dict.fromkeys(("MKT-RF", "SMB", "HML", "RMW", "CMA", "RF"), 0.01) for day in days})
+    monkeypatch.setattr(get_strategy_lab.factors, "momentum", lambda _cache: dict.fromkeys(["19261103", *days], 0.01))
+    past = make_context(tmp_path, cutoff=datetime(2016, 1, 10, tzinfo=timezone.utc))
+    result = get_strategy_lab.run(get_strategy_lab.GetStrategyLabInput(), past)
+    spans = {item["name"]: (item["start"], item["end"], item["observations"]) for item in result.data["strategies"]}
+    assert spans["value"] == ("2015-12-30", "2016-01-04", 3)
+    assert spans["momentum"] == ("1926-11-03", "2016-01-04", 4)
+    assert any("today's copy" in warning for warning in result.warnings)
+
+    before = make_context(tmp_path, cutoff=datetime(1920, 1, 1, tzinfo=timezone.utc))
+    assert get_strategy_lab.run(get_strategy_lab.GetStrategyLabInput(), before).status == "unsupported"
