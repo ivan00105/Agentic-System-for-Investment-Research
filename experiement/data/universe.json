@@ -1,0 +1,48 @@
+{
+  "Information Technology": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AVGO",
+    "ORCL",
+    "CRM",
+    "ADBE"
+  ],
+  "Communication Services": [
+    "GOOGL",
+    "META",
+    "NFLX"
+  ],
+  "Consumer Discretionary": [
+    "AMZN",
+    "HD",
+    "MCD",
+    "NKE"
+  ],
+  "Consumer Staples": [
+    "PG",
+    "KO",
+    "PEP",
+    "WMT",
+    "COST"
+  ],
+  "Health Care": [
+    "JNJ",
+    "UNH",
+    "MRK",
+    "ABBV",
+    "PFE"
+  ],
+  "Energy": [
+    "XOM",
+    "CVX"
+  ],
+  "Industrials": [
+    "CAT",
+    "HON",
+    "UPS"
+  ],
+  "Utilities": [
+    "NEE"
+  ]
+}
