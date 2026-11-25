@@ -1,0 +1,226 @@
+{
+  "ex_financials": {
+    "members": 427,
+    "excluded_sectors": [
+      "Financials"
+    ],
+    "counts": {
+      "screened": 423,
+      "eligible": 63,
+      "failed": 316,
+      "unknown": 44,
+      "unranked": 0,
+      "returned": 10
+    },
+    "rechecked": [
+      {
+        "rank": 1,
+        "name": "VERISIGN INC/CA",
+        "tickers": [
+          "VRSN"
+        ],
+        "frame_value": "0.644875",
+        "verdict": "unknown"
+      },
+      {
+        "rank": 2,
+        "name": "Comfort Systems USA,\u00a0Inc.",
+        "tickers": [
+          "FIX"
+        ],
+        "frame_value": "0.563240",
+        "verdict": "fail"
+      },
+      {
+        "rank": 3,
+        "name": "KIMCO REALTY CORPORATION",
+        "tickers": [
+          "KIM",
+          "KIM-PL",
+          "KIM-PM",
+          "KIM-PN"
+        ],
+        "frame_value": "0.514745",
+        "verdict": "pass"
+      },
+      {
+        "rank": 4,
+        "name": "Palantir Technologies Inc.",
+        "tickers": [
+          "PLTR"
+        ],
+        "frame_value": "0.469359",
+        "verdict": "pass"
+      },
+      {
+        "rank": 5,
+        "name": "NVIDIA CORP",
+        "tickers": [
+          "NVDA"
+        ],
+        "frame_value": "0.447703",
+        "verdict": "pass"
+      },
+      {
+        "rank": 6,
+        "name": "ADOBE INC.",
+        "tickers": [
+          "ADBE"
+        ],
+        "frame_value": "0.414489",
+        "verdict": "pass"
+      },
+      {
+        "rank": 7,
+        "name": "ALTRIA GROUP, INC.",
+        "tickers": [
+          "MO"
+        ],
+        "frame_value": "0.389793",
+        "verdict": "pass"
+      },
+      {
+        "rank": 8,
+        "name": "Analog Devices, Inc.",
+        "tickers": [
+          "ADI"
+        ],
+        "frame_value": "0.388273",
+        "verdict": "pass"
+      },
+      {
+        "rank": 9,
+        "name": "Verisk Analytics, Inc.",
+        "tickers": [
+          "VRSK"
+        ],
+        "frame_value": "0.387900",
+        "verdict": "pass"
+      },
+      {
+        "rank": 10,
+        "name": "Fair Isaac Corp",
+        "tickers": [
+          "FICO"
+        ],
+        "frame_value": "0.386708",
+        "verdict": "pass"
+      }
+    ],
+    "seconds_screen": 0.4,
+    "accepted": 8,
+    "rejected": 1,
+    "unknown": 1
+  },
+  "ex_financials_real_estate": {
+    "members": 397,
+    "excluded_sectors": [
+      "Financials",
+      "Real Estate"
+    ],
+    "counts": {
+      "screened": 393,
+      "eligible": 60,
+      "failed": 304,
+      "unknown": 29,
+      "unranked": 0,
+      "returned": 10
+    },
+    "rechecked": [
+      {
+        "rank": 1,
+        "name": "VERISIGN INC/CA",
+        "tickers": [
+          "VRSN"
+        ],
+        "frame_value": "0.644875",
+        "verdict": "unknown"
+      },
+      {
+        "rank": 2,
+        "name": "Comfort Systems USA,\u00a0Inc.",
+        "tickers": [
+          "FIX"
+        ],
+        "frame_value": "0.563240",
+        "verdict": "fail"
+      },
+      {
+        "rank": 3,
+        "name": "Palantir Technologies Inc.",
+        "tickers": [
+          "PLTR"
+        ],
+        "frame_value": "0.469359",
+        "verdict": "pass"
+      },
+      {
+        "rank": 4,
+        "name": "NVIDIA CORP",
+        "tickers": [
+          "NVDA"
+        ],
+        "frame_value": "0.447703",
+        "verdict": "pass"
+      },
+      {
+        "rank": 5,
+        "name": "ADOBE INC.",
+        "tickers": [
+          "ADBE"
+        ],
+        "frame_value": "0.414489",
+        "verdict": "pass"
+      },
+      {
+        "rank": 6,
+        "name": "ALTRIA GROUP, INC.",
+        "tickers": [
+          "MO"
+        ],
+        "frame_value": "0.389793",
+        "verdict": "pass"
+      },
+      {
+        "rank": 7,
+        "name": "Analog Devices, Inc.",
+        "tickers": [
+          "ADI"
+        ],
+        "frame_value": "0.388273",
+        "verdict": "pass"
+      },
+      {
+        "rank": 8,
+        "name": "Verisk Analytics, Inc.",
+        "tickers": [
+          "VRSK"
+        ],
+        "frame_value": "0.387900",
+        "verdict": "pass"
+      },
+      {
+        "rank": 9,
+        "name": "Fair Isaac Corp",
+        "tickers": [
+          "FICO"
+        ],
+        "frame_value": "0.386708",
+        "verdict": "pass"
+      },
+      {
+        "rank": 10,
+        "name": "Paychex, Inc.",
+        "tickers": [
+          "PAYX"
+        ],
+        "frame_value": "0.356542",
+        "verdict": "pass"
+      }
+    ],
+    "seconds_screen": 0.2,
+    "accepted": 8,
+    "rejected": 1,
+    "unknown": 1
+  }
+}

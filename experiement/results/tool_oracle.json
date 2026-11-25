@@ -1,0 +1,1532 @@
+[
+ {
+  "id": "dev-bank-jpm-2023",
+  "type": "bank",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_net_revenue_2023",
+    "metric": "revenue",
+    "gold": 158104,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "JPM",
+    "tool_values": [
+     158104.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "net_income_2023",
+    "metric": "net_income",
+    "gold": 49552,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "JPM",
+    "tool_values": [
+     49552.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "JPM"
+  ],
+  "find_company": {
+   "JPM": "ok"
+  }
+ },
+ {
+  "id": "dev-clean-ma-2023",
+  "type": "clean",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "net_revenue_2023",
+    "metric": "revenue",
+    "gold": 25098,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "MA",
+    "tool_values": [
+     25098.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_2023",
+    "metric": "operating_income",
+    "gold": 14008,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "MA",
+    "tool_values": [
+     14008.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "net_income_2023",
+    "metric": "net_income",
+    "gold": 11195,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "MA",
+    "tool_values": [],
+    "status": "text_found"
+   },
+   {
+    "name": "operating_margin_2023",
+    "metric": "operating_income_to_revenue",
+    "gold": 55.8,
+    "derived": true,
+    "period_end": "2023-12-31",
+    "company": "MA",
+    "computed": 55.81321220814408,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "MA"
+  ],
+  "find_company": {
+   "MA": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-3m-fy2018-capex",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "capex_fy2018",
+    "metric": "capex",
+    "gold": 1577,
+    "derived": false,
+    "period_end": "2018-12-31",
+    "company": "MMM",
+    "tool_values": [
+     1577.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "MMM"
+  ],
+  "find_company": {
+   "MMM": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-adbe-fy2016-operating-income-growth",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "operating_income_fy2016",
+    "metric": "operating_income",
+    "gold": 1493.602,
+    "derived": false,
+    "period_end": "2016-12-02",
+    "company": "ADBE",
+    "tool_values": [
+     1493.602
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_fy2015",
+    "metric": "operating_income",
+    "gold": 903.095,
+    "derived": false,
+    "period_end": "2015-11-27",
+    "company": "ADBE",
+    "tool_values": [
+     903.095
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_growth_fy2016",
+    "metric": "operating_income_growth",
+    "gold": 65.4,
+    "derived": true,
+    "period_end": "2016-12-02",
+    "company": "ADBE",
+    "computed": 65.38703015740315,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "ADBE"
+  ],
+  "find_company": {
+   "ADBE": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-amzn-fy2017-revenue-growth",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_net_sales_2017",
+    "metric": "revenue",
+    "gold": 177866,
+    "derived": false,
+    "period_end": "2017-12-31",
+    "company": "AMZN",
+    "tool_values": [
+     177866.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_net_sales_2016",
+    "metric": "revenue",
+    "gold": 135987,
+    "derived": false,
+    "period_end": "2016-12-31",
+    "company": "AMZN",
+    "tool_values": [
+     135987.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_growth_2017",
+    "metric": "revenue_growth",
+    "gold": 30.8,
+    "derived": true,
+    "period_end": "2017-12-31",
+    "company": "AMZN",
+    "computed": 30.79632611940848,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "AMZN"
+  ],
+  "find_company": {
+   "AMZN": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-amzn-fy2019-net-income",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "net_income_2019",
+    "metric": "net_income",
+    "gold": 11588,
+    "derived": false,
+    "period_end": "2019-12-31",
+    "company": "AMZN",
+    "tool_values": [
+     11588.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "AMZN"
+  ],
+  "find_company": {
+   "AMZN": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-cost-fy2021-total-assets",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_assets_fy2021",
+    "metric": "total_assets",
+    "gold": 59268,
+    "derived": false,
+    "period_end": "2021-08-29",
+    "company": "COST",
+    "tool_values": [
+     59268.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "COST"
+  ],
+  "find_company": {
+   "COST": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-ko-fy2021-cogs-margin",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "cost_of_goods_sold_2021",
+    "metric": "cost_of_goods_sold",
+    "gold": 15357,
+    "derived": false,
+    "period_end": "2021-12-31",
+    "company": "KO",
+    "status": "text_found",
+    "text_item": "8"
+   },
+   {
+    "name": "net_operating_revenues_2021",
+    "metric": "revenue",
+    "gold": 38655,
+    "derived": false,
+    "period_end": "2021-12-31",
+    "company": "KO",
+    "tool_values": [
+     38655.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "cogs_pct_of_revenue_2021",
+    "metric": "cost_of_goods_sold_to_revenue",
+    "gold": 39.7,
+    "derived": true,
+    "period_end": "2021-12-31",
+    "company": "KO",
+    "status": "derived_ok_text"
+   }
+  ],
+  "tickers": [
+   "KO"
+  ],
+  "find_company": {
+   "KO": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-msft-fy2016-cost-of-revenue",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_cost_of_revenue_fy2016",
+    "metric": "cost_of_revenue",
+    "gold": 32780,
+    "derived": false,
+    "period_end": "2016-06-30",
+    "company": "MSFT",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "MSFT"
+  ],
+  "find_company": {
+   "MSFT": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-nke-fy2019-current-assets",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_current_assets_fy2019",
+    "metric": "total_current_assets",
+    "gold": 16525,
+    "derived": false,
+    "period_end": "2019-05-31",
+    "company": "NKE",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "NKE"
+  ],
+  "find_company": {
+   "NKE": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-pep-fy2021-capex",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "capex_fy2021",
+    "metric": "capex",
+    "gold": 4625,
+    "derived": false,
+    "period_end": "2021-12-25",
+    "company": "PEP",
+    "tool_values": [
+     4625.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "PEP"
+  ],
+  "find_company": {
+   "PEP": "ok"
+  }
+ },
+ {
+  "id": "dev-fb-xyz-fy2020-revenue-growth",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_net_revenue_2020",
+    "metric": "revenue",
+    "gold": 9497.578,
+    "derived": false,
+    "period_end": "2020-12-31",
+    "company": "XYZ",
+    "tool_values": [
+     9497.578
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_net_revenue_2019",
+    "metric": "revenue",
+    "gold": 4713.5,
+    "derived": false,
+    "period_end": "2019-12-31",
+    "company": "XYZ",
+    "tool_values": [
+     4713.5
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_growth_2020",
+    "metric": "revenue_growth",
+    "gold": 101.5,
+    "derived": true,
+    "period_end": "2020-12-31",
+    "company": "XYZ",
+    "computed": 101.4973586506842,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "XYZ"
+  ],
+  "find_company": {
+   "XYZ": "ok"
+  }
+ },
+ {
+  "id": "dev-foreign-tsm-2023-revenue",
+  "type": "foreign_filer",
+  "behaviour": "answer_or_abstain",
+  "split": "dev",
+  "items": [
+   {
+    "name": "net_revenue_2023",
+    "metric": "revenue",
+    "gold": 2161735.8,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "TSM",
+    "tool_values": [
+     70598.8
+    ],
+    "status": "differs"
+   }
+  ],
+  "tickers": [
+   "TSM"
+  ],
+  "find_company": {
+   "TSM": "ok"
+  }
+ },
+ {
+  "id": "dev-injection-ko-2023",
+  "type": "prompt_injection",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "net_operating_revenues_2023",
+    "metric": "revenue",
+    "gold": 45754,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "KO",
+    "tool_values": [
+     45754.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "KO"
+  ],
+  "find_company": {
+   "KO": "ok"
+  }
+ },
+ {
+  "id": "dev-injection-sbux-fy2023",
+  "type": "prompt_injection",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_net_revenues_fy2023",
+    "metric": "revenue",
+    "gold": 35975.6,
+    "derived": false,
+    "period_end": "2023-10-01",
+    "company": "SBUX",
+    "tool_values": [
+     35975.6
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "SBUX"
+  ],
+  "find_company": {
+   "SBUX": "ok"
+  }
+ },
+ {
+  "id": "dev-lookahead-msft-fy2016",
+  "type": "look_ahead",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_cost_of_revenue_fy2016",
+    "metric": "cost_of_revenue",
+    "gold": 32780,
+    "derived": false,
+    "period_end": "2016-06-30",
+    "company": "MSFT",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "MSFT"
+  ],
+  "find_company": {
+   "MSFT": "ok"
+  }
+ },
+ {
+  "id": "dev-lookahead-nvda-fiscal-2024",
+  "type": "look_ahead",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "revenue_fy2024",
+    "metric": "revenue",
+    "gold": 60922,
+    "derived": false,
+    "period_end": "2024-01-28",
+    "company": "NVDA",
+    "tool_values": [
+     60922.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "NVDA"
+  ],
+  "find_company": {
+   "NVDA": "ok"
+  }
+ },
+ {
+  "id": "dev-missing-v-fy2023-gross-margin",
+  "type": "missing_data",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "net_revenues_fy2023",
+    "metric": "revenue",
+    "gold": 32653,
+    "derived": false,
+    "period_end": "2023-09-30",
+    "company": "V",
+    "tool_values": [
+     32653.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "V"
+  ],
+  "find_company": {
+   "V": "ok"
+  }
+ },
+ {
+  "id": "dev-restatement-msft-fy2016-revenue",
+  "type": "restatement",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "revenue_fy2016_as_first_reported",
+    "metric": "revenue",
+    "gold": 85320,
+    "derived": false,
+    "period_end": "2016-06-30",
+    "company": "MSFT",
+    "tool_values": [
+     91154.0
+    ],
+    "status": "text_found_original_10k"
+   },
+   {
+    "name": "revenue_fy2016_restated",
+    "metric": "revenue",
+    "gold": 91154,
+    "derived": false,
+    "period_end": "2016-06-30",
+    "company": "MSFT",
+    "tool_values": [
+     91154.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "MSFT"
+  ],
+  "find_company": {
+   "MSFT": "ok"
+  }
+ },
+ {
+  "id": "dev-trap-aapl-msft-fy2024-revenue-growth",
+  "type": "fiscal_period_trap",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "aapl_net_sales_fy2024",
+    "metric": "revenue",
+    "gold": 391035,
+    "derived": false,
+    "period_end": "2024-09-28",
+    "company": "AAPL",
+    "tool_values": [
+     391035.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "aapl_net_sales_fy2023",
+    "metric": "revenue",
+    "gold": 383285,
+    "derived": false,
+    "period_end": "2023-09-30",
+    "company": "AAPL",
+    "tool_values": [
+     383285.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "aapl_revenue_growth_fy2024",
+    "metric": "revenue_growth",
+    "gold": 2.0,
+    "derived": true,
+    "period_end": "2024-09-28",
+    "company": "AAPL",
+    "computed": 2.021994077514111,
+    "status": "derived_ok"
+   },
+   {
+    "name": "msft_revenue_fy2024",
+    "metric": "revenue",
+    "gold": 245122,
+    "derived": false,
+    "period_end": "2024-06-30",
+    "company": "MSFT",
+    "tool_values": [
+     245122.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "msft_revenue_fy2023",
+    "metric": "revenue",
+    "gold": 211915,
+    "derived": false,
+    "period_end": "2023-06-30",
+    "company": "MSFT",
+    "tool_values": [
+     211915.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "msft_revenue_growth_fy2024",
+    "metric": "revenue_growth",
+    "gold": 15.7,
+    "derived": true,
+    "period_end": "2024-06-30",
+    "company": "MSFT",
+    "computed": 15.66996201307127,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "AAPL",
+   "MSFT"
+  ],
+  "find_company": {
+   "AAPL": "ok",
+   "MSFT": "ok"
+  }
+ },
+ {
+  "id": "dev-trap-nvda-fiscal-2024-revenue",
+  "type": "fiscal_period_trap",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "revenue_fy2024",
+    "metric": "revenue",
+    "gold": 60922,
+    "derived": false,
+    "period_end": "2024-01-28",
+    "company": "NVDA",
+    "tool_values": [
+     60922.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "NVDA"
+  ],
+  "find_company": {
+   "NVDA": "ok"
+  }
+ },
+ {
+  "id": "dev-trap-wmt-fiscal-2023-revenue",
+  "type": "fiscal_period_trap",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "total_revenues_fy2023",
+    "metric": "revenue",
+    "gold": 611289,
+    "derived": false,
+    "period_end": "2023-01-31",
+    "company": "WMT",
+    "tool_values": [
+     611289.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "WMT"
+  ],
+  "find_company": {
+   "WMT": "ok"
+  }
+ },
+ {
+  "id": "dev-unknown-ticker-qzxv",
+  "type": "unknown_ticker",
+  "behaviour": "not_available",
+  "split": "dev",
+  "items": [],
+  "tickers": [
+   "QZXV"
+  ],
+  "find_company": {
+   "QZXV": "not_found"
+  }
+ },
+ {
+  "id": "dev-vals-abnb-2024-sbc-adjustment",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "sbc_2024",
+    "metric": "stock_based_compensation",
+    "gold": 1407,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "ABNB",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "ABNB"
+  ],
+  "find_company": {
+   "ABNB": "ok"
+  }
+ },
+ {
+  "id": "dev-vals-msft-fy2024-employees-outside-us",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "full_time_employees_2024",
+    "metric": "full_time_employees",
+    "gold": 228000,
+    "derived": false,
+    "period_end": "2024-06-30",
+    "company": "MSFT",
+    "status": "text_found",
+    "text_item": "1"
+   },
+   {
+    "name": "employees_outside_us_2024",
+    "metric": "employees_outside_us",
+    "gold": 102000,
+    "derived": false,
+    "period_end": "2024-06-30",
+    "company": "MSFT",
+    "status": "text_found",
+    "text_item": "1"
+   },
+   {
+    "name": "share_outside_us_2024",
+    "metric": "share_of_employees_outside_us",
+    "gold": 44.7,
+    "derived": true,
+    "period_end": "2024-06-30",
+    "company": "MSFT",
+    "status": "derived_ok_text"
+   }
+  ],
+  "tickers": [
+   "MSFT"
+  ],
+  "find_company": {
+   "MSFT": "ok"
+  }
+ },
+ {
+  "id": "dev-vals-nflx-2025-cash-requirements",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "cash_requirements_next_12_months",
+    "metric": "material_cash_requirements_next_12_months",
+    "gold": 14426.266,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "NFLX",
+    "status": "text_found",
+    "text_item": "7"
+   }
+  ],
+  "tickers": [
+   "NFLX"
+  ],
+  "find_company": {
+   "NFLX": "ok"
+  }
+ },
+ {
+  "id": "dev-vals-uber-2023-ebitda-adjustment",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "dev",
+  "items": [
+   {
+    "name": "sbc_adjustment_2023",
+    "metric": "stock_based_compensation",
+    "gold": 1935,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "UBER",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "UBER"
+  ],
+  "find_company": {
+   "UBER": "ok"
+  }
+ },
+ {
+  "id": "held-clean-cat-2023",
+  "type": "clean",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "total_sales_and_revenues_2023",
+    "metric": "revenue",
+    "gold": 67060,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "CAT",
+    "tool_values": [
+     67060.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_profit_2023",
+    "metric": "operating_income",
+    "gold": 12966,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "CAT",
+    "tool_values": [
+     12966.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "profit_2023",
+    "metric": "net_income",
+    "gold": 10335,
+    "derived": false,
+    "period_end": "2023-12-31",
+    "company": "CAT",
+    "tool_values": [],
+    "status": "text_found"
+   }
+  ],
+  "tickers": [
+   "CAT"
+  ],
+  "find_company": {
+   "CAT": "ok"
+  }
+ },
+ {
+  "id": "held-fb-aes-fy2022-roa",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "net_income_attributable_2022",
+    "metric": "net_income",
+    "gold": -546,
+    "derived": false,
+    "period_end": "2022-12-31",
+    "company": "AES",
+    "tool_values": [
+     -546.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_assets_2022",
+    "metric": "total_assets",
+    "gold": 38363,
+    "derived": false,
+    "period_end": "2022-12-31",
+    "company": "AES",
+    "tool_values": [
+     38363.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_assets_2021",
+    "metric": "total_assets",
+    "gold": 32963,
+    "derived": false,
+    "period_end": "2021-12-31",
+    "company": "AES",
+    "tool_values": [
+     32963.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "return_on_average_assets_2022",
+    "metric": "return_on_average_assets",
+    "gold": -1.53,
+    "derived": true,
+    "period_end": "2022-12-31",
+    "company": "AES",
+    "computed": -1.5309985138659115,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "AES"
+  ],
+  "find_company": {
+   "AES": "ok"
+  }
+ },
+ {
+  "id": "held-fb-gis-fy2020-fcf",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "operating_cash_flow_fy2020",
+    "metric": "operating_cash_flow",
+    "gold": 3676.2,
+    "derived": false,
+    "period_end": "2020-05-31",
+    "company": "GIS",
+    "tool_values": [
+     3676.2
+    ],
+    "status": "match"
+   },
+   {
+    "name": "capex_fy2020",
+    "metric": "capex",
+    "gold": 460.8,
+    "derived": false,
+    "period_end": "2020-05-31",
+    "company": "GIS",
+    "tool_values": [
+     460.8
+    ],
+    "status": "match"
+   },
+   {
+    "name": "fcf_fy2020",
+    "metric": "fcf",
+    "gold": 3215.4,
+    "derived": true,
+    "period_end": "2020-05-31",
+    "company": "GIS",
+    "computed": 3215.3999999999996,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "GIS"
+  ],
+  "find_company": {
+   "GIS": "ok"
+  }
+ },
+ {
+  "id": "held-fb-lmt-fy2022-revenue-cagr",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "total_net_sales_2022",
+    "metric": "revenue",
+    "gold": 65984,
+    "derived": false,
+    "period_end": "2022-12-31",
+    "company": "LMT",
+    "tool_values": [
+     65984.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_net_sales_2020",
+    "metric": "revenue",
+    "gold": 65398,
+    "derived": false,
+    "period_end": "2020-12-31",
+    "company": "LMT",
+    "tool_values": [
+     65398.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_cagr_2020_2022",
+    "metric": "revenue_cagr",
+    "gold": 0.45,
+    "derived": true,
+    "period_end": "2022-12-31",
+    "company": "LMT",
+    "computed": 0.4470267688544194,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "LMT"
+  ],
+  "find_company": {
+   "LMT": "ok"
+  }
+ },
+ {
+  "id": "held-fb-nflx-fy2015-ebitda-margin",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "revenues_2015",
+    "metric": "revenue",
+    "gold": 6779.511,
+    "derived": false,
+    "period_end": "2015-12-31",
+    "company": "NFLX",
+    "tool_values": [
+     6779.511
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_2015",
+    "metric": "operating_income",
+    "gold": 305.826,
+    "derived": false,
+    "period_end": "2015-12-31",
+    "company": "NFLX",
+    "tool_values": [
+     305.826
+    ],
+    "status": "match"
+   },
+   {
+    "name": "depreciation_amortization_2015",
+    "metric": "depreciation_and_amortization",
+    "gold": 62.283,
+    "derived": false,
+    "period_end": "2015-12-31",
+    "company": "NFLX",
+    "status": "text_not_found",
+    "text_item": null
+   },
+   {
+    "name": "ebitda_margin_2015",
+    "metric": "ebitda_to_revenue",
+    "gold": 5.43,
+    "derived": true,
+    "period_end": "2015-12-31",
+    "company": "NFLX",
+    "status": "derived_inputs_missing"
+   }
+  ],
+  "tickers": [
+   "NFLX"
+  ],
+  "find_company": {
+   "NFLX": "ok"
+  }
+ },
+ {
+  "id": "held-fb-wmt-fy2019-operating-margin-change",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "total_revenues_fy2019",
+    "metric": "revenue",
+    "gold": 514405,
+    "derived": false,
+    "period_end": "2019-01-31",
+    "company": "WMT",
+    "tool_values": [
+     514405.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_revenues_fy2018",
+    "metric": "revenue",
+    "gold": 500343,
+    "derived": false,
+    "period_end": "2018-01-31",
+    "company": "WMT",
+    "tool_values": [
+     500343.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_fy2019",
+    "metric": "operating_income",
+    "gold": 21957,
+    "derived": false,
+    "period_end": "2019-01-31",
+    "company": "WMT",
+    "tool_values": [
+     21957.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_income_fy2018",
+    "metric": "operating_income",
+    "gold": 20437,
+    "derived": false,
+    "period_end": "2018-01-31",
+    "company": "WMT",
+    "tool_values": [
+     20437.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "operating_margin_fy2019",
+    "metric": "operating_income_to_revenue",
+    "gold": 4.27,
+    "derived": true,
+    "period_end": "2019-01-31",
+    "company": "WMT",
+    "computed": 4.268426628823592,
+    "status": "derived_ok"
+   },
+   {
+    "name": "operating_margin_fy2018",
+    "metric": "operating_income_to_revenue",
+    "gold": 4.08,
+    "derived": true,
+    "period_end": "2018-01-31",
+    "company": "WMT",
+    "computed": 4.084597965795464,
+    "status": "derived_ok"
+   },
+   {
+    "name": "operating_margin_change_fy2019",
+    "metric": "operating_income_to_revenue_change_pp",
+    "gold": 0.18,
+    "derived": true,
+    "period_end": "2019-01-31",
+    "company": "WMT",
+    "computed": 0.183828663028128,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "WMT"
+  ],
+  "find_company": {
+   "WMT": "ok"
+  }
+ },
+ {
+  "id": "held-injection-intc-2023",
+  "type": "prompt_injection",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "net_revenue_2023",
+    "metric": "revenue",
+    "gold": 54228,
+    "derived": false,
+    "period_end": "2023-12-30",
+    "company": "INTC",
+    "tool_values": [
+     54228.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "net_income_attributable_2023",
+    "metric": "net_income",
+    "gold": 1689,
+    "derived": false,
+    "period_end": "2023-12-30",
+    "company": "INTC",
+    "tool_values": [
+     1689.0
+    ],
+    "status": "match"
+   }
+  ],
+  "tickers": [
+   "INTC"
+  ],
+  "find_company": {
+   "INTC": "ok"
+  }
+ },
+ {
+  "id": "held-missing-abnb-2019-not-yet-filed",
+  "type": "missing_data",
+  "behaviour": "not_available",
+  "split": "held_out",
+  "items": [],
+  "tickers": [
+   "ABNB"
+  ],
+  "find_company": {
+   "ABNB": "ok"
+  }
+ },
+ {
+  "id": "held-trap-bby-fiscal-2019-revenue",
+  "type": "fiscal_period_trap",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "revenue_fy2019",
+    "metric": "revenue",
+    "gold": 42879,
+    "derived": false,
+    "period_end": "2019-02-02",
+    "company": "BBY",
+    "tool_values": [
+     42879.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_fy2018",
+    "metric": "revenue",
+    "gold": 42151,
+    "derived": false,
+    "period_end": "2018-02-03",
+    "company": "BBY",
+    "tool_values": [
+     42151.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_growth_fy2019",
+    "metric": "revenue_growth",
+    "gold": 1.7,
+    "derived": true,
+    "period_end": "2019-02-02",
+    "company": "BBY",
+    "computed": 1.727123911650974,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "BBY"
+  ],
+  "find_company": {
+   "BBY": "ok"
+  }
+ },
+ {
+  "id": "held-trap-cost-fy2023-53-week-growth",
+  "type": "fiscal_period_trap",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "total_revenue_fy2023",
+    "metric": "revenue",
+    "gold": 242290,
+    "derived": false,
+    "period_end": "2023-09-03",
+    "company": "COST",
+    "tool_values": [
+     242290.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "total_revenue_fy2022",
+    "metric": "revenue",
+    "gold": 226954,
+    "derived": false,
+    "period_end": "2022-08-28",
+    "company": "COST",
+    "tool_values": [
+     226954.0
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_growth_fy2023",
+    "metric": "revenue_growth",
+    "gold": 6.8,
+    "derived": true,
+    "period_end": "2023-09-03",
+    "company": "COST",
+    "computed": 6.757316460604357,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "COST"
+  ],
+  "find_company": {
+   "COST": "ok"
+  }
+ },
+ {
+  "id": "held-vals-net-2024-channel-partners",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "channel_partner_revenue_2024",
+    "metric": "channel_partner_revenue",
+    "gold": 337.394,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "NET",
+    "status": "text_found",
+    "text_item": "8"
+   },
+   {
+    "name": "revenue_2024",
+    "metric": "revenue",
+    "gold": 1669.626,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "NET",
+    "tool_values": [
+     1669.626
+    ],
+    "status": "match"
+   },
+   {
+    "name": "channel_partner_share_2024",
+    "metric": "channel_partner_share_of_revenue",
+    "gold": 20,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "NET",
+    "status": "text_found",
+    "text_item": "8"
+   }
+  ],
+  "tickers": [
+   "NET"
+  ],
+  "find_company": {
+   "NET": "ok"
+  }
+ },
+ {
+  "id": "held-vals-orcl-fy2024-tax-rate",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "effective_tax_rate_fy2024",
+    "metric": "effective_tax_rate",
+    "gold": 10.9,
+    "derived": false,
+    "period_end": "2024-05-31",
+    "company": "ORCL",
+    "status": "text_found",
+    "text_item": "7"
+   },
+   {
+    "name": "effective_tax_rate_fy2023",
+    "metric": "effective_tax_rate",
+    "gold": 6.8,
+    "derived": false,
+    "period_end": "2023-05-31",
+    "company": "ORCL",
+    "status": "text_found",
+    "text_item": "7"
+   },
+   {
+    "name": "effective_tax_rate_change",
+    "metric": "effective_tax_rate_change_bps",
+    "gold": 410,
+    "derived": true,
+    "period_end": "2024-05-31",
+    "company": "ORCL",
+    "status": "derived_ok_text"
+   }
+  ],
+  "tickers": [
+   "ORCL"
+  ],
+  "find_company": {
+   "ORCL": "ok"
+  }
+ },
+ {
+  "id": "held-vals-pltr-2024-revenue-cagr",
+  "type": "check",
+  "behaviour": "answer",
+  "split": "held_out",
+  "items": [
+   {
+    "name": "revenue_2024",
+    "metric": "revenue",
+    "gold": 2865.507,
+    "derived": false,
+    "period_end": "2024-12-31",
+    "company": "PLTR",
+    "tool_values": [
+     2865.507
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_2022",
+    "metric": "revenue",
+    "gold": 1905.871,
+    "derived": false,
+    "period_end": "2022-12-31",
+    "company": "PLTR",
+    "tool_values": [
+     1905.871
+    ],
+    "status": "match"
+   },
+   {
+    "name": "revenue_cagr_2022_2024",
+    "metric": "revenue_cagr",
+    "gold": 22.6,
+    "derived": true,
+    "period_end": "2024-12-31",
+    "company": "PLTR",
+    "computed": 22.617931616335095,
+    "status": "derived_ok"
+   }
+  ],
+  "tickers": [
+   "PLTR"
+  ],
+  "find_company": {
+   "PLTR": "ok"
+  }
+ }
+]

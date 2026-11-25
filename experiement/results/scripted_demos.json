@@ -1,0 +1,288 @@
+{
+ "test_a_wrong_period_is_caught_routed_to_its_analyst_and_corrected_as_a_new_version": {
+  "events": 37,
+  "kinds": {
+   "run_start": 1,
+   "plan": 1,
+   "model_call": 10,
+   "analyst_start": 2,
+   "tool_call": 3,
+   "finish": 7,
+   "analyst_end": 2,
+   "check": 3,
+   "self_review": 1,
+   "critic_start": 2,
+   "objections": 2,
+   "revision_start": 1,
+   "outcomes": 1,
+   "run_end": 1
+  },
+  "status": "finished",
+  "by_agent": {
+   "coordinator": {
+    "model_calls": 6,
+    "tool_calls": 2,
+    "prompt_tokens": 60,
+    "completion_tokens": 30,
+    "total_tokens": 90,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "fundamentals": {
+    "model_calls": 3,
+    "tool_calls": 1,
+    "prompt_tokens": 30,
+    "completion_tokens": 15,
+    "total_tokens": 45,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "critic": {
+    "model_calls": 2,
+    "tool_calls": 0,
+    "prompt_tokens": 20,
+    "completion_tokens": 10,
+    "total_tokens": 30,
+    "cached_tokens": null,
+    "cost": null
+   }
+  },
+  "objections": [
+   {
+    "issue": "wrong_period",
+    "owner": "fundamentals",
+    "outcome": "corrected",
+    "version": 1,
+    "new_version": 2,
+    "closed_in": 1
+   }
+  ],
+  "claim_versions": {
+   "claim-dce8c0f76c73": 2
+  },
+  "test_passed": true
+ },
+ "test_outcomes_follow_the_ledger_and_what_is_open_at_the_guard_is_unresolved": {
+  "events": 25,
+  "kinds": {
+   "run_start": 1,
+   "plan": 1,
+   "model_call": 6,
+   "tool_call": 1,
+   "finish": 5,
+   "check": 3,
+   "self_review": 1,
+   "critic_start": 2,
+   "objections": 2,
+   "revision_start": 1,
+   "outcomes": 1,
+   "run_end": 1
+  },
+  "status": "finished",
+  "by_agent": {
+   "coordinator": {
+    "model_calls": 5,
+    "tool_calls": 1,
+    "prompt_tokens": 50,
+    "completion_tokens": 25,
+    "total_tokens": 75,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "critic": {
+    "model_calls": 2,
+    "tool_calls": 0,
+    "prompt_tokens": 20,
+    "completion_tokens": 10,
+    "total_tokens": 30,
+    "cached_tokens": null,
+    "cost": null
+   }
+  },
+  "objections": [
+   {
+    "issue": "misleading_certainty",
+    "owner": "coordinator",
+    "outcome": "withdrawn",
+    "version": 1,
+    "new_version": null,
+    "closed_in": 1
+   },
+   {
+    "issue": "unsupported_inference",
+    "owner": "coordinator",
+    "outcome": "unresolved",
+    "version": 1,
+    "new_version": null,
+    "closed_in": null
+   },
+   {
+    "issue": "wrong_entity",
+    "owner": "coordinator",
+    "outcome": "unresolved",
+    "version": 1,
+    "new_version": null,
+    "closed_in": 1
+   },
+   {
+    "issue": "wrong_entity",
+    "owner": "coordinator",
+    "outcome": "unresolved",
+    "version": 1,
+    "new_version": null,
+    "closed_in": null
+   }
+  ],
+  "claim_versions": {
+   "claim-7999cb5a8d6e": 1,
+   "claim-e6566397f174": 1
+  },
+  "test_passed": true
+ },
+ "test_a_missing_risk_is_corrected_by_adding_a_claim": {
+  "events": 25,
+  "kinds": {
+   "run_start": 1,
+   "plan": 1,
+   "model_call": 6,
+   "tool_call": 1,
+   "finish": 5,
+   "check": 3,
+   "self_review": 1,
+   "critic_start": 2,
+   "objections": 2,
+   "revision_start": 1,
+   "outcomes": 1,
+   "run_end": 1
+  },
+  "status": "finished",
+  "by_agent": {
+   "coordinator": {
+    "model_calls": 5,
+    "tool_calls": 1,
+    "prompt_tokens": 50,
+    "completion_tokens": 25,
+    "total_tokens": 75,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "critic": {
+    "model_calls": 2,
+    "tool_calls": 0,
+    "prompt_tokens": 20,
+    "completion_tokens": 10,
+    "total_tokens": 30,
+    "cached_tokens": null,
+    "cost": null
+   }
+  },
+  "objections": [
+   {
+    "issue": "missing_material_risk",
+    "owner": "coordinator",
+    "outcome": "corrected",
+    "version": 1,
+    "new_version": null,
+    "closed_in": 1
+   }
+  ],
+  "claim_versions": {
+   "claim-7999cb5a8d6e": 1,
+   "claim-0470c9ebe36d": 1
+  },
+  "test_passed": true
+ },
+ "test_the_coordinator_asks_analysts_and_merges_their_findings": {
+  "events": 31,
+  "kinds": {
+   "run_start": 1,
+   "plan": 1,
+   "model_call": 10,
+   "tool_call": 7,
+   "analyst_start": 2,
+   "finish": 4,
+   "analyst_end": 2,
+   "check": 2,
+   "self_review": 1,
+   "run_end": 1
+  },
+  "status": "finished",
+  "by_agent": {
+   "coordinator": {
+    "model_calls": 5,
+    "tool_calls": 3,
+    "prompt_tokens": 50,
+    "completion_tokens": 25,
+    "total_tokens": 75,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "fundamentals": {
+    "model_calls": 3,
+    "tool_calls": 2,
+    "prompt_tokens": 30,
+    "completion_tokens": 15,
+    "total_tokens": 45,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "filings": {
+    "model_calls": 3,
+    "tool_calls": 2,
+    "prompt_tokens": 30,
+    "completion_tokens": 15,
+    "total_tokens": 45,
+    "cached_tokens": null,
+    "cost": null
+   }
+  },
+  "objections": [],
+  "claim_versions": {
+   "claim-9606c46fd141": 1,
+   "claim-654cf96b2810": 2,
+   "claim-c66039a82027": 1,
+   "claim-f5f730029b31": 1
+  },
+  "test_passed": true
+ },
+ "test_a_failed_analyst_is_reported_and_a_follow_up_continues_its_conversation": {
+  "events": 21,
+  "kinds": {
+   "run_start": 1,
+   "plan": 1,
+   "model_call": 5,
+   "analyst_start": 2,
+   "error": 1,
+   "analyst_end": 2,
+   "tool_call": 2,
+   "finish": 3,
+   "check": 2,
+   "self_review": 1,
+   "run_end": 1
+  },
+  "status": "finished",
+  "by_agent": {
+   "coordinator": {
+    "model_calls": 5,
+    "tool_calls": 2,
+    "prompt_tokens": 50,
+    "completion_tokens": 25,
+    "total_tokens": 75,
+    "cached_tokens": null,
+    "cost": null
+   },
+   "market": {
+    "model_calls": 1,
+    "tool_calls": 0,
+    "prompt_tokens": 10,
+    "completion_tokens": 5,
+    "total_tokens": 15,
+    "cached_tokens": null,
+    "cost": null
+   }
+  },
+  "objections": [],
+  "claim_versions": {},
+  "test_passed": true
+ }
+}

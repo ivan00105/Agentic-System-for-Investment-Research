@@ -1,0 +1,104 @@
+{
+  "shipped_h5": {
+    "n": 390,
+    "covered": 291,
+    "coverage": 0.7461538461538462,
+    "relative_coverage": 0.7487179487179487,
+    "median_width": 0.09447078173436699,
+    "kupiec_p_value_naive": 0.009906299753902064,
+    "origin_coverage_min": 0.1,
+    "origin_coverage_max": 1.0,
+    "trail10_mean_p": 0.009142089058912674,
+    "trail10_freq": 0.023076923076923078,
+    "trail10_brier": 0.022599645281047426,
+    "trail10_brier_base": 0.022544378698224853
+  },
+  "corrected_walk_forward_h5": {
+    "2019": {
+      "n": 7560,
+      "covered": 7318,
+      "coverage": 0.967989417989418
+    },
+    "2020": {
+      "n": 7590,
+      "covered": 3050,
+      "coverage": 0.4018445322793149
+    },
+    "2021": {
+      "n": 7560,
+      "covered": 5296,
+      "coverage": 0.7005291005291006
+    },
+    "2022": {
+      "n": 7530,
+      "covered": 5121,
+      "coverage": 0.6800796812749004
+    },
+    "2023": {
+      "n": 7500,
+      "covered": 5649,
+      "coverage": 0.7532
+    },
+    "2024": {
+      "n": 7560,
+      "covered": 5537,
+      "coverage": 0.7324074074074074
+    },
+    "2025": {
+      "n": 7500,
+      "covered": 5390,
+      "coverage": 0.7186666666666667
+    }
+  },
+  "shipped_h20": {
+    "n": 390,
+    "covered": 295,
+    "coverage": 0.7564102564102564,
+    "relative_coverage": 0.7615384615384615,
+    "median_width": 0.17442506650682296,
+    "kupiec_p_value_naive": 0.03582297477810953,
+    "origin_coverage_min": 0.5,
+    "origin_coverage_max": 0.9,
+    "trail10_mean_p": 0.0617984629779862,
+    "trail10_freq": 0.08461538461538462,
+    "trail10_brier": 0.07666189966765949,
+    "trail10_brier_base": 0.07745562130177513
+  },
+  "corrected_walk_forward_h20": {
+    "2019": {
+      "n": 7560,
+      "covered": 6587,
+      "coverage": 0.8712962962962963
+    },
+    "2020": {
+      "n": 7590,
+      "covered": 3323,
+      "coverage": 0.4378129117259552
+    },
+    "2021": {
+      "n": 7560,
+      "covered": 5192,
+      "coverage": 0.6867724867724868
+    },
+    "2022": {
+      "n": 7530,
+      "covered": 5004,
+      "coverage": 0.6645418326693228
+    },
+    "2023": {
+      "n": 7500,
+      "covered": 6439,
+      "coverage": 0.8585333333333334
+    },
+    "2024": {
+      "n": 7560,
+      "covered": 5812,
+      "coverage": 0.7687830687830688
+    },
+    "2025": {
+      "n": 7500,
+      "covered": 5682,
+      "coverage": 0.7576
+    }
+  }
+}

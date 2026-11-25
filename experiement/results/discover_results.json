@@ -1,0 +1,501 @@
+{
+  "S1 tech: op. margin > 25%, revenue growth > 0, rank op. margin": {
+    "universe": "sp500_tech",
+    "universe_size": 97,
+    "issuers": 94,
+    "frame_year": 2025,
+    "counts": {
+      "screened": 94,
+      "eligible": 30,
+      "failed": 54,
+      "unknown": 10,
+      "unranked": 0,
+      "returned": 10
+    },
+    "warnings": [
+      "SEC frames hold each company's latest-filed value for the fiscal year closest to calendar 2025 (restated, not point-in-time) and may include filings after the cutoff. Verify shortlisted companies with get_financials.",
+      "1 companies have a larger revenue total in another filing than the value used; each one's notes in the screen record say which."
+    ],
+    "rechecked": [
+      {
+        "rank": 1,
+        "name": "AppLovin Corporation",
+        "tickers": [
+          "APP"
+        ],
+        "frame_value": "0.757549",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 75.8% (2025-01-01 to 2025-12-31)",
+          "revenue growth > 0.0%: 70.0% (fiscal year ending 2025-12-31 against the one before)"
+        ]
+      },
+      {
+        "rank": 2,
+        "name": "VERISIGN INC/CA",
+        "tickers": [
+          "VRSN"
+        ],
+        "frame_value": "0.676687",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 67.7% (2025-01-01 to 2025-12-31)",
+          "revenue growth > 0.0%: 6.4% (fiscal year ending 2025-12-31 against the one before)"
+        ]
+      },
+      {
+        "rank": 3,
+        "name": "NVIDIA CORP",
+        "tickers": [
+          "NVDA"
+        ],
+        "frame_value": "0.603817",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 60.4% (2025-01-27 to 2026-01-25)",
+          "revenue growth > 0.0%: 65.5% (fiscal year ending 2026-01-25 against the one before)"
+        ]
+      },
+      {
+        "rank": 4,
+        "name": "Fair Isaac Corp",
+        "tickers": [
+          "FICO"
+        ],
+        "frame_value": "0.464546",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 49.9% (2025-10-01 to 2026-09-30)",
+          "revenue growth > 0.0%: 27.3% (fiscal year ending 2026-09-30 against the one before)"
+        ]
+      },
+      {
+        "rank": 5,
+        "name": "MICROSOFT CORPORATION",
+        "tickers": [
+          "MSFT"
+        ],
+        "frame_value": "0.456220",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 46.8% (2025-07-01 to 2026-06-30)",
+          "revenue growth > 0.0%: 17.8% (fiscal year ending 2026-06-30 against the one before)"
+        ]
+      },
+      {
+        "rank": 6,
+        "name": "ARISTA NETWORKS,\u00a0INC.",
+        "tickers": [
+          "ANET"
+        ],
+        "frame_value": "0.428184",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 42.8% (2025-01-01 to 2025-12-31)",
+          "revenue growth > 0.0%: 28.6% (fiscal year ending 2025-12-31 against the one before)"
+        ]
+      },
+      {
+        "rank": 7,
+        "name": "Gen Digital Inc.",
+        "tickers": [
+          "GEN",
+          "GENVR"
+        ],
+        "frame_value": "0.424000",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 42.4% (2025-03-29 to 2026-04-03)",
+          "revenue growth > 0.0%: 27.1% (fiscal year ending 2026-04-03 against the one before)"
+        ]
+      },
+      {
+        "rank": 8,
+        "name": "Meta Platforms, Inc.",
+        "tickers": [
+          "META",
+          "METAM"
+        ],
+        "frame_value": "0.414379",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 41.4% (2025-01-01 to 2025-12-31)",
+          "revenue growth > 0.0%: 22.2% (fiscal year ending 2025-12-31 against the one before)"
+        ]
+      },
+      {
+        "rank": 9,
+        "name": "Broadcom Inc.",
+        "tickers": [
+          "AVGO"
+        ],
+        "frame_value": "0.398892",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 39.9% (2024-11-04 to 2025-11-02)",
+          "revenue growth > 0.0%: 23.9% (fiscal year ending 2025-11-02 against the one before)"
+        ]
+      },
+      {
+        "rank": 10,
+        "name": "ADOBE INC.",
+        "tickers": [
+          "ADBE"
+        ],
+        "frame_value": "0.366275",
+        "verdict": "pass",
+        "lines": [
+          "operating margin > 25.0%: 36.6% (2024-11-30 to 2025-11-28)",
+          "revenue growth > 0.0%: 10.5% (fiscal year ending 2025-11-28 against the one before)"
+        ]
+      }
+    ],
+    "accepted": 10,
+    "rejected": 0,
+    "unknown": 0,
+    "seconds_screen": 1.7,
+    "seconds_acceptance": 1.5
+  },
+  "S2 S&P 500: FCF margin > 20%, net margin > 15%, rank FCF margin": {
+    "universe": "sp500",
+    "universe_size": 503,
+    "issuers": 500,
+    "frame_year": 2025,
+    "counts": {
+      "screened": 499,
+      "eligible": 88,
+      "failed": 348,
+      "unknown": 63,
+      "unranked": 0,
+      "returned": 10
+    },
+    "warnings": [
+      "SEC frames hold each company's latest-filed value for the fiscal year closest to calendar 2025 (restated, not point-in-time) and may include filings after the cutoff. Verify shortlisted companies with get_financials.",
+      "KVUE: no SEC filer with that ticker; left out.",
+      "1 companies have a larger revenue total in another filing than the value used; each one's notes in the screen record say which."
+    ],
+    "rechecked": [
+      {
+        "rank": 1,
+        "name": "STATE STREET CORPORATION",
+        "tickers": [
+          "STT",
+          "STT-PG"
+        ],
+        "frame_value": "0.777610",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 77.8% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 21.1% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 2,
+        "name": "NORTHERN TRUST CORPORATION",
+        "tickers": [
+          "NTRS",
+          "NTRSO"
+        ],
+        "frame_value": "0.675146",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 67.5% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 21.5% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 3,
+        "name": "VERISIGN INC/CA",
+        "tickers": [
+          "VRSN"
+        ],
+        "frame_value": "0.644875",
+        "verdict": "unknown",
+        "lines": [
+          "fcf margin > 20.0%: 64.5% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: unknown (net_income: No annual value before the cutoff under us-gaap:NetIncomeLoss, ifrs-full:ProfitLossAttributableToOwnersOfParent, ifrs-full:ProfitLoss.)"
+        ]
+      },
+      {
+        "rank": 4,
+        "name": "CME GROUP INC.",
+        "tickers": [
+          "CME"
+        ],
+        "frame_value": "0.643131",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 64.3% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 62.5% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 5,
+        "name": "Comfort Systems USA,\u00a0Inc.",
+        "tickers": [
+          "FIX"
+        ],
+        "frame_value": "0.563240",
+        "verdict": "fail",
+        "lines": [
+          "fcf margin > 20.0%: 11.3% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 11.2% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 6,
+        "name": "VISA INC.",
+        "tickers": [
+          "V"
+        ],
+        "frame_value": "0.539425",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 48.1% (2025-10-01 to 2026-09-30)",
+          "net margin > 15.0%: 51.2% (2025-10-01 to 2026-09-30)"
+        ]
+      },
+      {
+        "rank": 7,
+        "name": "Mastercard Incorporated",
+        "tickers": [
+          "MA"
+        ],
+        "frame_value": "0.523284",
+        "verdict": "unknown",
+        "lines": [
+          "fcf margin > 20.0%: 52.3% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: unknown (net_income: No annual value before the cutoff under us-gaap:NetIncomeLoss, ifrs-full:ProfitLossAttributableToOwnersOfParent, ifrs-full:ProfitLoss.)"
+        ]
+      },
+      {
+        "rank": 8,
+        "name": "KIMCO REALTY CORPORATION",
+        "tickers": [
+          "KIM",
+          "KIM-PL",
+          "KIM-PM",
+          "KIM-PN"
+        ],
+        "frame_value": "0.514745",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 51.5% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 27.3% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 9,
+        "name": "MSCI INC.",
+        "tickers": [
+          "MSCI"
+        ],
+        "frame_value": "0.494225",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 49.4% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 38.4% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 10,
+        "name": "Palantir Technologies Inc.",
+        "tickers": [
+          "PLTR"
+        ],
+        "frame_value": "0.469359",
+        "verdict": "pass",
+        "lines": [
+          "fcf margin > 20.0%: 46.9% (2025-01-01 to 2025-12-31)",
+          "net margin > 15.0%: 36.3% (2025-01-01 to 2025-12-31)"
+        ]
+      }
+    ],
+    "accepted": 7,
+    "rejected": 1,
+    "unknown": 2,
+    "seconds_screen": 1.1,
+    "seconds_acceptance": 2.8
+  },
+  "S3 S&P 500: revenue growth > 15%, op. margin > 20%, rank growth": {
+    "universe": "sp500",
+    "universe_size": 503,
+    "issuers": 500,
+    "frame_year": 2025,
+    "counts": {
+      "screened": 499,
+      "eligible": 37,
+      "failed": 425,
+      "unknown": 37,
+      "unranked": 0,
+      "returned": 10
+    },
+    "warnings": [
+      "SEC frames hold each company's latest-filed value for the fiscal year closest to calendar 2025 (restated, not point-in-time) and may include filings after the cutoff. Verify shortlisted companies with get_financials.",
+      "KVUE: no SEC filer with that ticker; left out.",
+      "2 companies have a larger revenue total in another filing than the value used; each one's notes in the screen record say which."
+    ],
+    "rechecked": [
+      {
+        "rank": 1,
+        "name": "EXPAND ENERGY CORPORATION",
+        "tickers": [
+          "EXE"
+        ],
+        "frame_value": "1.862810",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 186.3% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 20.4% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 2,
+        "name": "AppLovin Corporation",
+        "tickers": [
+          "APP"
+        ],
+        "frame_value": "0.699944",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 70.0% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 75.8% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 3,
+        "name": "Reddit, Inc.",
+        "tickers": [
+          "RDDT"
+        ],
+        "frame_value": "0.693968",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 69.4% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 20.1% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 4,
+        "name": "NVIDIA CORP",
+        "tickers": [
+          "NVDA"
+        ],
+        "frame_value": "0.654735",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 65.5% (fiscal year ending 2026-01-25 against the one before)",
+          "operating margin > 20.0%: 60.4% (2025-01-27 to 2026-01-25)"
+        ]
+      },
+      {
+        "rank": 5,
+        "name": "EQT CORPORATION",
+        "tickers": [
+          "EQT"
+        ],
+        "frame_value": "0.639238",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 63.9% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 37.6% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 6,
+        "name": "Palantir Technologies Inc.",
+        "tickers": [
+          "PLTR"
+        ],
+        "frame_value": "0.561834",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 56.2% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 31.6% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 7,
+        "name": "AMPHENOL CORPORATION",
+        "tickers": [
+          "APH"
+        ],
+        "frame_value": "0.517122",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 51.7% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 25.4% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 8,
+        "name": "Micron Technology, Inc.",
+        "tickers": [
+          "MU"
+        ],
+        "frame_value": "0.488511",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 256.3% (fiscal year ending 2026-09-03 against the one before)",
+          "operating margin > 20.0%: 74.6% (2025-08-29 to 2026-09-03)"
+        ]
+      },
+      {
+        "rank": 9,
+        "name": "ARISTA NETWORKS,\u00a0INC.",
+        "tickers": [
+          "ANET"
+        ],
+        "frame_value": "0.285959",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 28.6% (fiscal year ending 2025-12-31 against the one before)",
+          "operating margin > 20.0%: 42.8% (2025-01-01 to 2025-12-31)"
+        ]
+      },
+      {
+        "rank": 10,
+        "name": "Gen Digital Inc.",
+        "tickers": [
+          "GEN",
+          "GENVR"
+        ],
+        "frame_value": "0.270648",
+        "verdict": "pass",
+        "lines": [
+          "revenue growth > 15.0%: 27.1% (fiscal year ending 2026-04-03 against the one before)",
+          "operating margin > 20.0%: 42.4% (2025-03-29 to 2026-04-03)"
+        ]
+      }
+    ],
+    "accepted": 10,
+    "rejected": 0,
+    "unknown": 0,
+    "seconds_screen": 0.4,
+    "seconds_acceptance": 2.4
+  },
+  "S4 tech: op. margin > 60%, revenue growth > 100% (near-impossible)": {
+    "universe": "sp500_tech",
+    "universe_size": 97,
+    "issuers": 94,
+    "frame_year": 2025,
+    "counts": {
+      "screened": 94,
+      "eligible": 0,
+      "failed": 90,
+      "unknown": 4,
+      "unranked": 0,
+      "returned": 0
+    },
+    "warnings": [
+      "SEC frames hold each company's latest-filed value for the fiscal year closest to calendar 2025 (restated, not point-in-time) and may include filings after the cutoff. Verify shortlisted companies with get_financials.",
+      "1 companies have a larger revenue total in another filing than the value used; each one's notes in the screen record say which."
+    ],
+    "rechecked": [],
+    "accepted": 0,
+    "rejected": 0,
+    "unknown": 0,
+    "seconds_screen": 0.6,
+    "seconds_acceptance": 0.0
+  }
+}
