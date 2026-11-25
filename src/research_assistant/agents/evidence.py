@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .. import config
 from ..finance import quant, risk
+from ..finance.filing_changes import measure_changes
 from ..tools import calculate
 from ..tools.result import ToolContext, ToolResult
 from .checker import PLACEHOLDER, check, lookup
@@ -85,10 +86,16 @@ def recheck(path: Path) -> Recheck:
 def _recompute(calc: dict, run: SavedRun, cutoff: datetime):
     """The calculation recomputed from the versions frozen under its input IDs, latest first. The first combination
     that gives the saved value wins; if none does, the latest versions' result is the one reported."""
-    if str(calc.get("formula", "")).startswith("outlook_"):
+    formula = calc.get("formula", "")
+    if formula.startswith("outlook_"):
         return _recompute_outlook(calc, run)
-    if calc.get("formula") in ("typical_results_day_move", "option_implied_range"):
+    if formula in ("typical_results_day_move", "option_implied_range"):
         return _recompute_event_market_view(calc, run)
+    if formula == "filing_change_alert":
+        return _recompute_filing_change(calc, run)
+    if formula not in calculate.ROLES:
+        return ToolResult(status="unavailable", source="frozen calculations",
+                          warnings=[f"No offline replay for {formula!r}."])
     ids = list(calc["inputs"].values())
     latest = None
     for chosen in product(*(run.versions.get(i, [])[::-1] or [None] for i in ids)):  # None: calculate says unknown
@@ -99,6 +106,28 @@ def _recompute(calc: dict, run: SavedRun, cutoff: datetime):
         if result.status in ("ok", "unsupported") and result.data["value"] == calc["value"]:
             return result
     return latest
+
+
+def _recompute_filing_change(calc: dict, run: SavedRun) -> ToolResult:
+    source = "frozen filing text"
+    inputs = calc.get("inputs") or {}
+    method = calc.get("method")
+    if method not in ("cosine", "tfidf"):
+        return ToolResult(status="invalid", source=source, warnings=["Unknown frozen filing-change method."])
+    sections = []
+    for key in ("current_chunks", "prior_chunks"):
+        ids = inputs.get(key)
+        if not isinstance(ids, list) or not ids:
+            return ToolResult(status="invalid", source=source, warnings=[f"No frozen {key} IDs."])
+        paragraphs = []
+        for chunk_id in ids:
+            record = run.records.get(chunk_id, {}) if isinstance(chunk_id, str) else {}
+            if record.get("kind") != "chunk" or not isinstance(record.get("text"), str):
+                return ToolResult(status="invalid", source=source, warnings=[f"Missing frozen chunk {chunk_id}."])
+            paragraphs.append(record["text"])
+        sections.append("\n\n".join(paragraphs))
+    similarity = measure_changes(sections[0], sections[1], method)["similarity"]
+    return ToolResult(status="ok", data={"value": round(float(similarity), 8)}, ids=[calc["id"]], source=source)
 
 
 def _recompute_event_market_view(calc: dict, run: SavedRun) -> ToolResult:

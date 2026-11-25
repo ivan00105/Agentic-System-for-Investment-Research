@@ -129,6 +129,37 @@ def test_a_trace_holding_two_versions_under_one_id_still_rechecks(tmp_path):
     assert any("(volatility) was saved as 0.5 but recomputes to" in p for p in evidence.recheck(path).problems)
 
 
+def test_recheck_recomputes_filing_change_from_frozen_chunks(tmp_path):
+    path = tmp_path / "filing_change.jsonl"
+    chunks = {key: {"kind": "chunk", "text": text}
+              for key, text in {"c1": "Demand", "c2": "rose", "p1": "Demand fell"}.items()}
+    alert = {"id": "change", "kind": "calc", "formula": "filing_change_alert", "method": "cosine", "value": 0.5,
+             "inputs": {"current_accession": "new", "prior_accession": "old",
+                        "current_chunks": ["c1", "c2"], "prior_chunks": ["p1"]}}
+    path.write_text(json.dumps({"kind": "tool_call", "records": chunks | {"change": alert}}), encoding="utf-8")
+    assert (evidence.recheck(path).calcs, evidence.recheck(path).problems) == (1, [])
+
+    def change_text(event):
+        event["records"]["c2"]["text"] = "fell"
+    rewrite(path, change_text)
+    [problem] = evidence.recheck(path).problems
+    assert "(filing_change_alert) was saved as 0.5 but recomputes to 1.0" in problem
+
+    rewrite(path, lambda event: event["records"].pop("c2"))
+    [problem] = evidence.recheck(path).problems
+    assert "change could not be recomputed" in problem and "c2" in problem
+
+
+def test_unhandled_tool_calculation_is_reported_without_stopping_recheck(tmp_path):
+    path = saved_run(tmp_path).trace_path
+    record = {"kind": "calc", "id": "rates", "formula": "base_rates", "value": None, "unit": "distribution"}
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps({"kind": "tool_call", "records": {"rates": record}}) + "\n")
+    outcome = evidence.recheck(path)
+    assert (outcome.calcs, outcome.statements) == (2, 1)
+    assert outcome.problems == ["rates could not be recomputed: No offline replay for 'base_rates'."]
+
+
 def test_the_cli_rechecks_a_trace(tmp_path, capsys):
     path = saved_run(tmp_path).trace_path
     assert cli.main(["--recheck", str(path)]) == 0
