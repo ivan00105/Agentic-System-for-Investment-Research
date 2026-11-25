@@ -48,8 +48,10 @@ def sections(sec: SecClient, filing: Filing, cache: DiskCache) -> dict[str, dict
 
 
 def find_item(found: dict[str, dict], item: str, part: str | None) -> list[str]:
-    """Section names for an item like "1A" or "7", optionally within a part ("I", "II"); several means ambiguous."""
+    """Section names for an item like "1A", "7" or an 8-K's "2.02", optionally within a part ("I", "II"); several
+    means ambiguous."""
     wanted = re.sub(r"^item[\s._]*", "", item.strip().lower()).rstrip(".")
+    wanted = re.sub(r"(?<=\d)\.(?=\d)", "", wanted)  # edgartools names an 8-K's Item 2.02 "item_202"
     names = [name for name, section in found.items()
              if name.endswith(f"item_{wanted}") or wanted in [c.lower() for c in section.get("covered_items", [])]]
     if part:

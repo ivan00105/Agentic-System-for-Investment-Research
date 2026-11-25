@@ -27,15 +27,18 @@ test('History nests a Discover run\'s picks and comparison under it, folded, wit
   const title = discover.locator('.agent-history-question').first()
   await expect(title).toHaveText(LONG) // the whole text is there; CSS clamps it to two lines
   expect(await title.evaluate(el => getComputedStyle(el).webkitLineClamp)).toBe('2')
+  await expect(discover.locator('.history-info span').first()).toHaveText('Discover · single agent for each pick') // a name, not "B"
   const children = discover.locator('details.run-children')
   await expect(children.locator('summary')).toHaveText('3 picks · 1 comparison')
   await expect(children.getByText('Pick 2 of 3: NVIDIA CORP (NVDA)')).toBeHidden()
   await children.locator('summary').click()
   await expect(children.locator('li .agent-history-question')).toHaveText(['Pick 1 of 3: Apple Inc. (AAPL)', 'Pick 2 of 3: NVIDIA CORP (NVDA)', 'Pick 3 of 3: Alphabet Inc. (GOOGL)', 'Compare Apple and NVIDIA on growth.'])
+  await expect(children.locator('li .history-info span').first()).toHaveText('Single agent')
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([])
   await mockRun(page, {title: 'Pick 1 of 3: Apple Inc. (AAPL)', question: BRIEF, kind: 'pick'}, {...REPORT, title: 'Pick 1 of 3: Apple Inc. (AAPL)', question: BRIEF, kind: 'pick'})
   await children.locator(`li[data-run-id="${RUN}"]`).getByRole('button', {name: 'Open ↗'}).click()
   await expect(page.getByRole('heading', {level: 2, name: 'Pick 1 of 3: Apple Inc. (AAPL)'})).toBeVisible()
+  await expect(page.locator('.agent-run .section-label').first()).toHaveText('AGENT RUN · Analyst team with critic')
   const brief = page.locator('details.run-brief')
   await expect(brief).not.toHaveAttribute('open') // a pick's brief is long, so it starts folded
   await brief.locator('summary').click()

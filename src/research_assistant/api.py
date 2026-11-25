@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import agent_api, companies_api
 from .application import Application
+from .config import WEB_DISCOVER_CONDITION, WEB_RESEARCH_CONDITION
 from .contracts import ConnectionInfo, DomainError, Evidence, Run, RunMetadataPatch, RunRequest, UNIVERSE, utcnow
 from .data import providers
 from .data.errors import DataError
@@ -129,6 +130,7 @@ def create_app(data_dir: Path | None = None):
             ],
             "forecast_available": False,
             "connections": connections,
+            "agents": {"research": WEB_RESEARCH_CONDITION, "find": WEB_DISCOVER_CONDITION},
         }
 
     def _active_llm() -> str | None:

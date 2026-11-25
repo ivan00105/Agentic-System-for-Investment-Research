@@ -38,6 +38,40 @@ def test_another_currency_is_named_only_once_its_filing_is_public():
     assert sec_facts.other_units(payload, REVENUE, NOW) == ["CNY"]
 
 
+def tenk(**tags) -> dict:
+    """One 10-K's companyfacts for fiscal 2023; each tag is a value, a period's flow unless the name says Assets."""
+    gaap = {}
+    for tag, value in {"Revenues": 1000, **tags}.items():
+        row = {"end": "2023-12-31", "val": value, "accn": OLD_20F[0], "form": "10-K", "filed": "2024-02-20"}
+        gaap[tag] = {"units": {"USD": [row if "Assets" in tag else {"start": "2023-01-01", **row}]}}
+    return {"facts": {"us-gaap": gaap}}
+
+
+def picked(payload: dict, metric: str) -> list[tuple[str, str]]:
+    facts, _ = sec_facts.select(payload, sec_facts.CONCEPTS[metric], NOW, sec_facts.fiscal_year_ends(payload, NOW))
+    return [(f.tag, str(f.value)) for f in facts]
+
+
+def test_cost_of_revenue_is_the_total_never_a_product_only_line():
+    # Microsoft's FY2016 10-K tags its total as CostOfRevenue and its product cost alone as CostOfGoodsSold.
+    assert picked(tenk(CostOfRevenue=32780, CostOfGoodsSold=17880), "cost_of_revenue") == [
+        ("us-gaap:CostOfRevenue", "32780")]
+    assert picked(tenk(CostOfGoodsSold=17880), "cost_of_revenue") == []
+    assert picked(tenk(CostOfGoodsAndServicesSold=15357), "cost_of_revenue") == [  # Coca-Cola's tag
+        ("us-gaap:CostOfGoodsAndServicesSold", "15357")]
+
+
+def test_stock_based_compensation_prefers_the_cash_flow_add_back():
+    both = tenk(ShareBasedCompensation=1407, AllocatedShareBasedCompensationExpense=1400)  # Airbnb 2024
+    assert picked(both, "stock_based_compensation") == [("us-gaap:ShareBasedCompensation", "1407")]
+    assert picked(tenk(AllocatedShareBasedCompensationExpense=2668), "stock_based_compensation") == [
+        ("us-gaap:AllocatedShareBasedCompensationExpense", "2668")]
+
+
+def test_current_assets_is_a_year_end_balance():
+    assert picked(tenk(AssetsCurrent=16525), "current_assets") == [("us-gaap:AssetsCurrent", "16525")]
+
+
 def test_a_switch_of_reporting_currency_keeps_the_newest_year():
     payload = revenue(*[("CNY", value, year, OLD_20F) for year, value in ((2023, 700), (2022, 630), (2021, 560))],
                       ("USD", 110, 2024, NEW_20F), ("USD", 100, 2023, NEW_20F))

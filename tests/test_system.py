@@ -492,6 +492,7 @@ def test_api_security_validation_and_evidence_scope(tmp_path):
         assert len(client.get("/api/runs?limit=2").json()["items"]) == 2
         config = client.get("/api/config").json()
         assert "OPENAI_API_KEY" not in str(config)
+        assert config["agents"] == {"research": "D", "find": "B"}  # Advanced options show these by name
         body = frozen(mode="replay").model_dump(mode="json")
         first = client.post("/api/runs", json=body, headers={"Idempotency-Key": "api-replay-intent"})
         second = client.post("/api/runs", json=body, headers={"Idempotency-Key": "api-replay-intent"})

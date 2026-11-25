@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 
 from . import preferences
-from .checker import PLACEHOLDER, lookup
+from .checker import PLACEHOLDER, empty_status, lookup
 from .discover import pick_title
 from .draft import SECTIONS
 from .evidence import load
@@ -162,7 +162,8 @@ def report(path: Path) -> dict | None:
         claims = [{"text": c["text"], "status": "qualified" if c["flags"] else "cited",
                    "citations": [number[i] for i in c["citations"] if i in number],
                    "flags": [flag["problem"] for flag in c["flags"]]} for c in checked["sections"].get(key, [])]
-        status = "abstained" if not claims else "qualified" if any(c["flags"] for c in claims) else "cited"
+        status = (empty_status(key, answered=bool(checked["sections"].get("summary"))) if not claims
+                  else "qualified" if any(c["flags"] for c in claims) else "cited")
         sections.append({"key": key, "heading": heading, "status": status, "claims": claims})
     outlook = [
         r for r in run.records.values()

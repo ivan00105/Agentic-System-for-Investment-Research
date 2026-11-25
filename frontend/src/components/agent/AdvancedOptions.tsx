@@ -2,7 +2,7 @@
 // Professional view, folded away otherwise.
 import { useEffect, useState } from 'react'
 import { api, setupApi } from '../../api'
-import type { Condition, ModelSource } from '../../api'
+import type { Condition, Config, ModelSource } from '../../api'
 import { useLevel } from '../../level'
 import { CONDITIONS } from './labels'
 
@@ -15,12 +15,14 @@ export function AdvancedOptions({find, options, onChange, onDefaults}: {
   const {level} = useLevel()
   const [defaultModel, setDefaultModel] = useState<string | null>(null)
   const [sources, setSources] = useState<ModelSource[]>([])
+  const [agents, setAgents] = useState<Config['agents'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   useEffect(() => {
     api.config().then(c => {
       setDefaultModel(c.model)
       setSources(c.model_sources ?? [])
+      setAgents(c.agents ?? null)
       const defaultSource = c.default_model_source ?? 'default'
       const agentModels = c.default_agent_models ?? {}
       onDefaults?.({modelSource: defaultSource, agentModels})
@@ -29,7 +31,9 @@ export function AdvancedOptions({find, options, onChange, onDefaults}: {
   const configured = sources.filter(source => source.configured)
   const activeSource = configured.find(s => s.id === (options.modelSource || 'default')) ?? configured[0]
   const shownDefaultModel = activeSource?.model || defaultModel
-  const effectiveCondition = options.condition || (find ? 'B' : 'D')
+  // Not chosen yet: show the set-up the server will use for this mode, by name.
+  const preset = agents?.[find ? 'find' : 'research']
+  const effectiveCondition = options.condition || preset || (find ? 'B' : 'D')
   const roles: {key: string; label: string}[] = [
     ...(effectiveCondition === 'B' ? [{key: 'single_agent', label: 'Single agent'}] : [
       {key: 'coordinator', label: 'Coordinator'},
@@ -53,8 +57,8 @@ export function AdvancedOptions({find, options, onChange, onDefaults}: {
     finally { setSaving(false) }
   }
   return <details className="agent-options" open={level === 'professional'}><summary>Advanced options</summary>
-    <label>Agents<select value={options.condition} onChange={e => onChange({condition: e.target.value as Condition | ''})}><option value="">Default</option>{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{c} · {CONDITIONS[c]}</option>)}</select></label>
-    <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is D: three analysts write the report and a critic checks it.'}</p>
+    <label>Agents<select value={options.condition || preset || ''} onChange={e => onChange({condition: e.target.value as Condition | ''})}>{!options.condition && !preset && <option value="">Set by the server</option>}{(['D', 'C', 'B'] as Condition[]).map(c => <option key={c} value={c}>{CONDITIONS[c]}</option>)}</select></label>
+    <p className="form-note">{find ? 'Find researches each pick in turn. Its default is one agent per pick, so a shortlist takes minutes rather than an hour.' : 'The default is the analyst team with critic: three analysts write the report and a critic checks it.'}</p>
     {configured.length > 1 && <label>Default model source<select value={options.modelSource || configured[0].id} onChange={e => { setSavedMsg(''); onChange({modelSource: e.target.value}) }}>
       {configured.map(source => <option key={source.id} value={source.id}>{source.label}: {source.model}</option>)}
     </select></label>}

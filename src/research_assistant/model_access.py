@@ -77,9 +77,13 @@ class ModelSettings:
         return kwargs
 
     def agent_kwargs(self) -> dict:
-        """What every agent model call sends: host fallback, plus the decoding settings config.py pins (none by default)."""
+        """What every agent model call sends: host fallback minus the hosts config.py skips, plus the decoding
+        settings config.py pins (none by default)."""
         pinned = {name: value for name, value in decoding().items() if value is not None}
-        return self.request_kwargs(fallbacks=True) | pinned
+        kwargs = self.request_kwargs(fallbacks=True)
+        if self.provider == "openrouter" and config.AGENT_IGNORED_HOSTS:
+            kwargs["extra_body"]["provider"]["ignore"] = list(config.AGENT_IGNORED_HOSTS)
+        return kwargs | pinned
 
     def metadata(self) -> dict:
         return {

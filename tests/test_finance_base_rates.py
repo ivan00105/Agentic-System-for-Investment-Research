@@ -53,3 +53,38 @@ def test_base_rate_tool_keeps_first_reported_values(tmp_path):
     result = run(GetBaseRatesInput(cik="1", revenue_floor=Decimal(1)), context)
     assert result.status == "ok" and result.data["first_reported"] is True
     assert result.data["observations"] == 1
+
+
+def _row(start, end, value, filed="2023-02-01", form="10-K"):
+    return {"start": start, "end": end, "filed": filed, "form": form, "value": str(value), "val": str(value)}
+
+
+def test_a_quarter_in_the_10k_never_replaces_the_full_year():
+    rows = [_row("2022-01-01", "2022-12-31", 1000), _row("2022-10-01", "2022-12-31", 260)]
+    for order in (rows, rows[::-1]):
+        assert [item.revenue for item in base_rates.observations("1", order, [])] == [Decimal(1000)]
+
+
+def test_52_53_week_years_pair_with_the_next_fiscal_year():
+    # As Johnson & Johnson: two fiscal years end in calendar 2022.
+    rows = [_row("2020-01-04", "2021-01-02", 100), _row("2021-01-03", "2022-01-01", 110),
+            _row("2022-01-02", "2022-12-31", 132)]
+    changes = base_rates.next_year_changes(base_rates.observations("1", rows, []))
+    assert [item["growth"] for item in changes] == [Decimal("0.1"), Decimal("0.2")]
+
+
+def test_a_missing_year_is_not_bridged():
+    rows = [_row("2020-01-01", "2020-12-31", 100), _row("2022-01-01", "2022-12-31", 130)]
+    assert base_rates.next_year_changes(base_rates.observations("1", rows, [])) == []
+
+
+def test_base_rate_tool_says_what_its_sample_is(tmp_path):
+    payload = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+        _row("2021-01-01", "2021-12-31", 100, "2022-02-01"), _row("2022-01-01", "2022-12-31", 120)]}}}}}
+    context = make_context(tmp_path)
+    context.sec.companyfacts = lambda cik: _Response(payload)
+    alone = run(GetBaseRatesInput(cik="1", revenue_floor=Decimal(1)), context)
+    assert alone.data["sample"] == "the company's own history" and "not an outside view" in alone.warnings[0]
+    assert "survivorship_free_input" not in alone.data
+    compared = run(GetBaseRatesInput(cik="1", comparable_ciks=["2"], revenue_floor=Decimal(1)), context)
+    assert compared.data["sample"] == "the companies passed in" and compared.warnings == []

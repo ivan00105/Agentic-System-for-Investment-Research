@@ -116,7 +116,7 @@ export function AgentReport({runId, report}: {runId: string; report: Report}) {
       {report.error && <p className="configuration-note">The run failed: {report.error}</p>}
       {answer ? <ul className="agent-answer"><Claim claim={answer} {...parts} /></ul> : <p className="empty-inline">The agents could not answer from the evidence they found. The sections below say what they did find.</p>}
       {takeaways.length > 0 && <><h3>Takeaways</h3><ul className="agent-claims">{takeaways.map((claim, i) => <Claim key={i} claim={claim} {...parts} />)}</ul></>}
-      {level === 'beginner' && <p className="muted">Each section has a label. Cited: every statement links to its source. Qualified: a problem with some statement is noted next to it. Abstained: the agents found no evidence to say anything there. Click a source chip to see the filing or figure behind a statement.</p>}
+      {level === 'beginner' && <p className="muted">Each section has a label. Cited: every statement links to its source. Qualified: a problem with some statement is noted next to it. Abstained: the agents found no evidence to say anything there. None found: the evidence gave no point for that side of the case, so none was made up. Click a source chip to see the filing or figure behind a statement.</p>}
     </section>
     {level === 'beginner' && <Glossary texts={texts} />}
     <section className="report-section">

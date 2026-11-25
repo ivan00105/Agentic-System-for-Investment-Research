@@ -13,7 +13,8 @@ from . import fx_convert, share_basis
 from .result import Tool, ToolContext, ToolResult, make_id
 
 Metric = Literal[tuple(sec_facts.CONCEPTS)]
-NOT_REPORTED_BY_FINANCIALS = {"operating_income", "gross_profit"}
+# Banks, brokers and insurers have no cost of sales and an unclassified balance sheet.
+NOT_REPORTED_BY_FINANCIALS = {"operating_income", "gross_profit", "cost_of_revenue", "current_assets"}
 
 
 class GetFinancialsInput(BaseModel):

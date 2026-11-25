@@ -63,6 +63,11 @@ def test_missing_item_lists_what_exists(tmp_path, files):
     assert result.status == "not_found" and "part_ii_item_7" in result.data["available_sections"]
 
 
+@pytest.mark.parametrize("item", ["2.02", "Item 2.02", "202"])
+def test_8k_item_numbers_match_with_or_without_the_dot(item):
+    assert sec_sections.find_item({"item_202": {}, "item_901": {}, "signatures": {}}, item, None) == ["item_202"]
+
+
 def test_named_filing_after_the_cutoff_is_refused(tmp_path, files):
     cutoff = datetime(2025, 10, 31, 10, 1, tzinfo=timezone.utc)
     result, _ = read(tmp_path, files, cutoff=cutoff, item="1A", accession="0000320193-25-000079")

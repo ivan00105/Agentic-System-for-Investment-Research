@@ -46,8 +46,10 @@ class Draft(BaseModel):
                                     "the main takeaways, one idea each.")
     key_numbers: list[Claim] = _section("The figures the answer rests on, one per statement, each labelled with its "
                                         "metric and period.")
-    bull_case: list[Claim] = _section("The strongest evidence-based case for the company.")
-    bear_case: list[Claim] = _section("The strongest evidence-based case against it.")
+    bull_case: list[Claim] = _section("Evidence-backed points for the company, one per statement. Fewer or none "
+                                      "when the evidence for it is thin; say why in limitations.")
+    bear_case: list[Claim] = _section("Evidence-backed points against it, one per statement. Fewer or none when "
+                                      "the evidence against it is thin; say why in limitations.")
     risks: list[Claim] = _section("Material risks, attributed to their source (e.g. the 10-K's Item 1A).")
     what_would_change_view: list[Claim] = _section("Observable developments that would change the conclusion.")
     limitations: list[str] = Field(default_factory=list, description=(

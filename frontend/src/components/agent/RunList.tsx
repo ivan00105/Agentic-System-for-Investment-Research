@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { agentApi, stamp } from '../../api'
 import type { AgentRunSummary } from '../../api'
 import { Badge } from '../Badge'
-import { childCount, tone } from './labels'
+import { childCount, setupName, tone } from './labels'
 import { RunActions } from './RunActions'
 
 export function RunList({onOpen, recent, onSeeAll}: {onOpen: (id: string) => void; recent?: number; onSeeAll?: () => void}) {
@@ -37,7 +37,7 @@ export function RunList({onOpen, recent, onSeeAll}: {onOpen: (id: string) => voi
 
 function RunRow({run, onOpen}: {run: AgentRunSummary; onOpen: (id: string) => void}) {
   return <div className="history-row">
-    <div className="history-info"><strong className="agent-history-question">{run.title ?? run.question ?? 'Question not recorded'}</strong><span>{run.condition ?? 'Condition not recorded'}</span></div>
+    <div className="history-info"><strong className="agent-history-question">{run.title ?? run.question ?? 'Question not recorded'}</strong><span>{run.condition ? setupName(run.condition) : 'Set-up not recorded'}</span></div>
     <div><Badge tone={tone(run.status)}>{run.status.replaceAll('_', ' ')}</Badge>{run.started_at && <small>{stamp(run.started_at)}</small>}</div>
     <button className="text-button history-open" onClick={() => onOpen(run.run_id)}>Open ↗</button>
   </div>

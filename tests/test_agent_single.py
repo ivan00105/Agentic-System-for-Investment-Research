@@ -74,13 +74,14 @@ def test_plan_loop_check_and_one_self_review_give_a_cited_report(tmp_path):
     assert result.plan.startswith("1. find_company") and "- Model: fake-model (served by Baidu)" in result.markdown
     assert "- Apple's operating margin was 32.0% in the fiscal year ended 2025-09-27. [1]" in result.markdown
     assert "- Revenue was $416.2 billion. [2]" in result.markdown
-    assert "## Bull case (cited)" in result.markdown and "## Bear case (abstained)" in result.markdown
+    assert "## Bull case (cited)" in result.markdown and "## Bear case (none found)" in result.markdown
     assert "1. `calc-" in result.markdown and "2. `fact-" in result.markdown
     # Plan call has no tools; every request uses the model settings and no output-token cap.
     assert "tools" not in client.requests[0] and client.requests[1]["tools"]
     for request in client.requests:
         assert request["model"] == "fake-model" and request["store"] is False
-        assert request["extra_body"]["provider"] == {"require_parameters": True, "allow_fallbacks": True}
+        assert request["extra_body"]["provider"] == {"require_parameters": True, "allow_fallbacks": True,
+                                                     "ignore": ["wafer"]}
         assert not {"max_tokens", "max_completion_tokens"} & set(request)
     assert "2026-11-01" in client.requests[1]["messages"][0]["content"]
     assert "Your plan:\n1. find_company AAPL" in client.requests[1]["messages"][1]["content"]
@@ -132,6 +133,22 @@ def test_a_failed_self_review_keeps_the_first_draft_with_its_flags(tmp_path):
     assert result.status == "finished" and [f.where for f in result.report.flags] == ["bull_case[0]"]
     assert "Margins above 30% leave room. [1] (qualified: see checker flags)" in result.markdown
     assert "The self-review pass ended without a new report" in result.markdown
+
+
+def test_a_self_review_that_sends_back_only_its_changes_keeps_the_draft_before_it(tmp_path):
+    # Live eval 13 Nov 2026: the revision held only the sections it changed, so the summary (the answer) vanished.
+    def changes_only(messages):
+        margin = next(r for r in reversed(tool_results(messages)) if r["source"] == "calculate")["ids"][0]
+        return reply(tool_calls=[("submit_report", {"bull_case": [
+            {"text": "The margin leaves room for investment.", "citations": [margin], "kind": "interpretation"}]})])
+
+    result, _, events = run(tmp_path, PLAN, find_apple, get_financials, calculate_margin, submit(stray=True),
+                            changes_only)
+    assert result.status == "finished" and "## Summary (cited)" in result.markdown
+    assert "Margins above 30% leave room. [1] (qualified: see checker flags)" in result.markdown
+    assert ("The self-review pass left the summary empty, so the report would no longer answer the question; the "
+            "draft before it is shown with its checker flags.") in result.markdown
+    assert [e["kind"] for e in events].count("check") == 1  # the claim ledger never sees the partial revision
 
 
 def test_the_step_guard_gives_a_partial_report_marked_stopped_at_limit(tmp_path):

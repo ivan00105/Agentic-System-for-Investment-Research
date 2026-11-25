@@ -1,7 +1,7 @@
 export type View = 'research' | 'history' | 'setup'
-// /api/config: the configured model, which Advanced options shows as the default.
+// /api/config: the configured model, its sources and each mode's set-up, which Advanced options show as the defaults.
 export interface ModelSource { id: string; label: string; provider: string; model: string; configured: boolean }
-export interface Config { model: string | null; model_configured: boolean; default_model_source?: string | null; default_agent_models?: Record<string, string>; model_sources?: ModelSource[] }
+export interface Config { model: string | null; model_configured: boolean; agents: {research: Condition; find: Condition}; default_model_source?: string | null; default_agent_models?: Record<string, string>; model_sources?: ModelSource[] }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -32,7 +32,7 @@ export interface DiscoverTerm { term: string; definition: string; question: stri
 export interface DiscoverQuestionSet { terms: DiscoverTerm[]; shown: string[]; spec?: Record<string, unknown> | null }
 export interface AgentProgress extends AgentRunSummary { progress: ProgressLine[]; questions?: DiscoverQuestionSet | null }
 export interface AgentClaim { text: string; status: 'cited' | 'qualified'; citations: number[]; flags: string[] }
-export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained'; claims: AgentClaim[] }
+export interface AgentSection { key: string; heading: string; status: 'cited' | 'qualified' | 'abstained' | 'none found'; claims: AgentClaim[] }
 export interface AgentObjection { claim: string; version: number; where?: string | null; issue: string; meaning?: string | null; material: boolean; problem: string; outcome: string; explanation: string | null; notes?: string[] }
 export interface OutlookRecord { id: string; formula: string; ticker: string | null; value: number | null; unit: string | null; start?: string | null; end?: string | null; status?: string; inputs?: Record<string, unknown>; notes?: string[]; data?: Record<string, unknown>; betas?: Record<string, number>; plain_words?: string; name?: string; annualized_return?: number; worst_drawdown?: number; losing_years?: number; correlations?: unknown[]; equal_weight_volatility?: number }
 export interface OutlookLogEntry { sequence: number; recorded_at: string; kind: 'record' | 'outcome'; payload: Record<string, unknown>; previous_hash: string | null; hash: string }
